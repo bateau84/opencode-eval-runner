@@ -40,25 +40,15 @@ Authentication is seeded from the normal OpenCode credential file:
 ~/.local/share/opencode/auth.json
 ```
 
-Model availability is seeded independently from the normal OpenCode model catalog:
+An optional model-catalog seed may be supplied explicitly for custom/private-provider cases. Normal public-provider runs do not inherit the host model cache.
 
-```text
-~/.cache/opencode/models.json
-```
-
-Both files are mounted read-only and copied into fresh container-local XDG directories. Sessions, history, the rest of the cache, and the global config tree are not inherited.
+The auth seed and any explicit model-catalog seed are mounted read-only and copied into fresh container-local XDG directories. Sessions, history, the rest of the cache, and the global config tree are not inherited.
 
 An OpenCode config is **not** inherited automatically. The container constructs a minimal config unless you explicitly pass one with `--config` or `OPENCODE_EVAL_RUNNER_CONFIG`.
 
 This avoids importing host MCPs, plugins, agent defaults, or provider overrides into behavioral evidence. Only explicit seed files are mounted; the host OpenCode config directory, data directory, cache, and sessions are never mounted.
 
-For normal public-provider runs, the container creates a writable cache under `/tmp` and runs:
-
-```bash
-opencode models --refresh
-```
-
-before model preflight. This keeps model discovery self-contained and avoids inheriting the host's `~/.cache/opencode/models.json`. If an explicit models catalog is supplied, that seed is used instead and is not refreshed away.
+OpenCode V2 does not document a manual model-catalog refresh command. The runner therefore does not run the legacy `opencode models --refresh` path. Each invocation starts a fresh OpenCode process with a fresh writable cache and lets V2 resolve the requested model through its normal catalog/provider startup path. If an explicit models catalog is supplied, it is available as a seed for custom/private-provider cases.
 
 Known API-key environment variables are passed when present:
 
@@ -127,7 +117,6 @@ or:
 OPENCODE_EVAL_RUNNER_AUTH=/path/to/auth.json
 OPENCODE_EVAL_RUNNER_MODELS=/path/to/models.json
 OPENCODE_EVAL_RUNNER_CONFIG=/path/to/opencode.json
-OPENCODE_EVAL_RUNNER_MODELS=/path/to/models.json
 ```
 
 ### Copilot CLI locally
