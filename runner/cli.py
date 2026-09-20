@@ -25,6 +25,9 @@ COPILOT_AUTH_ENVS = (
     "GITHUB_TOKEN",
 )
 
+RUNTIME_UID = 1000
+RUNTIME_GID = 1000
+
 
 class RunnerError(RuntimeError):
     pass
