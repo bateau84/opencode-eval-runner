@@ -27,11 +27,6 @@ class RunnerError(RuntimeError):
     pass
 
 
-def default_config_path() -> Path:
-    base = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"))
-    return base / "opencode" / "opencode.json"
-
-
 def default_auth_path() -> Path:
     base = Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local" / "share"))
     return base / "opencode" / "auth.json"
@@ -99,7 +94,7 @@ def build_container_command(args: argparse.Namespace, input_dir: Path, output_di
     command += bind_arg(output_dir, "/output", readonly=False)
 
     auth = existing_seed(args.auth, "OPENCODE_EVAL_RUNNER_AUTH", default_auth_path())
-    config = existing_seed(args.config, "OPENCODE_EVAL_RUNNER_CONFIG", default_config_path())
+    config = existing_seed(args.config, "OPENCODE_EVAL_RUNNER_CONFIG", Path("/nonexistent/opencode-eval-runner-config"))
     if auth:
         command += bind_arg(auth, "/seed/auth.json", readonly=True)
     if config:
