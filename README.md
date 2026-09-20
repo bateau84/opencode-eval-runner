@@ -52,6 +52,14 @@ An OpenCode config is **not** inherited automatically. The container constructs 
 
 This avoids importing host MCPs, plugins, agent defaults, or provider overrides into behavioral evidence. Only explicit seed files are mounted; the host OpenCode config directory, data directory, cache, and sessions are never mounted.
 
+For normal public-provider runs, the container creates a writable cache under `/tmp` and runs:
+
+```bash
+opencode models --refresh
+```
+
+before model preflight. This keeps model discovery self-contained and avoids inheriting the host's `~/.cache/opencode/models.json`. If an explicit models catalog is supplied, that seed is used instead and is not refreshed away.
+
 Known API-key environment variables are passed when present:
 
 - `OPENAI_API_KEY`
@@ -105,7 +113,7 @@ PYTHONPATH=. python3 bin/opencode-eval-runner invoke \
   --output /tmp/target.json
 ```
 
-The wrapper automatically mounts the normal OpenCode `auth.json` when it exists. OpenCode config is explicit-only:
+The wrapper automatically mounts the normal OpenCode `auth.json` when it exists. OpenCode config and model-catalog seeds are explicit-only:
 
 ```text
 --auth /path/to/auth.json
@@ -119,6 +127,7 @@ or:
 OPENCODE_EVAL_RUNNER_AUTH=/path/to/auth.json
 OPENCODE_EVAL_RUNNER_MODELS=/path/to/models.json
 OPENCODE_EVAL_RUNNER_CONFIG=/path/to/opencode.json
+OPENCODE_EVAL_RUNNER_MODELS=/path/to/models.json
 ```
 
 ### Copilot CLI locally

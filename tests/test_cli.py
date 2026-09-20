@@ -13,7 +13,6 @@ from runner.cli import (
     RunnerError,
     build_container_command,
     default_auth_path,
-    default_models_path,
     resolve_engine,
 )
 
@@ -23,10 +22,6 @@ class RunnerCliTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp, patch.dict(os.environ, {"XDG_DATA_HOME": tmp}, clear=False):
             self.assertEqual(default_auth_path(), Path(tmp) / "opencode" / "auth.json")
 
-
-    def test_default_models_uses_xdg_cache_home(self):
-        with tempfile.TemporaryDirectory() as tmp, patch.dict(os.environ, {"XDG_CACHE_HOME": tmp}, clear=False):
-            self.assertEqual(default_models_path(), Path(tmp) / "opencode" / "models.json")
 
     def test_default_images_are_transport_specific(self):
         self.assertEqual(
@@ -108,6 +103,41 @@ class RunnerCliTests(unittest.TestCase):
                 command, _ = build_container_command(args, input_dir, output_dir)
 
             self.assertNotIn("label=disable", command)
+
+
+    def test_models_catalog_is_explicit_only(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            workspace = root / "workspace"
+            input_dir = root / "input"
+            output_dir = root / "output"
+            workspace.mkdir()
+            input_dir.mkdir()
+            output_dir.mkdir()
+            args = argparse.Namespace(
+                engine="podman",
+                image="test-image",
+                workspace=str(workspace),
+                workspace_mode="ro",
+                output=str(root / "result.json"),
+                transport="opencode",
+                model="openai/test",
+                agent="reviewer",
+                timeout_seconds=120,
+                env=[],
+                auth=None,
+                config=None,
+                models_catalog=None,
+            )
+            with patch("runner.cli.shutil.which", return_value="/usr/bin/podman"), patch.dict(
+                os.environ,
+                {"XDG_CACHE_HOME": str(root / "cache")},
+                clear=True,
+            ):
+                command, _ = build_container_command(args, input_dir, output_dir)
+
+            rendered = " ".join(command)
+            self.assertNotIn("/seed/models.json", rendered)
 
     def test_copilot_transport_passes_supported_token_names_only_when_present(self):
         with tempfile.TemporaryDirectory() as tmp:
