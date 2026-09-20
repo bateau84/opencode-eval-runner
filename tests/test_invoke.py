@@ -82,8 +82,7 @@ class OpenCodeTransportTests(unittest.TestCase):
             encoding="utf-8"
         )
         self.assertIn('seed_config_root = Path("/seed/opencode-config")', invoke)
-        self.assertIn('for name in ("package.json", "bun.lock")', invoke)
-        self.assertIn('for name in ("plugins", "node_modules")', invoke)
+        self.assertIn('source = seed_config_root / "plugins"', invoke)
         self.assertIn('"OPENCODE_CONFIG_DIR": str(config)', invoke)
         self.assertIn("target.symlink_to(source, target_is_directory=True)", invoke)
 
