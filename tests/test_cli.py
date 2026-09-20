@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import sqlite3
 import tempfile
 import unittest
 import subprocess
@@ -14,7 +15,9 @@ from runner.cli import (
     RunnerError,
     build_container_command,
     default_auth_path,
+    default_database_path,
     default_models_path,
+    sanitize_database_seed,
     resolve_engine,
     host_environment_for_transport,
 )
@@ -43,6 +46,44 @@ class RunnerCliTests(unittest.TestCase):
     def test_default_models_uses_xdg_cache_home(self):
         with tempfile.TemporaryDirectory() as tmp, patch.dict(os.environ, {"XDG_CACHE_HOME": tmp}, clear=False):
             self.assertEqual(default_models_path(), Path(tmp) / "opencode" / "models.json")
+
+    def test_default_database_uses_xdg_data_home(self):
+        with tempfile.TemporaryDirectory() as tmp, patch.dict(os.environ, {"XDG_DATA_HOME": tmp}, clear=False):
+            self.assertEqual(default_database_path(), Path(tmp) / "opencode" / "opencode.db")
+
+    def test_sanitized_database_keeps_credentials_and_clears_runtime_data(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "opencode.db"
+            destination = root / "sanitized.db"
+            with sqlite3.connect(source) as db:
+                db.execute(
+                    "CREATE TABLE credential ("
+                    "id TEXT PRIMARY KEY, integration_id TEXT, label TEXT NOT NULL, value TEXT NOT NULL)"
+                )
+                db.execute("CREATE TABLE session (id TEXT PRIMARY KEY, title TEXT)")
+                db.execute("CREATE TABLE migration (id TEXT PRIMARY KEY, time_completed INTEGER NOT NULL)")
+                db.execute(
+                    "INSERT INTO credential VALUES (?, ?, ?, ?)",
+                    ("cred_1", "openai", "default", '{"type":"oauth","access":"secret"}'),
+                )
+                db.execute("INSERT INTO session VALUES (?, ?)", ("ses_1", "private session"))
+                db.execute("INSERT INTO migration VALUES (?, ?)", ("m1", 1))
+                db.commit()
+
+            sanitize_database_seed(source, destination)
+
+            with sqlite3.connect(destination) as db:
+                credential = db.execute(
+                    "SELECT integration_id, label, value FROM credential"
+                ).fetchone()
+                sessions = db.execute("SELECT COUNT(*) FROM session").fetchone()[0]
+                migrations = db.execute("SELECT COUNT(*) FROM migration").fetchone()[0]
+
+            self.assertEqual(credential[0:2], ("openai", "default"))
+            self.assertIn('"type":"oauth"', credential[2])
+            self.assertEqual(sessions, 0)
+            self.assertEqual(migrations, 1)
 
     def test_explicit_missing_engine_is_rejected(self):
         with patch("runner.cli.shutil.which", return_value=None):
