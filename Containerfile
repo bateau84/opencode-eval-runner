@@ -30,6 +30,8 @@ ENV HOME=/tmp/runtime/home \
     XDG_CONFIG_HOME=/tmp/runtime/config \
     XDG_DATA_HOME=/tmp/runtime/data \
     XDG_CACHE_HOME=/tmp/runtime/cache \
+    XDG_STATE_HOME=/tmp/runtime/state \
+    OPENCODE_DB=opencode.db \
     OPENCODE_DISABLE_AUTOUPDATE=1
 
 COPY container /opt/opencode-eval-runner/container
