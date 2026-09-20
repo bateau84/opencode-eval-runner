@@ -70,11 +70,14 @@ This transport reuses the trust-boundary pattern already proven in `nrkno/mats-o
 
 ## Local usage
 
-Build once:
+Build the transport you need:
 
 ```bash
-podman build -t opencode-eval-runner:local .
+podman build -f Containerfile --target opencode -t opencode-eval-runner:opencode-local .
+podman build -f Containerfile --target copilot -t opencode-eval-runner:copilot-local .
 ```
+
+The published runtime images are split by transport and do not contain Node/npm. The build stages may use Node or curl to obtain the pinned native executables, but only the native binary and the minimal Python runtime land in the final image.
 
 Prepare a prompt:
 
@@ -87,7 +90,7 @@ Run a real OpenCode invocation:
 ```bash
 PYTHONPATH=. python3 bin/opencode-eval-runner invoke \
   --engine podman \
-  --image opencode-eval-runner:local \
+  --image opencode-eval-runner:opencode-local \
   --transport opencode \
   --workspace /path/to/evaluated/project \
   --model openai/gpt-5.3-codex-spark \
@@ -116,7 +119,7 @@ OPENCODE_EVAL_RUNNER_CONFIG=/path/to/opencode.json
 export COPILOT_GITHUB_TOKEN=...
 PYTHONPATH=. python3 bin/opencode-eval-runner invoke \
   --engine podman \
-  --image opencode-eval-runner:local \
+  --image opencode-eval-runner:copilot-local \
   --transport github-copilot-cli \
   --workspace /path/to/evaluated/project \
   --model gpt-5.4 \
@@ -188,21 +191,32 @@ The eval repository decides whether that observed behavior is PASS, FAIL, or non
 
 ## Image versions
 
-The image currently pins:
+The transport images currently pin:
 
 - OpenCode CLI `2.0.11`
 - GitHub Copilot CLI `1.0.83`
 
+The two CLIs are not bundled together. OpenCode's npm package is used only as a build-time native-binary selector; GitHub Copilot CLI is installed from its native release installer. Node/npm are absent from the final runtime images.
+
 Pinning is deliberate: behavioral evidence should not silently change because a CLI auto-updated.
 
-`main` publishes:
+`main` publishes transport-specific images:
 
 ```text
-ghcr.io/bateau84/opencode-eval-runner:edge
-ghcr.io/bateau84/opencode-eval-runner:sha-...
+ghcr.io/bateau84/opencode-eval-runner:opencode-edge
+ghcr.io/bateau84/opencode-eval-runner:copilot-edge
+ghcr.io/bateau84/opencode-eval-runner:opencode-sha-...
+ghcr.io/bateau84/opencode-eval-runner:copilot-sha-...
 ```
 
-Tags matching `v*` are also published.
+The host runner selects the correct image from `--transport`. Override either image with:
+
+```text
+OPENCODE_EVAL_RUNNER_OPENCODE_IMAGE=...
+OPENCODE_EVAL_RUNNER_COPILOT_IMAGE=...
+```
+
+Tags matching `v*` are published with `opencode-` and `copilot-` prefixes.
 
 ## Security boundary
 
