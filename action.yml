@@ -1,18 +1,22 @@
 name: OpenCode Eval Runner
-description: Set up the isolated OCI eval runner and optionally execute a repository-owned eval command.
+description: Set up isolated OCI eval transports and optionally execute a repository-owned eval command.
 author: bateau84
 
 inputs:
-  image:
-    description: OCI image used for isolated invocations.
+  opencode-image:
+    description: OCI image used for OpenCode transport invocations.
     required: false
-    default: ghcr.io/bateau84/opencode-eval-runner:edge
+    default: ghcr.io/bateau84/opencode-eval-runner:opencode-edge
+  copilot-image:
+    description: OCI image used for GitHub Copilot CLI transport invocations.
+    required: false
+    default: ghcr.io/bateau84/opencode-eval-runner:copilot-edge
   engine:
     description: Container engine used by repository eval harnesses.
     required: false
     default: docker
   build:
-    description: Build the action checkout as the runner image instead of pulling image.
+    description: Build transport images from this action checkout instead of pulling published images.
     required: false
     default: "false"
   command:
@@ -30,23 +34,40 @@ runs:
     - name: Prepare eval runner
       shell: bash
       env:
-        INPUT_IMAGE: ${{ inputs.image }}
+        INPUT_OPENCODE_IMAGE: ${{ inputs.opencode-image }}
+        INPUT_COPILOT_IMAGE: ${{ inputs.copilot-image }}
         INPUT_ENGINE: ${{ inputs.engine }}
         INPUT_BUILD: ${{ inputs.build }}
         INPUT_ARTIFACT_DIR: ${{ inputs.artifact-dir }}
       run: |
         set -euo pipefail
-        image="$INPUT_IMAGE"
+
+        opencode_image="$INPUT_OPENCODE_IMAGE"
+        copilot_image="$INPUT_COPILOT_IMAGE"
+
         if [[ "$INPUT_BUILD" == "true" ]]; then
-          image="opencode-eval-runner:local-${GITHUB_RUN_ID:-dev}"
-          "$INPUT_ENGINE" build -f "${{ github.action_path }}/Containerfile" -t "$image" "${{ github.action_path }}"
+          suffix="${GITHUB_RUN_ID:-dev}"
+          opencode_image="opencode-eval-runner:opencode-local-$suffix"
+          copilot_image="opencode-eval-runner:copilot-local-$suffix"
+          "$INPUT_ENGINE" build \
+            -f "${{ github.action_path }}/Containerfile" \
+            --target opencode \
+            -t "$opencode_image" \
+            "${{ github.action_path }}"
+          "$INPUT_ENGINE" build \
+            -f "${{ github.action_path }}/Containerfile" \
+            --target copilot \
+            -t "$copilot_image" \
+            "${{ github.action_path }}"
         else
-          "$INPUT_ENGINE" pull "$image"
+          "$INPUT_ENGINE" pull "$opencode_image"
+          "$INPUT_ENGINE" pull "$copilot_image"
         fi
 
         echo "${{ github.action_path }}/bin" >> "$GITHUB_PATH"
         echo "PYTHONPATH=${{ github.action_path }}${PYTHONPATH:+:$PYTHONPATH}" >> "$GITHUB_ENV"
-        echo "OPENCODE_EVAL_RUNNER_IMAGE=$image" >> "$GITHUB_ENV"
+        echo "OPENCODE_EVAL_RUNNER_OPENCODE_IMAGE=$opencode_image" >> "$GITHUB_ENV"
+        echo "OPENCODE_EVAL_RUNNER_COPILOT_IMAGE=$copilot_image" >> "$GITHUB_ENV"
         echo "OPENCODE_EVAL_RUNNER_ENGINE=$INPUT_ENGINE" >> "$GITHUB_ENV"
         mkdir -p "$INPUT_ARTIFACT_DIR"
 
