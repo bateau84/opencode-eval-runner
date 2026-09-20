@@ -138,6 +138,10 @@ def build_container_command(
         "no-new-privileges",
     ]
     if engine == "podman":
+        # Map the invoking host user to the dedicated non-root runtime user so
+        # private read-only seed files (for example auth.json mode 0600) remain
+        # readable without running the container as root.
+        command += ["--userns", f"keep-id:uid={RUNTIME_UID},gid={RUNTIME_GID}"]
         # Rootless Podman on SELinux hosts blocks bind mounts unless they are
         # relabeled (:z/:Z) or container labeling is disabled. Do not relabel
         # the user's repository or credential files; disable labeling for this
