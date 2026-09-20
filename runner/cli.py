@@ -10,7 +10,10 @@ import sys
 import tempfile
 from pathlib import Path
 
-DEFAULT_IMAGE = "ghcr.io/bateau84/opencode-eval-runner:edge"
+DEFAULT_IMAGES = {
+    "opencode": "ghcr.io/bateau84/opencode-eval-runner:opencode-edge",
+    "github-copilot-cli": "ghcr.io/bateau84/opencode-eval-runner:copilot-edge",
+}
 DEFAULT_ENV_ALLOWLIST = (
     "OPENAI_API_KEY",
     "ANTHROPIC_API_KEY",
@@ -67,7 +70,17 @@ def pass_env(command: list[str], names: list[str]) -> None:
 
 def build_container_command(args: argparse.Namespace, input_dir: Path, output_dir: Path) -> tuple[list[str], Path]:
     engine = resolve_engine(args.engine)
-    image = args.image or os.environ.get("OPENCODE_EVAL_RUNNER_IMAGE") or DEFAULT_IMAGE
+    transport_env = (
+        "OPENCODE_EVAL_RUNNER_OPENCODE_IMAGE"
+        if args.transport == "opencode"
+        else "OPENCODE_EVAL_RUNNER_COPILOT_IMAGE"
+    )
+    image = (
+        args.image
+        or os.environ.get(transport_env)
+        or os.environ.get("OPENCODE_EVAL_RUNNER_IMAGE")
+        or DEFAULT_IMAGES[args.transport]
+    )
     workspace = Path(args.workspace).resolve()
     if not workspace.is_dir():
         raise RunnerError(f"workspace not found: {workspace}")

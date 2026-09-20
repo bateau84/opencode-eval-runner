@@ -19,10 +19,18 @@ jobs:
           python3 -m py_compile runner/cli.py container/invoke.py
           python3 -m unittest discover -s tests -p 'test_*.py'
 
-      - name: Build OCI image
-        run: docker build -f Containerfile -t opencode-eval-runner:test .
+      - name: Build OpenCode transport image
+        run: docker build -f Containerfile --target opencode -t opencode-eval-runner:opencode-test .
+
+      - name: Build Copilot transport image
+        run: docker build -f Containerfile --target copilot -t opencode-eval-runner:copilot-test .
 
       - name: Verify pinned tools
         run: |
-          docker run --rm --entrypoint opencode opencode-eval-runner:test --version
-          docker run --rm --entrypoint copilot opencode-eval-runner:test --version
+          docker run --rm --entrypoint opencode opencode-eval-runner:opencode-test --version
+          docker run --rm --entrypoint copilot opencode-eval-runner:copilot-test --version
+
+      - name: Report image sizes
+        run: |
+          docker image inspect opencode-eval-runner:opencode-test --format 'OpenCode image: {{.Size}} bytes'
+          docker image inspect opencode-eval-runner:copilot-test --format 'Copilot image: {{.Size}} bytes'
