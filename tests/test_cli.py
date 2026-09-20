@@ -42,6 +42,66 @@ class RunnerCliTests(unittest.TestCase):
             with self.assertRaises(RunnerError):
                 resolve_engine("podman")
 
+
+    def test_podman_disables_selinux_labeling_without_relabeling_host_files(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            workspace = root / "workspace"
+            input_dir = root / "input"
+            output_dir = root / "output"
+            workspace.mkdir()
+            input_dir.mkdir()
+            output_dir.mkdir()
+            args = argparse.Namespace(
+                engine="podman",
+                image="test-image",
+                workspace=str(workspace),
+                workspace_mode="ro",
+                output=str(root / "result.json"),
+                transport="opencode",
+                model="openai/test",
+                agent="reviewer",
+                timeout_seconds=120,
+                env=[],
+                auth=None,
+                config=None,
+            )
+            with patch("runner.cli.shutil.which", return_value="/usr/bin/podman"), patch.dict(os.environ, {}, clear=True):
+                command, _ = build_container_command(args, input_dir, output_dir)
+
+            rendered = " ".join(command)
+            self.assertIn("--security-opt label=disable", rendered)
+            self.assertNotIn(":Z", rendered)
+            self.assertNotIn(":z", rendered)
+
+    def test_docker_does_not_add_podman_label_override(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            workspace = root / "workspace"
+            input_dir = root / "input"
+            output_dir = root / "output"
+            workspace.mkdir()
+            input_dir.mkdir()
+            output_dir.mkdir()
+            args = argparse.Namespace(
+                engine="docker",
+                image="test-image",
+                workspace=str(workspace),
+                workspace_mode="ro",
+                output=str(root / "result.json"),
+                transport="opencode",
+                model="openai/test",
+                agent="reviewer",
+                timeout_seconds=120,
+                env=[],
+                auth=None,
+                config=None,
+            )
+            with patch("runner.cli.shutil.which", return_value="/usr/bin/docker"), patch.dict(os.environ, {}, clear=True):
+                command, _ = build_container_command(args, input_dir, output_dir)
+
+            self.assertNotIn("label=disable", command)
+
     def test_copilot_transport_passes_supported_token_names_only_when_present(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

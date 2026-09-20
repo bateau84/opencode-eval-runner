@@ -99,6 +99,14 @@ def build_container_command(args: argparse.Namespace, input_dir: Path, output_di
         "ALL",
         "--security-opt",
         "no-new-privileges",
+    ]
+    if engine == "podman":
+        # Rootless Podman on SELinux hosts blocks bind mounts unless they are
+        # relabeled (:z/:Z) or container labeling is disabled. Do not relabel
+        # the user's repository or credential files; disable labeling for this
+        # tightly scoped eval container instead.
+        command += ["--security-opt", "label=disable"]
+    command += [
         "--workdir",
         "/workspace",
     ]
