@@ -115,11 +115,13 @@ def prepare_opencode_env() -> dict[str, str]:
     config = root / "config" / "opencode"
     data = root / "data" / "opencode"
     cache = root / "cache"
-    for path in (home, config, data, cache):
+    cache_opencode = cache / "opencode"
+    for path in (home, config, data, cache_opencode):
         path.mkdir(parents=True, exist_ok=True)
 
     seed_config = Path("/seed/opencode.json")
     seed_auth = Path("/seed/auth.json")
+    seed_models = Path("/seed/models.json")
     if seed_config.is_file():
         shutil.copyfile(seed_config, config / "opencode.json")
     else:
@@ -129,6 +131,8 @@ def prepare_opencode_env() -> dict[str, str]:
         )
     if seed_auth.is_file():
         shutil.copyfile(seed_auth, data / "auth.json")
+    if seed_models.is_file():
+        shutil.copyfile(seed_models, cache_opencode / "models.json")
 
     env.update({
         "HOME": str(home),
@@ -140,8 +144,53 @@ def prepare_opencode_env() -> dict[str, str]:
     return env
 
 
+def available_models(env: dict[str, str], timeout: int) -> tuple[int, set[str], str]:
+    proc = run(["opencode", "models"], Path("/workspace"), env, timeout)
+    models = {
+        line.strip().split()[0]
+        for line in proc.stdout.splitlines()
+        if line.strip()
+    }
+    return proc.returncode, models, proc.stderr
+
+
 def invoke_opencode(model: str, agent: str, prompt: str, timeout: int) -> dict[str, Any]:
     env = prepare_opencode_env()
+    preflight_code, models, preflight_stderr = available_models(env, timeout)
+    catalog_model = model.split("#", 1)[0]
+    if preflight_code != 0:
+        return {
+            "schema": RESULT_SCHEMA,
+            "transport": "opencode",
+            "model": model,
+            "agent": agent or None,
+            "exit_code": 2,
+            "session_id": None,
+            "text": "",
+            "tools": [],
+            "stderr": "model preflight failed: " + preflight_stderr[:20000],
+            "stdout": "",
+            "infrastructure_error": True,
+        }
+    if catalog_model not in models:
+        sample = ", ".join(sorted(models)[:20])
+        return {
+            "schema": RESULT_SCHEMA,
+            "transport": "opencode",
+            "model": model,
+            "agent": agent or None,
+            "exit_code": 2,
+            "session_id": None,
+            "text": "",
+            "tools": [],
+            "stderr": (
+                f"model preflight: {catalog_model} is not available in the isolated OpenCode catalog"
+                + (f"; sample: {sample}" if sample else "")
+            ),
+            "stdout": "",
+            "infrastructure_error": True,
+        }
+
     command = ["opencode", "run", "--standalone", "--format", "json", "--auto"]
     if agent:
         command += ["--agent", agent]
