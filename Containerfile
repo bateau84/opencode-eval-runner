@@ -22,6 +22,17 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/* \
     && mkdir -p /seed /input /output /workspace
 
+# The runtime root filesystem is intentionally read-only. Point all normal
+# user/XDG state at /tmp, which the runner mounts as a writable tmpfs.
+# container/invoke.py creates these directories and seeds auth/models there
+# for normal eval execution; the image-level defaults also make direct
+# OpenCode/Copilot commands safe in an interactive debug shell.
+ENV HOME=/tmp/runtime/home \
+    XDG_CONFIG_HOME=/tmp/runtime/config \
+    XDG_DATA_HOME=/tmp/runtime/data \
+    XDG_CACHE_HOME=/tmp/runtime/cache \
+    OPENCODE_DISABLE_AUTOUPDATE=1
+
 COPY container /opt/opencode-eval-runner/container
 WORKDIR /workspace
 ENTRYPOINT ["python3", "/opt/opencode-eval-runner/container/invoke.py"]
