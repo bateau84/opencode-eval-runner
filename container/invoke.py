@@ -133,14 +133,21 @@ def prepare_opencode_env() -> dict[str, str]:
             encoding="utf-8",
         )
     if seed_config_root.is_dir():
-        # Loom itself can be an OpenCode global config root. Keep the eval's
-        # minimal opencode.json and copy only the plugin tree into the writable
-        # config root. OpenCode V2 does not reliably register plugins through
-        # a symlinked global plugins directory.
-        source = seed_config_root / "plugins"
-        target = config / "plugins"
-        if source.is_dir():
-            shutil.copytree(source, target, dirs_exist_ok=True)
+        # Loom itself can be an OpenCode global config root. OpenCode 2.0.11's
+        # packaged runtime can fail to register directory plugins even when
+        # plugins/<name>/index.ts is present. Materialize a direct plugins/*.ts
+        # entrypoint instead, which bypasses Host.resolve/Bun.resolveSync for
+        # the plugin root while preserving Loom's local module tree.
+        loom_source = seed_config_root / "plugins" / "loom"
+        if loom_source.is_dir():
+            module_root = config / "loom-plugin"
+            plugin_root = config / "plugins"
+            shutil.copytree(loom_source, module_root, dirs_exist_ok=True)
+            plugin_root.mkdir(parents=True, exist_ok=True)
+            (plugin_root / "loom.ts").write_text(
+                'export { default } from "../loom-plugin/index.ts"\n',
+                encoding="utf-8",
+            )
     if seed_auth.is_file():
         shutil.copyfile(seed_auth, data / "auth.json")
     if seed_models.is_file():
@@ -168,6 +175,8 @@ def plugin_diagnostic(env: dict[str, str], timeout: int) -> dict[str, Any]:
     )
     plugins_root = config_root / "plugins"
     loom_root = plugins_root / "loom"
+    loom_flat = plugins_root / "loom.ts"
+    loom_module_root = config_root / "loom-plugin"
     filesystem = {
         "config_root": str(config_root),
         "config_root_exists": config_root.exists(),
@@ -179,6 +188,8 @@ def plugin_diagnostic(env: dict[str, str], timeout: int) -> dict[str, Any]:
         "loom_exists": loom_root.exists(),
         "loom_is_dir": loom_root.is_dir(),
         "loom_index_exists": (loom_root / "index.ts").is_file(),
+        "loom_flat_exists": loom_flat.is_file(),
+        "loom_module_index_exists": (loom_module_root / "index.ts").is_file(),
         "package_json_exists": (config_root / "package.json").is_file(),
         "node_modules_exists": (config_root / "node_modules").is_dir(),
     }
