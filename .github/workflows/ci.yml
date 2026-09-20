@@ -20,7 +20,7 @@ jobs:
           python3 -m unittest discover -s tests -p 'test_*.py'
 
       - name: Build OCI image
-        run: docker build -t opencode-eval-runner:test .
+        run: docker build -f Containerfile -t opencode-eval-runner:test .
 
       - name: Verify pinned tools
         run: |
