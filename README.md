@@ -9,7 +9,7 @@ The runner intentionally does **not** own an eval corpus, grading semantics, or 
 - fresh HOME/XDG/OpenCode state per invocation;
 - explicit provider configuration and authentication;
 - read-only workspace by default;
-- host-owned result/artifact files;
+- results emitted as JSON on container stdout, then written to host-owned artifact files by the harness;
 - the same invocation model locally and in GitHub Actions.
 
 ## Why
@@ -197,6 +197,8 @@ Each invocation writes one JSON document:
   "stdout": "..."
 }
 ```
+
+The container emits this object as a single JSON line on stdout. The host harness writes artifact files itself, so no writable bind mount is required for result transport.
 
 The eval repository decides whether that observed behavior is PASS, FAIL, or non-evidence.
 
