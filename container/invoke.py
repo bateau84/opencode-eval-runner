@@ -154,6 +154,7 @@ def prepare_opencode_env() -> dict[str, str]:
         "XDG_DATA_HOME": str(root / "data"),
         "XDG_CACHE_HOME": str(cache),
         "XDG_STATE_HOME": str(state),
+        "OPENCODE_CONFIG_DIR": str(config),
         "OPENCODE_DB": "opencode.db",
         "OPENCODE_DISABLE_AUTOUPDATE": "1",
     })
@@ -161,6 +162,23 @@ def prepare_opencode_env() -> dict[str, str]:
 
 
 def plugin_diagnostic(env: dict[str, str], timeout: int) -> dict[str, Any]:
+    config_root = Path(env["OPENCODE_CONFIG_DIR"])
+    plugins_root = config_root / "plugins"
+    loom_root = plugins_root / "loom"
+    filesystem = {
+        "config_root": str(config_root),
+        "config_root_exists": config_root.exists(),
+        "plugins_root": str(plugins_root),
+        "plugins_exists": plugins_root.exists(),
+        "plugins_is_dir": plugins_root.is_dir(),
+        "plugins_resolved": str(plugins_root.resolve()) if plugins_root.exists() else None,
+        "plugins_entries": sorted(item.name for item in plugins_root.iterdir()) if plugins_root.is_dir() else [],
+        "loom_exists": loom_root.exists(),
+        "loom_is_dir": loom_root.is_dir(),
+        "loom_index_exists": (loom_root / "index.ts").is_file(),
+        "package_json_exists": (config_root / "package.json").is_file(),
+        "node_modules_exists": (config_root / "node_modules").is_dir(),
+    }
     proc = run(
         ["opencode", "plugin", "list"],
         Path("/workspace"),
@@ -171,6 +189,7 @@ def plugin_diagnostic(env: dict[str, str], timeout: int) -> dict[str, Any]:
         "exit_code": proc.returncode,
         "stdout": proc.stdout[:20000],
         "stderr": proc.stderr[:20000],
+        "filesystem": filesystem,
     }
 
 
@@ -198,7 +217,8 @@ def invoke_opencode(model: str, agent: str, prompt: str, timeout: int) -> dict[s
                 "stderr": (
                     f"required OpenCode plugin not loaded: {expected_plugin}; "
                     f"plugin list exit={plugins['exit_code']}; "
-                    f"stdout={plugins['stdout']!r}; stderr={plugins['stderr']!r}"
+                    f"stdout={plugins['stdout']!r}; stderr={plugins['stderr']!r}; "
+                    f"filesystem={plugins['filesystem']!r}"
                 )[:20000],
                 "stdout": "",
                 "infrastructure_error": True,
