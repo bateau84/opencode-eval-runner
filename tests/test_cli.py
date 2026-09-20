@@ -76,6 +76,8 @@ class RunnerCliTests(unittest.TestCase):
             self.assertIn("--security-opt label=disable", rendered)
             self.assertNotIn(":Z", rendered)
             self.assertNotIn(":z", rendered)
+            self.assertNotIn("/output", rendered)
+            self.assertNotIn("EVAL_RESULT_FILE", rendered)
 
     def test_docker_does_not_add_podman_label_override(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -105,6 +107,9 @@ class RunnerCliTests(unittest.TestCase):
                 command, _ = build_container_command(args, input_dir, output_dir)
 
             self.assertNotIn("label=disable", command)
+            rendered = " ".join(command)
+            self.assertNotIn("/output", rendered)
+            self.assertNotIn("EVAL_RESULT_FILE", rendered)
 
 
     def test_models_catalog_is_explicit_only(self):
