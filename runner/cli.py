@@ -147,6 +147,11 @@ def build_container_command(
         # the user's repository or credential files; disable labeling for this
         # tightly scoped eval container instead.
         command += ["--security-opt", "label=disable"]
+    elif hasattr(os, "getuid") and os.getuid() != 0:
+        # Rootful Docker preserves numeric ownership on bind mounts. Match the
+        # non-root host caller so mode-0600 seed files remain readable. When
+        # invoked by root, do not add --user: keep the image's non-root USER.
+        command += ["--user", f"{os.getuid()}:{os.getgid()}"]
     command += [
         "--workdir",
         "/workspace",
