@@ -144,7 +144,6 @@ def build_container_command(
     ]
     command += bind_arg(workspace, "/workspace", readonly=args.workspace_mode == "ro")
     command += bind_arg(input_dir, "/input", readonly=True)
-    command += bind_arg(output_dir, "/output", readonly=False)
 
     auth = existing_seed(args.auth, "OPENCODE_EVAL_RUNNER_AUTH", default_auth_path())
     config = existing_seed(args.config, "OPENCODE_EVAL_RUNNER_CONFIG")
@@ -162,7 +161,6 @@ def build_container_command(
         "--env", f"EVAL_AGENT={args.agent or ''}",
         "--env", "EVAL_PROMPT_FILE=/input/prompt.txt",
         "--env", "EVAL_SYSTEM_FILE=/input/system.txt",
-        "--env", "EVAL_RESULT_FILE=/output/result.json",
         "--env", f"EVAL_TIMEOUT_SECONDS={args.timeout_seconds}",
     ]
 
@@ -208,19 +206,22 @@ def invoke(args: argparse.Namespace) -> int:
             timeout=args.container_timeout,
             check=False,
         )
-        produced = output_dir / "result.json"
+        try:
+            result = json.loads(proc.stdout)
+        except json.JSONDecodeError as exc:
+            detail = " | ".join(part.strip() for part in (proc.stderr, proc.stdout) if part.strip())
+            raise RunnerError(
+                f"container produced invalid result JSON (exit {proc.returncode}): {exc}"
+                + (f": {detail[:2000]}" if detail else "")
+            ) from exc
 
-        if produced.is_file():
-            shutil.copyfile(produced, result_host)
-            if args.print_result:
-                sys.stdout.write(result_host.read_text(encoding="utf-8"))
-            return 0 if proc.returncode == 0 else proc.returncode
+        if not isinstance(result, dict):
+            raise RunnerError("container result must be a JSON object")
 
-        detail = " | ".join(part.strip() for part in (proc.stderr, proc.stdout) if part.strip())
-        raise RunnerError(
-            f"container produced no result (exit {proc.returncode})"
-            + (f": {detail[:2000]}" if detail else "")
-        )
+        result_host.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
+        if args.print_result:
+            sys.stdout.write(result_host.read_text(encoding="utf-8"))
+        return 0 if proc.returncode == 0 else proc.returncode
 
 
 def parser() -> argparse.ArgumentParser:

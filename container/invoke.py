@@ -268,9 +268,12 @@ def invoke_copilot(model: str, prompt: str, system: str, timeout: int) -> dict[s
     }
 
 
+def emit_result(result: dict[str, Any]) -> None:
+    sys.stdout.write(json.dumps(result, separators=(",", ":")) + "\n")
+    sys.stdout.flush()
+
+
 def main() -> int:
-    result_path = Path(os.environ.get("EVAL_RESULT_FILE", "/output/result.json"))
-    result_path.parent.mkdir(parents=True, exist_ok=True)
     try:
         transport = os.environ.get("EVAL_TRANSPORT", "opencode")
         model = os.environ["EVAL_MODEL"]
@@ -287,7 +290,7 @@ def main() -> int:
         else:
             raise RuntimeError(f"unsupported transport: {transport}")
 
-        result_path.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
+        emit_result(result)
         return 0
     except Exception as exc:
         result = {
@@ -302,7 +305,7 @@ def main() -> int:
             "stdout": "",
             "infrastructure_error": True,
         }
-        result_path.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
+        emit_result(result)
         return 2
 
 
