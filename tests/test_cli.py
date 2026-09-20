@@ -4,6 +4,7 @@ import argparse
 import os
 import tempfile
 import unittest
+import subprocess
 from pathlib import Path
 from unittest.mock import patch
 
@@ -14,6 +15,7 @@ from runner.cli import (
     build_container_command,
     default_auth_path,
     resolve_engine,
+    host_environment_for_transport,
 )
 
 
@@ -138,6 +140,27 @@ class RunnerCliTests(unittest.TestCase):
 
             rendered = " ".join(command)
             self.assertNotIn("/seed/models.json", rendered)
+
+
+    def test_copilot_uses_gh_auth_token_fallback_without_exposing_value(self):
+        fake = subprocess.CompletedProcess(["gh", "auth", "token"], 0, stdout="gho_example\n", stderr="")
+        with patch("runner.cli.shutil.which", side_effect=lambda name: "/usr/bin/gh" if name == "gh" else "/usr/bin/podman"), \
+             patch("runner.cli.subprocess.run", return_value=fake), \
+             patch.dict(os.environ, {}, clear=True):
+            env = host_environment_for_transport("github-copilot-cli")
+
+        self.assertEqual(env["COPILOT_GITHUB_TOKEN"], "gho_example")
+
+    def test_copilot_explicit_env_beats_gh_fallback(self):
+        with patch("runner.cli.subprocess.run") as run, patch.dict(
+            os.environ,
+            {"GH_TOKEN": "explicit"},
+            clear=True,
+        ):
+            env = host_environment_for_transport("github-copilot-cli")
+
+        self.assertEqual(env["GH_TOKEN"], "explicit")
+        run.assert_not_called()
 
     def test_copilot_transport_passes_supported_token_names_only_when_present(self):
         with tempfile.TemporaryDirectory() as tmp:

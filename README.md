@@ -62,11 +62,14 @@ Additional variables require explicit `--env NAME`.
 
 Use this for pure model/role/judge execution when OpenCode runtime tools are not required.
 
-Authentication precedence matches GitHub Copilot CLI:
+Authentication precedence for container execution is:
 
 1. `COPILOT_GITHUB_TOKEN`
 2. `GH_TOKEN`
 3. `GITHUB_TOKEN`
+4. host `gh auth token` fallback
+
+When no token environment variable is set, the host wrapper uses an authenticated GitHub CLI session if `gh` is available. The token is injected into the container as `COPILOT_GITHUB_TOKEN` via the child-process environment; its value is not written to disk or placed on the command line.
 
 The container uses fresh `COPILOT_HOME` and `COPILOT_CACHE_HOME`, disables auto-update, prompt-mode extensions, repo hooks, MCPs, remote operations, and model tools.
 
@@ -122,7 +125,9 @@ OPENCODE_EVAL_RUNNER_CONFIG=/path/to/opencode.json
 ### Copilot CLI locally
 
 ```bash
-export COPILOT_GITHUB_TOKEN=...
+# Either export a supported token, or authenticate the host GitHub CLI:
+gh auth status
+
 PYTHONPATH=. python3 bin/opencode-eval-runner invoke \
   --engine podman \
   --image opencode-eval-runner:copilot-local \

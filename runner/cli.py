@@ -62,13 +62,45 @@ def existing_seed(explicit: str | None, env_name: str, fallback: Path | None = N
     return fallback if fallback and fallback.is_file() else None
 
 
-def pass_env(command: list[str], names: list[str]) -> None:
+def host_environment_for_transport(transport: str) -> dict[str, str]:
+    env = dict(os.environ)
+    if transport != "github-copilot-cli" or any(env.get(name, "").strip() for name in COPILOT_AUTH_ENVS):
+        return env
+
+    gh = shutil.which("gh")
+    if not gh:
+        return env
+
+    try:
+        proc = subprocess.run(
+            [gh, "auth", "token"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return env
+
+    token = proc.stdout.strip() if proc.returncode == 0 else ""
+    if token:
+        env["COPILOT_GITHUB_TOKEN"] = token
+    return env
+
+
+def pass_env(command: list[str], names: list[str], host_env: dict[str, str]) -> None:
     for name in names:
-        if os.environ.get(name):
+        if host_env.get(name):
             command += ["--env", name]
 
 
-def build_container_command(args: argparse.Namespace, input_dir: Path, output_dir: Path) -> tuple[list[str], Path]:
+def build_container_command(
+    args: argparse.Namespace,
+    input_dir: Path,
+    output_dir: Path,
+    host_env: dict[str, str] | None = None,
+) -> tuple[list[str], Path]:
+    host_env = dict(os.environ) if host_env is None else host_env
     engine = resolve_engine(args.engine)
     transport_env = (
         "OPENCODE_EVAL_RUNNER_OPENCODE_IMAGE"
@@ -77,8 +109,8 @@ def build_container_command(args: argparse.Namespace, input_dir: Path, output_di
     )
     image = (
         args.image
-        or os.environ.get(transport_env)
-        or os.environ.get("OPENCODE_EVAL_RUNNER_IMAGE")
+        or host_env.get(transport_env)
+        or host_env.get("OPENCODE_EVAL_RUNNER_IMAGE")
         or DEFAULT_IMAGES[args.transport]
     )
     workspace = Path(args.workspace).resolve()
@@ -137,7 +169,7 @@ def build_container_command(args: argparse.Namespace, input_dir: Path, output_di
     env_names = list(dict.fromkeys(DEFAULT_ENV_ALLOWLIST + tuple(args.env)))
     if args.transport == "github-copilot-cli":
         env_names.extend(COPILOT_AUTH_ENVS)
-    pass_env(command, env_names)
+    pass_env(command, env_names, host_env)
 
     command.append(image)
     return command, result_host
@@ -166,8 +198,16 @@ def invoke(args: argparse.Namespace) -> int:
         else:
             (input_dir / "system.txt").write_text("", encoding="utf-8")
 
-        command, _ = build_container_command(args, input_dir, output_dir)
-        proc = subprocess.run(command, text=True, capture_output=True, timeout=args.container_timeout, check=False)
+        host_env = host_environment_for_transport(args.transport)
+        command, _ = build_container_command(args, input_dir, output_dir, host_env=host_env)
+        proc = subprocess.run(
+            command,
+            env=host_env,
+            text=True,
+            capture_output=True,
+            timeout=args.container_timeout,
+            check=False,
+        )
         produced = output_dir / "result.json"
 
         if produced.is_file():
