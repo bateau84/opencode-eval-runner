@@ -56,34 +56,66 @@ def sanitize_database_seed(source: Path, destination: Path) -> Path:
         raise RunnerError(f"OpenCode database file not found: {source}")
 
     destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.unlink(missing_ok=True)
+
+    def quote(identifier: str) -> str:
+        return '"' + identifier.replace('"', '""') + '"'
+
     try:
         with sqlite3.connect(f"file:{source}?mode=ro", uri=True) as src_db, sqlite3.connect(destination) as dst_db:
-            src_db.backup(dst_db)
+            schema = src_db.execute(
+                "SELECT type, name, sql FROM sqlite_master "
+                "WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite_%' "
+                "ORDER BY CASE type "
+                "WHEN 'table' THEN 0 WHEN 'index' THEN 1 "
+                "WHEN 'view' THEN 2 WHEN 'trigger' THEN 3 ELSE 4 END, name"
+            ).fetchall()
 
-        with sqlite3.connect(destination) as db:
-            tables = [
-                row[0]
-                for row in db.execute(
-                    "SELECT name FROM sqlite_master "
-                    "WHERE type='table' AND name NOT LIKE 'sqlite_%'"
-                )
-            ]
+            tables = {name for object_type, name, _ in schema if object_type == "table"}
             if "credential" not in tables:
                 raise RunnerError("OpenCode database has no credential table")
+            if "session" not in tables:
+                raise RunnerError("OpenCode database has no session table")
 
-            keep = {"credential", "migration", "__drizzle_migrations"}
-            db.execute("PRAGMA foreign_keys=OFF")
-            for table in tables:
-                if table in keep:
+            dst_db.execute("PRAGMA foreign_keys=OFF")
+
+            # Create all tables, but copy no application rows by default.
+            for object_type, _, sql in schema:
+                if object_type == "table":
+                    dst_db.execute(sql)
+
+            # Preserve only V2 credentials and migration journals. Everything
+            # session/project/history related remains schema-only and empty.
+            for table in ("credential", "migration", "__drizzle_migrations"):
+                if table not in tables:
                     continue
-                quoted = table.replace('"', '""')
-                db.execute(f'DELETE FROM "{quoted}"')
-            db.commit()
-            db.execute("PRAGMA journal_mode=DELETE")
-            db.execute("VACUUM")
+                columns = [row[1] for row in src_db.execute(f"PRAGMA table_info({quote(table)})")]
+                if not columns:
+                    continue
+                column_sql = ", ".join(quote(column) for column in columns)
+                placeholders = ", ".join("?" for _ in columns)
+                rows = src_db.execute(f"SELECT {column_sql} FROM {quote(table)}").fetchall()
+                if rows:
+                    dst_db.executemany(
+                        f"INSERT INTO {quote(table)} ({column_sql}) VALUES ({placeholders})",
+                        rows,
+                    )
+
+            # Add indexes/views/triggers after the retained rows are copied so
+            # triggers cannot manufacture extra state while seeding.
+            for object_type, _, sql in schema:
+                if object_type != "table":
+                    dst_db.execute(sql)
+
+            dst_db.commit()
+            dst_db.execute("PRAGMA journal_mode=DELETE")
+            dst_db.execute("VACUUM")
     except sqlite3.Error as exc:
         destination.unlink(missing_ok=True)
         raise RunnerError(f"failed to prepare sanitized OpenCode database: {exc}") from exc
+    except RunnerError:
+        destination.unlink(missing_ok=True)
+        raise
 
     destination.chmod(0o600)
     return destination
