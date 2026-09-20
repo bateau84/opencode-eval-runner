@@ -114,6 +114,8 @@ class RunnerCliTests(unittest.TestCase):
 
             self.assertNotIn("label=disable", command)
             rendered = " ".join(command)
+            if hasattr(os, "getuid") and os.getuid() != 0:
+                self.assertIn(f"--user {os.getuid()}:{os.getgid()}", rendered)
             self.assertNotIn("/output", rendered)
             self.assertNotIn("EVAL_RESULT_FILE", rendered)
 
