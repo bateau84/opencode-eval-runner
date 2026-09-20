@@ -124,6 +124,7 @@ def prepare_opencode_env() -> dict[str, str]:
     seed_auth = Path("/seed/auth.json")
     seed_models = Path("/seed/models.json")
     seed_database = Path("/seed/opencode.db")
+    seed_config_root = Path("/seed/opencode-config")
     if seed_config.is_file():
         shutil.copyfile(seed_config, config / "opencode.json")
     else:
@@ -131,6 +132,15 @@ def prepare_opencode_env() -> dict[str, str]:
             json.dumps({"$schema": "https://opencode.ai/config.json"}) + "\n",
             encoding="utf-8",
         )
+    if seed_config_root.is_dir():
+        # Loom itself can be an OpenCode global config root. Keep the eval's
+        # minimal opencode.json, but expose the real plugin tree and its
+        # dependency tree from the read-only seed.
+        for name in ("plugins", "node_modules"):
+            source = seed_config_root / name
+            target = config / name
+            if source.exists() and not target.exists():
+                target.symlink_to(source, target_is_directory=True)
     if seed_auth.is_file():
         shutil.copyfile(seed_auth, data / "auth.json")
     if seed_models.is_file():
