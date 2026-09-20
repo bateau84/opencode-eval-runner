@@ -144,63 +144,14 @@ def prepare_opencode_env() -> dict[str, str]:
     return env
 
 
-def available_models(env: dict[str, str], timeout: int) -> tuple[int, set[str], str]:
-    seed_models = Path("/seed/models.json")
-    if not seed_models.is_file():
-        # Normal isolated runs own a writable cache under /tmp. Refresh it
-        # inside the container so host cache state is not required.
-        refreshed = run(["opencode", "models", "--refresh"], Path("/workspace"), env, timeout)
-        if refreshed.returncode != 0:
-            return refreshed.returncode, set(), refreshed.stderr
-
-    # Explicit catalog seeds are authoritative for custom/private provider
-    # cases. They skip refresh but still use the same normal listing path.
-    proc = run(["opencode", "models"], Path("/workspace"), env, timeout)
-    models = {
-        line.strip().split()[0]
-        for line in proc.stdout.splitlines()
-        if line.strip()
-    }
-    return proc.returncode, models, proc.stderr
-
-
 def invoke_opencode(model: str, agent: str, prompt: str, timeout: int) -> dict[str, Any]:
     env = prepare_opencode_env()
-    preflight_code, models, preflight_stderr = available_models(env, timeout)
-    catalog_model = model.split("#", 1)[0]
-    if preflight_code != 0:
-        return {
-            "schema": RESULT_SCHEMA,
-            "transport": "opencode",
-            "model": model,
-            "agent": agent or None,
-            "exit_code": 2,
-            "session_id": None,
-            "text": "",
-            "tools": [],
-            "stderr": "model preflight failed: " + preflight_stderr[:20000],
-            "stdout": "",
-            "infrastructure_error": True,
-        }
-    if catalog_model not in models:
-        sample = ", ".join(sorted(models)[:20])
-        return {
-            "schema": RESULT_SCHEMA,
-            "transport": "opencode",
-            "model": model,
-            "agent": agent or None,
-            "exit_code": 2,
-            "session_id": None,
-            "text": "",
-            "tools": [],
-            "stderr": (
-                f"model preflight: {catalog_model} is not available in the isolated OpenCode catalog"
-                + (f"; sample: {sample}" if sample else "")
-            ),
-            "stdout": "",
-            "infrastructure_error": True,
-        }
 
+    # OpenCode V2 has no documented force-refresh command for the model
+    # catalog. A fresh isolated process owns a fresh cache and resolves the
+    # requested model through its normal provider/catalog startup path.
+    # The real model invocation is authoritative; provider/model resolution
+    # failures are reported as transport failures instead of preflight guesses.
     command = ["opencode", "run", "--standalone", "--format", "json", "--auto"]
     if agent:
         command += ["--agent", agent]
