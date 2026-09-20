@@ -148,6 +148,16 @@ def existing_seed(explicit: str | None, env_name: str, fallback: Path | None = N
     return fallback if fallback and fallback.is_file() else None
 
 
+def existing_dir(explicit: str | None, env_name: str) -> Path | None:
+    raw = explicit or os.environ.get(env_name)
+    if not raw:
+        return None
+    path = Path(raw).expanduser()
+    if not path.is_dir():
+        raise RunnerError(f"{env_name.lower().replace('_', ' ')} directory not found: {path}")
+    return path
+
+
 def host_environment_for_transport(transport: str) -> dict[str, str]:
     env = dict(os.environ)
     if transport != "github-copilot-cli" or any(env.get(name, "").strip() for name in COPILOT_AUTH_ENVS):
@@ -256,6 +266,9 @@ def build_container_command(
         command += bind_arg(models, "/seed/models.json", readonly=True)
     if database_seed:
         command += bind_arg(database_seed, "/seed/opencode.db", readonly=True)
+    config_root = existing_dir(args.config_root, "OPENCODE_EVAL_RUNNER_CONFIG_ROOT")
+    if config_root:
+        command += bind_arg(config_root, "/seed/opencode-config", readonly=True)
 
     command += [
         "--env", f"EVAL_TRANSPORT={args.transport}",
@@ -361,6 +374,7 @@ def parser() -> argparse.ArgumentParser:
     run.add_argument("--config")
     run.add_argument("--models-catalog")
     run.add_argument("--database")
+    run.add_argument("--config-root")
     run.add_argument("--env", action="append", default=[], metavar="NAME")
     run.add_argument("--timeout-seconds", type=int, default=240)
     run.add_argument("--container-timeout", type=int, default=300)
