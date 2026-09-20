@@ -227,6 +227,7 @@ The runner:
 - uses a read-only container root filesystem with ephemeral `/tmp`;
 - mounts the evaluated workspace read-only unless `--workspace-mode rw` is explicitly selected;
 - mounts config/auth seed files read-only;
+- on rootless Podman, disables SELinux container labeling instead of relabeling the user's repository/auth files;
 - creates fresh OpenCode/Copilot state per invocation;
 - passes only explicit credential environment variables;
 - never treats infrastructure/provider failure as behavioral evidence.
