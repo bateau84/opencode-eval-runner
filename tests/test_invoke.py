@@ -46,6 +46,8 @@ class OpenCodeTransportTests(unittest.TestCase):
             "XDG_CONFIG_HOME=/tmp/runtime/config",
             "XDG_DATA_HOME=/tmp/runtime/data",
             "XDG_CACHE_HOME=/tmp/runtime/cache",
+            "XDG_STATE_HOME=/tmp/runtime/state",
+            "OPENCODE_DB=opencode.db",
             "OPENCODE_DISABLE_AUTOUPDATE=1",
             "useradd --uid 1000 --gid 1000",
             "USER 1000:1000",
