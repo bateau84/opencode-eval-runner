@@ -49,11 +49,19 @@ class OpenCodeTransportTests(unittest.TestCase):
             "XDG_STATE_HOME=/tmp/runtime/state",
             "OPENCODE_DB=opencode.db",
             "OPENCODE_DISABLE_AUTOUPDATE=1",
-            'for name in ("plugins", "node_modules")',
             "useradd --uid 1000 --gid 1000",
             "USER 1000:1000",
         ):
             self.assertIn(expected, containerfile)
+
+
+    def test_runtime_exposes_seeded_global_plugins(self):
+        invoke = (Path(__file__).resolve().parents[1] / "container" / "invoke.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn('seed_config_root = Path("/seed/opencode-config")', invoke)
+        self.assertIn('for name in ("plugins", "node_modules")', invoke)
+        self.assertIn("target.symlink_to(source, target_is_directory=True)", invoke)
 
 
 if __name__ == "__main__":
