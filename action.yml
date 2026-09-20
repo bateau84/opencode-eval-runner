@@ -39,7 +39,7 @@ runs:
         image="$INPUT_IMAGE"
         if [[ "$INPUT_BUILD" == "true" ]]; then
           image="opencode-eval-runner:local-${GITHUB_RUN_ID:-dev}"
-          "$INPUT_ENGINE" build -t "$image" "${{ github.action_path }}"
+          "$INPUT_ENGINE" build -f "${{ github.action_path }}/Containerfile" -t "$image" "${{ github.action_path }}"
         else
           "$INPUT_ENGINE" pull "$image"
         fi
