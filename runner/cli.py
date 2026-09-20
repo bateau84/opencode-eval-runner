@@ -70,8 +70,14 @@ def pass_env(command: list[str], names: list[str]) -> None:
 
 def build_container_command(args: argparse.Namespace, input_dir: Path, output_dir: Path) -> tuple[list[str], Path]:
     engine = resolve_engine(args.engine)
+    transport_env = (
+        "OPENCODE_EVAL_RUNNER_OPENCODE_IMAGE"
+        if args.transport == "opencode"
+        else "OPENCODE_EVAL_RUNNER_COPILOT_IMAGE"
+    )
     image = (
         args.image
+        or os.environ.get(transport_env)
         or os.environ.get("OPENCODE_EVAL_RUNNER_IMAGE")
         or DEFAULT_IMAGES[args.transport]
     )
