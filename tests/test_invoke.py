@@ -84,7 +84,8 @@ class OpenCodeTransportTests(unittest.TestCase):
         self.assertIn('seed_config_root = Path("/seed/opencode-config")', invoke)
         self.assertIn('source = seed_config_root / "plugins"', invoke)
         self.assertIn('"OPENCODE_CONFIG_DIR": str(config)', invoke)
-        self.assertIn("target.symlink_to(source, target_is_directory=True)", invoke)
+        self.assertIn("shutil.copytree(source, target, dirs_exist_ok=True)", invoke)
+        self.assertNotIn("target.symlink_to(source, target_is_directory=True)", invoke)
 
 
 if __name__ == "__main__":
