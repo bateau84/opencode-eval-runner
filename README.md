@@ -34,11 +34,19 @@ The caller may use the same model for both, but they do not share OpenCode sessi
 
 Use this for real OpenCode runtime behavior, including project-local agents, skills, plugins, and tool assertions.
 
-Authentication is seeded from the normal OpenCode credential file:
+Legacy authentication compatibility is seeded from the normal OpenCode auth file:
 
 ```text
 ~/.local/share/opencode/auth.json
 ```
+
+OpenCode V2 provider connections are stored in the normal OpenCode database:
+
+```text
+~/.local/share/opencode/opencode.db
+```
+
+The runner does **not** mount that database directly. It creates a temporary schema-only copy containing only the `credential` rows and migration journals; session, project, message, event, and other runtime tables remain empty. That sanitized credential database is mounted read-only and copied into the container's fresh writable data directory.
 
 The normal OpenCode model catalog is also seeded automatically when present:
 
@@ -48,7 +56,7 @@ The normal OpenCode model catalog is also seeded automatically when present:
 
 (or `$XDG_CACHE_HOME/opencode/models.json`). This makes the isolated container see the same resolved model registry as the host without inheriting the rest of the host cache.
 
-The auth and model-catalog seeds are mounted read-only and copied into fresh container-local XDG directories. Sessions, history, the rest of the cache, and the global config tree are not inherited.
+The auth, sanitized V2 credential database, and model-catalog seeds are mounted read-only and copied into fresh container-local XDG directories. Sessions, history, projects, the rest of the cache, and the global config tree are not inherited.
 
 An OpenCode config is **not** inherited automatically. The container constructs a minimal config unless you explicitly pass one with `--config` or `OPENCODE_EVAL_RUNNER_CONFIG`.
 
@@ -112,10 +120,11 @@ PYTHONPATH=. python3 bin/opencode-eval-runner invoke \
   --output /tmp/target.json
 ```
 
-The wrapper automatically mounts the normal OpenCode `auth.json` and `models.json` when they exist. Override either seed explicitly as needed:
+The wrapper automatically detects the normal OpenCode `auth.json`, `opencode.db`, and `models.json` when they exist. The database is always sanitized before it enters the container. Override the source files explicitly as needed:
 
 ```text
 --auth /path/to/auth.json
+--database /path/to/opencode.db
 --models-catalog /path/to/models.json
 --config /path/to/opencode.json
 ```
@@ -124,6 +133,7 @@ or:
 
 ```text
 OPENCODE_EVAL_RUNNER_AUTH=/path/to/auth.json
+OPENCODE_EVAL_RUNNER_DB=/path/to/opencode.db
 OPENCODE_EVAL_RUNNER_MODELS=/path/to/models.json
 OPENCODE_EVAL_RUNNER_CONFIG=/path/to/opencode.json
 ```
