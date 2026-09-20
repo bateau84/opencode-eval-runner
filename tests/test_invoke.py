@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 import unittest
 from unittest.mock import patch
 
@@ -35,6 +36,19 @@ class OpenCodeTransportTests(unittest.TestCase):
         self.assertIn("--model", calls[0])
         self.assertNotIn("--refresh", calls[0])
         self.assertNotIn("models", calls[0][1:])
+
+    def test_container_routes_default_runtime_state_to_tmpfs(self):
+        containerfile = (Path(__file__).resolve().parents[1] / "Containerfile").read_text(
+            encoding="utf-8"
+        )
+        for expected in (
+            "HOME=/tmp/runtime/home",
+            "XDG_CONFIG_HOME=/tmp/runtime/config",
+            "XDG_DATA_HOME=/tmp/runtime/data",
+            "XDG_CACHE_HOME=/tmp/runtime/cache",
+            "OPENCODE_DISABLE_AUTOUPDATE=1",
+        ):
+            self.assertIn(expected, containerfile)
 
 
 if __name__ == "__main__":
