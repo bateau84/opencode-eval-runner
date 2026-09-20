@@ -49,14 +49,14 @@ def bind_arg(source: Path, target: str, *, readonly: bool = True) -> list[str]:
     return ["--volume", f"{source}:{target}:{mode}"]
 
 
-def existing_seed(explicit: str | None, env_name: str, fallback: Path) -> Path | None:
+def existing_seed(explicit: str | None, env_name: str, fallback: Path | None = None) -> Path | None:
     raw = explicit or os.environ.get(env_name)
     if raw:
         path = Path(raw).expanduser()
         if not path.is_file():
             raise RunnerError(f"{env_name.lower().replace('_', ' ')} file not found: {path}")
         return path
-    return fallback if fallback.is_file() else None
+    return fallback if fallback and fallback.is_file() else None
 
 
 def pass_env(command: list[str], names: list[str]) -> None:
@@ -94,7 +94,7 @@ def build_container_command(args: argparse.Namespace, input_dir: Path, output_di
     command += bind_arg(output_dir, "/output", readonly=False)
 
     auth = existing_seed(args.auth, "OPENCODE_EVAL_RUNNER_AUTH", default_auth_path())
-    config = existing_seed(args.config, "OPENCODE_EVAL_RUNNER_CONFIG", Path("/nonexistent/opencode-eval-runner-config"))
+    config = existing_seed(args.config, "OPENCODE_EVAL_RUNNER_CONFIG")
     if auth:
         command += bind_arg(auth, "/seed/auth.json", readonly=True)
     if config:
