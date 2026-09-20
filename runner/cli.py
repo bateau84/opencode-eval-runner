@@ -5,6 +5,7 @@ import argparse
 import json
 import os
 import shutil
+import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -41,6 +42,51 @@ def default_auth_path() -> Path:
 def default_models_path() -> Path:
     base = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache"))
     return base / "opencode" / "models.json"
+
+
+def default_database_path() -> Path:
+    base = Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local" / "share"))
+    return base / "opencode" / "opencode.db"
+
+
+def sanitize_database_seed(source: Path, destination: Path) -> Path:
+    source = source.expanduser().resolve()
+    destination = destination.resolve()
+    if not source.is_file():
+        raise RunnerError(f"OpenCode database file not found: {source}")
+
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        with sqlite3.connect(f"file:{source}?mode=ro", uri=True) as src_db, sqlite3.connect(destination) as dst_db:
+            src_db.backup(dst_db)
+
+        with sqlite3.connect(destination) as db:
+            tables = [
+                row[0]
+                for row in db.execute(
+                    "SELECT name FROM sqlite_master "
+                    "WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+                )
+            ]
+            if "credential" not in tables:
+                raise RunnerError("OpenCode database has no credential table")
+
+            keep = {"credential", "migration", "__drizzle_migrations"}
+            db.execute("PRAGMA foreign_keys=OFF")
+            for table in tables:
+                if table in keep:
+                    continue
+                quoted = table.replace('"', '""')
+                db.execute(f'DELETE FROM "{quoted}"')
+            db.commit()
+            db.execute("PRAGMA journal_mode=DELETE")
+            db.execute("VACUUM")
+    except sqlite3.Error as exc:
+        destination.unlink(missing_ok=True)
+        raise RunnerError(f"failed to prepare sanitized OpenCode database: {exc}") from exc
+
+    destination.chmod(0o600)
+    return destination
 
 
 def resolve_engine(requested: str) -> str:
@@ -107,6 +153,7 @@ def build_container_command(
     input_dir: Path,
     output_dir: Path,
     host_env: dict[str, str] | None = None,
+    database_seed: Path | None = None,
 ) -> tuple[list[str], Path]:
     host_env = dict(os.environ) if host_env is None else host_env
     engine = resolve_engine(args.engine)
@@ -175,6 +222,8 @@ def build_container_command(
         command += bind_arg(config, "/seed/opencode.json", readonly=True)
     if models:
         command += bind_arg(models, "/seed/models.json", readonly=True)
+    if database_seed:
+        command += bind_arg(database_seed, "/seed/opencode.db", readonly=True)
 
     command += [
         "--env", f"EVAL_TRANSPORT={args.transport}",
@@ -217,8 +266,25 @@ def invoke(args: argparse.Namespace) -> int:
         else:
             (input_dir / "system.txt").write_text("", encoding="utf-8")
 
+        database_source = existing_seed(
+            args.database,
+            "OPENCODE_EVAL_RUNNER_DB",
+            default_database_path(),
+        )
+        database_seed = (
+            sanitize_database_seed(database_source, root / "opencode-credentials.db")
+            if database_source
+            else None
+        )
+
         host_env = host_environment_for_transport(args.transport)
-        command, _ = build_container_command(args, input_dir, output_dir, host_env=host_env)
+        command, _ = build_container_command(
+            args,
+            input_dir,
+            output_dir,
+            host_env=host_env,
+            database_seed=database_seed,
+        )
         proc = subprocess.run(
             command,
             env=host_env,
@@ -262,6 +328,7 @@ def parser() -> argparse.ArgumentParser:
     run.add_argument("--auth")
     run.add_argument("--config")
     run.add_argument("--models-catalog")
+    run.add_argument("--database")
     run.add_argument("--env", action="append", default=[], metavar="NAME")
     run.add_argument("--timeout-seconds", type=int, default=240)
     run.add_argument("--container-timeout", type=int, default=300)
