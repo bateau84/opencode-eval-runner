@@ -35,11 +35,6 @@ def default_auth_path() -> Path:
     return base / "opencode" / "auth.json"
 
 
-def default_models_path() -> Path:
-    base = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache"))
-    return base / "opencode" / "models.json"
-
-
 def resolve_engine(requested: str) -> str:
     if requested != "auto":
         if not shutil.which(requested):
@@ -121,7 +116,7 @@ def build_container_command(args: argparse.Namespace, input_dir: Path, output_di
 
     auth = existing_seed(args.auth, "OPENCODE_EVAL_RUNNER_AUTH", default_auth_path())
     config = existing_seed(args.config, "OPENCODE_EVAL_RUNNER_CONFIG")
-    models = existing_seed(args.models_catalog, "OPENCODE_EVAL_RUNNER_MODELS", default_models_path())
+    models = existing_seed(args.models_catalog, "OPENCODE_EVAL_RUNNER_MODELS")
     if auth:
         command += bind_arg(auth, "/seed/auth.json", readonly=True)
     if config:
