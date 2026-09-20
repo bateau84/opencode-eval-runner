@@ -116,12 +116,14 @@ def prepare_opencode_env() -> dict[str, str]:
     data = root / "data" / "opencode"
     cache = root / "cache"
     cache_opencode = cache / "opencode"
-    for path in (home, config, data, cache_opencode):
+    state = root / "state"
+    for path in (home, config, data, cache_opencode, state):
         path.mkdir(parents=True, exist_ok=True)
 
     seed_config = Path("/seed/opencode.json")
     seed_auth = Path("/seed/auth.json")
     seed_models = Path("/seed/models.json")
+    seed_database = Path("/seed/opencode.db")
     if seed_config.is_file():
         shutil.copyfile(seed_config, config / "opencode.json")
     else:
@@ -133,12 +135,16 @@ def prepare_opencode_env() -> dict[str, str]:
         shutil.copyfile(seed_auth, data / "auth.json")
     if seed_models.is_file():
         shutil.copyfile(seed_models, cache_opencode / "models.json")
+    if seed_database.is_file():
+        shutil.copyfile(seed_database, data / "opencode.db")
 
     env.update({
         "HOME": str(home),
         "XDG_CONFIG_HOME": str(root / "config"),
         "XDG_DATA_HOME": str(root / "data"),
         "XDG_CACHE_HOME": str(cache),
+        "XDG_STATE_HOME": str(state),
+        "OPENCODE_DB": "opencode.db",
         "OPENCODE_DISABLE_AUTOUPDATE": "1",
     })
     return env
