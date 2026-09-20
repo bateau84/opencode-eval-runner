@@ -34,13 +34,19 @@ The caller may use the same model for both, but they do not share OpenCode sessi
 
 Use this for real OpenCode runtime behavior, including project-local agents, skills, plugins, and tool assertions.
 
-Authentication may be seeded with the normal OpenCode credential file:
+Authentication is seeded from the normal OpenCode credential file:
 
 ```text
 ~/.local/share/opencode/auth.json
 ```
 
-The file is mounted read-only and copied into an ephemeral container-local `XDG_DATA_HOME`. It is never used as mutable state.
+Model availability is seeded independently from the normal OpenCode model catalog:
+
+```text
+~/.cache/opencode/models.json
+```
+
+Both files are mounted read-only and copied into fresh container-local XDG directories. Sessions, history, the rest of the cache, and the global config tree are not inherited.
 
 An OpenCode config is **not** inherited automatically. The container constructs a minimal config unless you explicitly pass one with `--config` or `OPENCODE_EVAL_RUNNER_CONFIG`.
 
@@ -103,6 +109,7 @@ The wrapper automatically mounts the normal OpenCode `auth.json` when it exists.
 
 ```text
 --auth /path/to/auth.json
+--models-catalog /path/to/models.json
 --config /path/to/opencode.json
 ```
 
@@ -110,6 +117,7 @@ or:
 
 ```text
 OPENCODE_EVAL_RUNNER_AUTH=/path/to/auth.json
+OPENCODE_EVAL_RUNNER_MODELS=/path/to/models.json
 OPENCODE_EVAL_RUNNER_CONFIG=/path/to/opencode.json
 ```
 
@@ -226,7 +234,7 @@ The runner:
 - enables `no-new-privileges`;
 - uses a read-only container root filesystem with ephemeral `/tmp`;
 - mounts the evaluated workspace read-only unless `--workspace-mode rw` is explicitly selected;
-- mounts config/auth seed files read-only;
+- mounts config/auth/model-catalog seed files read-only;
 - on rootless Podman, disables SELinux container labeling instead of relabeling the user's repository/auth files;
 - creates fresh OpenCode/Copilot state per invocation;
 - passes only explicit credential environment variables;
