@@ -1,0 +1,61 @@
+name: OpenCode Eval Runner
+description: Set up the isolated OCI eval runner and optionally execute a repository-owned eval command.
+author: bateau84
+
+inputs:
+  image:
+    description: OCI image used for isolated invocations.
+    required: false
+    default: ghcr.io/bateau84/opencode-eval-runner:edge
+  engine:
+    description: Container engine used by repository eval harnesses.
+    required: false
+    default: docker
+  build:
+    description: Build the action checkout as the runner image instead of pulling image.
+    required: false
+    default: "false"
+  command:
+    description: Optional repository-owned eval command to execute after runner setup.
+    required: false
+    default: ""
+  artifact-dir:
+    description: Host directory for eval artifacts.
+    required: false
+    default: .opencode-evals
+
+runs:
+  using: composite
+  steps:
+    - name: Prepare eval runner
+      shell: bash
+      env:
+        INPUT_IMAGE: ${{ inputs.image }}
+        INPUT_ENGINE: ${{ inputs.engine }}
+        INPUT_BUILD: ${{ inputs.build }}
+        INPUT_ARTIFACT_DIR: ${{ inputs.artifact-dir }}
+      run: |
+        set -euo pipefail
+        image="$INPUT_IMAGE"
+        if [[ "$INPUT_BUILD" == "true" ]]; then
+          image="opencode-eval-runner:local-${GITHUB_RUN_ID:-dev}"
+          "$INPUT_ENGINE" build -f "${{ github.action_path }}/Containerfile" -t "$image" "${{ github.action_path }}"
+        else
+          "$INPUT_ENGINE" pull "$image"
+        fi
+
+        echo "${{ github.action_path }}/bin" >> "$GITHUB_PATH"
+        echo "PYTHONPATH=${{ github.action_path }}${PYTHONPATH:+:$PYTHONPATH}" >> "$GITHUB_ENV"
+        echo "OPENCODE_EVAL_RUNNER_IMAGE=$image" >> "$GITHUB_ENV"
+        echo "OPENCODE_EVAL_RUNNER_ENGINE=$INPUT_ENGINE" >> "$GITHUB_ENV"
+        mkdir -p "$INPUT_ARTIFACT_DIR"
+
+    - name: Run repository eval command
+      if: ${{ inputs.command != '' }}
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+        EVAL_COMMAND: ${{ inputs.command }}
+      run: |
+        set -euo pipefail
+        bash -euo pipefail -c "$EVAL_COMMAND"

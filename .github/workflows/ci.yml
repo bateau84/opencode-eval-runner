@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Python checks
+        run: |
+          python3 -m py_compile runner/cli.py container/invoke.py
+          python3 -m unittest discover -s tests -p 'test_*.py'
+
+      - name: Build OCI image
+        run: docker build -f Containerfile -t opencode-eval-runner:test .
+
+      - name: Verify pinned tools
+        run: |
+          docker run --rm --entrypoint opencode opencode-eval-runner:test --version
+          docker run --rm --entrypoint copilot opencode-eval-runner:test --version
