@@ -161,6 +161,39 @@ class RunnerCliTests(unittest.TestCase):
             self.assertNotIn("EVAL_RESULT_FILE", rendered)
 
 
+    def test_config_root_is_mounted_read_only_when_explicit(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            workspace = root / "workspace"
+            input_dir = root / "input"
+            output_dir = root / "output"
+            config_root = root / "config-root"
+            for path in (workspace, input_dir, output_dir, config_root):
+                path.mkdir()
+            args = argparse.Namespace(
+                engine="podman",
+                image="test-image",
+                workspace=str(workspace),
+                workspace_mode="ro",
+                output=str(root / "result.json"),
+                transport="opencode",
+                model="openai/test",
+                agent="general",
+                timeout_seconds=120,
+                env=[],
+                auth=None,
+                config=None,
+                models_catalog=None,
+                config_root=str(config_root),
+            )
+            with patch("runner.cli.shutil.which", return_value="/usr/bin/podman"), patch.dict(os.environ, {}, clear=True):
+                command, _ = build_container_command(args, input_dir, output_dir)
+
+            rendered = " ".join(command)
+            self.assertIn(str(config_root.resolve()), rendered)
+            self.assertIn("/seed/opencode-config:ro", rendered)
+
+
     def test_models_catalog_defaults_to_host_cache_when_present(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
