@@ -42,13 +42,9 @@ Authentication may be seeded with the normal OpenCode credential file:
 
 The file is mounted read-only and copied into an ephemeral container-local `XDG_DATA_HOME`. It is never used as mutable state.
 
-An optional OpenCode config may also be mounted read-only. By default the host wrapper detects:
+An OpenCode config is **not** inherited automatically. The container constructs a minimal config unless you explicitly pass one with `--config` or `OPENCODE_EVAL_RUNNER_CONFIG`.
 
-```text
-~/.config/opencode/opencode.json
-```
-
-Only those explicit files are mounted. The host OpenCode config directory, data directory, cache, and sessions are not mounted.
+This avoids importing host MCPs, plugins, agent defaults, or provider overrides into behavioral evidence. Only explicit seed files are mounted; the host OpenCode config directory, data directory, cache, and sessions are never mounted.
 
 Known API-key environment variables are passed when present:
 
@@ -100,7 +96,7 @@ PYTHONPATH=. python3 bin/opencode-eval-runner invoke \
   --output /tmp/target.json
 ```
 
-The wrapper automatically mounts the normal OpenCode `auth.json` and `opencode.json` when they exist. Override them with:
+The wrapper automatically mounts the normal OpenCode `auth.json` when it exists. OpenCode config is explicit-only:
 
 ```text
 --auth /path/to/auth.json
