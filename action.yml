@@ -11,6 +11,14 @@ inputs:
     description: OCI image used for GitHub Copilot CLI transport invocations.
     required: false
     default: ghcr.io/bateau84/opencode-eval-runner:copilot-edge
+  prepare-opencode:
+    description: Pull/build the OpenCode transport image.
+    required: false
+    default: "true"
+  prepare-copilot:
+    description: Pull/build the GitHub Copilot CLI transport image.
+    required: false
+    default: "true"
   engine:
     description: Container engine used by repository eval harnesses.
     required: false
@@ -36,6 +44,8 @@ runs:
       env:
         INPUT_OPENCODE_IMAGE: ${{ inputs.opencode-image }}
         INPUT_COPILOT_IMAGE: ${{ inputs.copilot-image }}
+        INPUT_PREPARE_OPENCODE: ${{ inputs.prepare-opencode }}
+        INPUT_PREPARE_COPILOT: ${{ inputs.prepare-copilot }}
         INPUT_ENGINE: ${{ inputs.engine }}
         INPUT_BUILD: ${{ inputs.build }}
         INPUT_ARTIFACT_DIR: ${{ inputs.artifact-dir }}
@@ -49,19 +59,27 @@ runs:
           suffix="${GITHUB_RUN_ID:-dev}"
           opencode_image="opencode-eval-runner:opencode-local-$suffix"
           copilot_image="opencode-eval-runner:copilot-local-$suffix"
-          "$INPUT_ENGINE" build \
-            -f "${{ github.action_path }}/Containerfile" \
-            --target opencode \
-            -t "$opencode_image" \
-            "${{ github.action_path }}"
-          "$INPUT_ENGINE" build \
-            -f "${{ github.action_path }}/Containerfile" \
-            --target copilot \
-            -t "$copilot_image" \
-            "${{ github.action_path }}"
+          if [[ "$INPUT_PREPARE_OPENCODE" == "true" ]]; then
+            "$INPUT_ENGINE" build \
+              -f "${{ github.action_path }}/Containerfile" \
+              --target opencode \
+              -t "$opencode_image" \
+              "${{ github.action_path }}"
+          fi
+          if [[ "$INPUT_PREPARE_COPILOT" == "true" ]]; then
+            "$INPUT_ENGINE" build \
+              -f "${{ github.action_path }}/Containerfile" \
+              --target copilot \
+              -t "$copilot_image" \
+              "${{ github.action_path }}"
+          fi
         else
-          "$INPUT_ENGINE" pull "$opencode_image"
-          "$INPUT_ENGINE" pull "$copilot_image"
+          if [[ "$INPUT_PREPARE_OPENCODE" == "true" ]]; then
+            "$INPUT_ENGINE" pull "$opencode_image"
+          fi
+          if [[ "$INPUT_PREPARE_COPILOT" == "true" ]]; then
+            "$INPUT_ENGINE" pull "$copilot_image"
+          fi
         fi
 
         echo "${{ github.action_path }}/bin" >> "$GITHUB_PATH"
