@@ -7,6 +7,7 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates git python3 \
     && rm -rf /var/lib/apt/lists/* \
     && npm install --global "@opencode/cli@${OPENCODE_VERSION}" "@github/copilot@${COPILOT_VERSION}" \
+    && mkdir -p /seed /input /output /workspace \
     && opencode --version \
     && copilot --version
 
