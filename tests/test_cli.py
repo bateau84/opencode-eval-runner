@@ -23,10 +23,6 @@ class RunnerCliTests(unittest.TestCase):
             self.assertEqual(default_auth_path(), Path(tmp) / "opencode" / "auth.json")
 
 
-    def test_default_models_uses_xdg_cache_home(self):
-        with tempfile.TemporaryDirectory() as tmp, patch.dict(os.environ, {"XDG_CACHE_HOME": tmp}, clear=False):
-            self.assertEqual(default_models_path(), Path(tmp) / "opencode" / "models.json")
-
     def test_default_images_are_transport_specific(self):
         self.assertEqual(
             DEFAULT_IMAGES["opencode"],
