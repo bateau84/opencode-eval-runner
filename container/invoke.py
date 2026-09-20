@@ -167,7 +167,10 @@ def prepare_opencode_env() -> dict[str, str]:
 
 
 def plugin_diagnostic(env: dict[str, str], timeout: int) -> dict[str, Any]:
-    config_root = Path(env["OPENCODE_CONFIG_DIR"])
+    config_root = Path(
+        env.get("OPENCODE_CONFIG_DIR")
+        or Path(env.get("XDG_CONFIG_HOME", "/tmp/runtime/config")) / "opencode"
+    )
     plugins_root = config_root / "plugins"
     loom_root = plugins_root / "loom"
     filesystem = {
