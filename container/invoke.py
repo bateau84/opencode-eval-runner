@@ -211,34 +211,11 @@ def invoke_opencode(model: str, agent: str, prompt: str, timeout: int) -> dict[s
     env = prepare_opencode_env()
     plugins = plugin_diagnostic(env, timeout)
 
-    expected_plugin = os.environ.get("EVAL_EXPECT_PLUGIN", "").strip()
-    if expected_plugin:
-        names = {
-            line.split()[0]
-            for line in plugins["stdout"].splitlines()
-            if line.strip() and not line.startswith("ID ")
-        }
-        if plugins["exit_code"] != 0 or expected_plugin not in names:
-            return {
-                "schema": RESULT_SCHEMA,
-                "transport": "opencode",
-                "model": model,
-                "agent": agent or None,
-                "exit_code": 2,
-                "session_id": None,
-                "text": "",
-                "tools": [],
-                "stderr": (
-                    f"required OpenCode plugin not loaded: {expected_plugin}; "
-                    f"plugin list exit={plugins['exit_code']}; "
-                    f"stdout={plugins['stdout']!r}; stderr={plugins['stderr']!r}; "
-                    f"filesystem={plugins['filesystem']!r}"
-                )[:20000],
-                "stdout": "",
-                "infrastructure_error": True,
-                "plugin_diagnostic": plugins,
-            }
-
+    # 'opencode plugin list' uses the managed background service in 2.0.11.
+    # That service is spawned from the service-config env map rather than the
+    # caller's full environment, so it can miss this invocation's XDG/config
+    # overrides. Keep the result as diagnostic metadata only. The authoritative
+    # runtime path below uses --standalone, which inherits the full environment.
     # OpenCode V2 has no documented force-refresh command for the model
     # catalog. A fresh isolated process owns a fresh cache and resolves the
     # requested model through its normal provider/catalog startup path.
