@@ -31,12 +31,11 @@ class OpenCodeTransportTests(unittest.TestCase):
             )
 
         self.assertEqual(result["exit_code"], 0)
-        self.assertEqual(len(calls), 2)
-        self.assertEqual(calls[0], ["opencode", "plugin", "list"])
-        self.assertEqual(calls[1][0:2], ["opencode", "run"])
-        self.assertIn("--model", calls[1])
-        self.assertNotIn("--refresh", calls[1])
-        self.assertNotIn("models", calls[1][1:])
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(calls[0][0:2], ["opencode", "run"])
+        self.assertIn("--model", calls[0])
+        self.assertNotIn("--refresh", calls[0])
+        self.assertNotIn("models", calls[0][1:])
 
     def test_plugin_diagnostic_does_not_spawn_managed_service(self):
         calls = []
