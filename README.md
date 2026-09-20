@@ -40,9 +40,15 @@ Authentication is seeded from the normal OpenCode credential file:
 ~/.local/share/opencode/auth.json
 ```
 
-An optional model-catalog seed may be supplied explicitly for custom/private-provider cases. Normal public-provider runs do not inherit the host model cache.
+The normal OpenCode model catalog is also seeded automatically when present:
 
-The auth seed and any explicit model-catalog seed are mounted read-only and copied into fresh container-local XDG directories. Sessions, history, the rest of the cache, and the global config tree are not inherited.
+```text
+~/.cache/opencode/models.json
+```
+
+(or `$XDG_CACHE_HOME/opencode/models.json`). This makes the isolated container see the same resolved model registry as the host without inheriting the rest of the host cache.
+
+The auth and model-catalog seeds are mounted read-only and copied into fresh container-local XDG directories. Sessions, history, the rest of the cache, and the global config tree are not inherited.
 
 An OpenCode config is **not** inherited automatically. The container constructs a minimal config unless you explicitly pass one with `--config` or `OPENCODE_EVAL_RUNNER_CONFIG`.
 
@@ -106,7 +112,7 @@ PYTHONPATH=. python3 bin/opencode-eval-runner invoke \
   --output /tmp/target.json
 ```
 
-The wrapper automatically mounts the normal OpenCode `auth.json` when it exists. OpenCode config and model-catalog seeds are explicit-only:
+The wrapper automatically mounts the normal OpenCode `auth.json` and `models.json` when they exist. Override either seed explicitly as needed:
 
 ```text
 --auth /path/to/auth.json

@@ -14,6 +14,7 @@ from runner.cli import (
     RunnerError,
     build_container_command,
     default_auth_path,
+    default_models_path,
     resolve_engine,
     host_environment_for_transport,
 )
@@ -38,6 +39,10 @@ class RunnerCliTests(unittest.TestCase):
             DEFAULT_IMAGES["opencode"],
             DEFAULT_IMAGES["github-copilot-cli"],
         )
+
+    def test_default_models_uses_xdg_cache_home(self):
+        with tempfile.TemporaryDirectory() as tmp, patch.dict(os.environ, {"XDG_CACHE_HOME": tmp}, clear=False):
+            self.assertEqual(default_models_path(), Path(tmp) / "opencode" / "models.json")
 
     def test_explicit_missing_engine_is_rejected(self):
         with patch("runner.cli.shutil.which", return_value=None):
@@ -112,7 +117,7 @@ class RunnerCliTests(unittest.TestCase):
             self.assertNotIn("EVAL_RESULT_FILE", rendered)
 
 
-    def test_models_catalog_is_explicit_only(self):
+    def test_models_catalog_defaults_to_host_cache_when_present(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             workspace = root / "workspace"
@@ -136,6 +141,10 @@ class RunnerCliTests(unittest.TestCase):
                 config=None,
                 models_catalog=None,
             )
+            cache_dir = root / "cache" / "opencode"
+            cache_dir.mkdir(parents=True)
+            models = cache_dir / "models.json"
+            models.write_text("{}", encoding="utf-8")
             with patch("runner.cli.shutil.which", return_value="/usr/bin/podman"), patch.dict(
                 os.environ,
                 {"XDG_CACHE_HOME": str(root / "cache")},
@@ -144,7 +153,8 @@ class RunnerCliTests(unittest.TestCase):
                 command, _ = build_container_command(args, input_dir, output_dir)
 
             rendered = " ".join(command)
-            self.assertNotIn("/seed/models.json", rendered)
+            self.assertIn(str(models.resolve()), rendered)
+            self.assertIn("/seed/models.json:ro", rendered)
 
 
     def test_copilot_uses_gh_auth_token_fallback_without_exposing_value(self):
