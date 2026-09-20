@@ -79,6 +79,7 @@ class RunnerCliTests(unittest.TestCase):
 
             rendered = " ".join(command)
             self.assertIn("--security-opt label=disable", rendered)
+            self.assertIn("--userns keep-id:uid=1000,gid=1000", rendered)
             self.assertNotIn(":Z", rendered)
             self.assertNotIn(":z", rendered)
             self.assertNotIn("/output", rendered)
