@@ -49,6 +49,7 @@ class OpenCodeTransportTests(unittest.TestCase):
             "XDG_STATE_HOME=/tmp/runtime/state",
             "OPENCODE_DB=opencode.db",
             "OPENCODE_DISABLE_AUTOUPDATE=1",
+            'for name in ("plugins", "node_modules")',
             "useradd --uid 1000 --gid 1000",
             "USER 1000:1000",
         ):
