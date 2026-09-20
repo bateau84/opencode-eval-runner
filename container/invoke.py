@@ -168,7 +168,7 @@ def prepare_opencode_env() -> dict[str, str]:
     return env
 
 
-def plugin_diagnostic(env: dict[str, str], timeout: int) -> dict[str, Any]:
+def plugin_diagnostic(env: dict[str, str]) -> dict[str, Any]:
     config_root = Path(
         env.get("OPENCODE_CONFIG_DIR")
         or Path(env.get("XDG_CONFIG_HOME", "/tmp/runtime/config")) / "opencode"
@@ -177,7 +177,7 @@ def plugin_diagnostic(env: dict[str, str], timeout: int) -> dict[str, Any]:
     loom_root = plugins_root / "loom"
     loom_flat = plugins_root / "loom.ts"
     loom_module_root = config_root / "loom-plugin"
-    filesystem = {
+    return {
         "config_root": str(config_root),
         "config_root_exists": config_root.exists(),
         "plugins_root": str(plugins_root),
@@ -190,32 +190,13 @@ def plugin_diagnostic(env: dict[str, str], timeout: int) -> dict[str, Any]:
         "loom_index_exists": (loom_root / "index.ts").is_file(),
         "loom_flat_exists": loom_flat.is_file(),
         "loom_module_index_exists": (loom_module_root / "index.ts").is_file(),
-        "package_json_exists": (config_root / "package.json").is_file(),
-        "node_modules_exists": (config_root / "node_modules").is_dir(),
-    }
-    proc = run(
-        ["opencode", "plugin", "list"],
-        Path("/workspace"),
-        env,
-        min(max(timeout, 1), 30),
-    )
-    return {
-        "exit_code": proc.returncode,
-        "stdout": proc.stdout[:20000],
-        "stderr": proc.stderr[:20000],
-        "filesystem": filesystem,
     }
 
 
 def invoke_opencode(model: str, agent: str, prompt: str, timeout: int) -> dict[str, Any]:
     env = prepare_opencode_env()
-    plugins = plugin_diagnostic(env, timeout)
+    plugins = plugin_diagnostic(env)
 
-    # 'opencode plugin list' uses the managed background service in 2.0.11.
-    # That service is spawned from the service-config env map rather than the
-    # caller's full environment, so it can miss this invocation's XDG/config
-    # overrides. Keep the result as diagnostic metadata only. The authoritative
-    # runtime path below uses --standalone, which inherits the full environment.
     # OpenCode V2 has no documented force-refresh command for the model
     # catalog. A fresh isolated process owns a fresh cache and resolves the
     # requested model through its normal provider/catalog startup path.
