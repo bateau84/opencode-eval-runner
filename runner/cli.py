@@ -266,7 +266,7 @@ def build_container_command(
         command += bind_arg(models, "/seed/models.json", readonly=True)
     if database_seed:
         command += bind_arg(database_seed, "/seed/opencode.db", readonly=True)
-    config_root = existing_dir(args.config_root, "OPENCODE_EVAL_RUNNER_CONFIG_ROOT")
+    config_root = existing_dir(getattr(args, "config_root", None), "OPENCODE_EVAL_RUNNER_CONFIG_ROOT")
     if config_root:
         command += bind_arg(config_root, "/seed/opencode-config", readonly=True)
 
