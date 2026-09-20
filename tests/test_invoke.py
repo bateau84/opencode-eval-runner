@@ -38,15 +38,28 @@ class OpenCodeTransportTests(unittest.TestCase):
         self.assertNotIn("--refresh", calls[1])
         self.assertNotIn("models", calls[1][1:])
 
-    def test_required_plugin_missing_is_infrastructure_error(self):
-        class Result:
-            returncode = 0
-            stdout = "ID    VERSION  SOURCE\nother local    /tmp/other\n"
-            stderr = ""
+    def test_managed_plugin_list_does_not_block_standalone_invocation(self):
+        calls = []
 
-        with patch("container.invoke.prepare_opencode_env", return_value={}), patch(
-            "container.invoke.run", return_value=Result()
-        ), patch.dict("container.invoke.os.environ", {"EVAL_EXPECT_PLUGIN": "loom"}, clear=False):
+        class Result:
+            def __init__(self, returncode=0, stdout="", stderr=""):
+                self.returncode = returncode
+                self.stdout = stdout
+                self.stderr = stderr
+
+        def fake_run(command, cwd, env, timeout):
+            calls.append(command)
+            if command[:3] == ["opencode", "plugin", "list"]:
+                return Result(stdout="No plugins found\n")
+            if command[:2] == ["opencode", "run"]:
+                return Result(stdout='{"type":"text","text":"ok"}\n')
+            return Result()
+
+        with patch("container.invoke.prepare_opencode_env", return_value={
+            "OPENCODE_CONFIG_DIR": "/tmp/runtime/config/opencode"
+        }), patch("container.invoke.run", side_effect=fake_run), patch.dict(
+            "container.invoke.os.environ", {"EVAL_EXPECT_PLUGIN": "loom"}, clear=False
+        ):
             result = invoke_opencode(
                 "openai/gpt-5.5",
                 "general",
@@ -54,9 +67,10 @@ class OpenCodeTransportTests(unittest.TestCase):
                 30,
             )
 
-        self.assertEqual(result["exit_code"], 2)
-        self.assertTrue(result["infrastructure_error"])
-        self.assertIn("required OpenCode plugin not loaded: loom", result["stderr"])
+        self.assertEqual(result["exit_code"], 0)
+        self.assertEqual(calls[0], ["opencode", "plugin", "list"])
+        self.assertEqual(calls[1][0:2], ["opencode", "run"])
+        self.assertEqual(result["plugin_diagnostic"]["stdout"], "No plugins found\n")
 
 
     def test_container_routes_default_runtime_state_to_tmpfs(self):
