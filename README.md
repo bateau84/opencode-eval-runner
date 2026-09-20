@@ -1,1 +1,224 @@
 # opencode-eval-runner
+
+Reusable OCI isolation for behavioral evals that invoke OpenCode or GitHub Copilot CLI.
+
+The runner intentionally does **not** own an eval corpus, grading semantics, or agent policy. Those stay in the repository being evaluated. This project owns the execution boundary:
+
+- one fresh container per model invocation;
+- separate target and judge containers;
+- fresh HOME/XDG/OpenCode state per invocation;
+- explicit provider configuration and authentication;
+- read-only workspace by default;
+- host-owned result/artifact files;
+- the same invocation model locally and in GitHub Actions.
+
+## Why
+
+Behavioral eval evidence becomes weak when the target or judge can inherit host sessions, plugins, global agents, caches, or mutable provider configuration.
+
+The unit of isolation here is one invocation:
+
+```text
+eval harness
+  |
+  +-- target -> fresh OCI container -> result.json
+  |
+  +-- judge  -> different fresh OCI container -> judgment.json
+```
+
+The caller may use the same model for both, but they do not share OpenCode session state or filesystem state.
+
+## Transports
+
+### `opencode`
+
+Use this for real OpenCode runtime behavior, including project-local agents, skills, plugins, and tool assertions.
+
+Authentication may be seeded with the normal OpenCode credential file:
+
+```text
+~/.local/share/opencode/auth.json
+```
+
+The file is mounted read-only and copied into an ephemeral container-local `XDG_DATA_HOME`. It is never used as mutable state.
+
+An optional OpenCode config may also be mounted read-only. By default the host wrapper detects:
+
+```text
+~/.config/opencode/opencode.json
+```
+
+Only those explicit files are mounted. The host OpenCode config directory, data directory, cache, and sessions are not mounted.
+
+Known API-key environment variables are passed when present:
+
+- `OPENAI_API_KEY`
+- `ANTHROPIC_API_KEY`
+- `OPENROUTER_API_KEY`
+
+Additional variables require explicit `--env NAME`.
+
+### `github-copilot-cli`
+
+Use this for pure model/role/judge execution when OpenCode runtime tools are not required.
+
+Authentication precedence matches GitHub Copilot CLI:
+
+1. `COPILOT_GITHUB_TOKEN`
+2. `GH_TOKEN`
+3. `GITHUB_TOKEN`
+
+The container uses fresh `COPILOT_HOME` and `COPILOT_CACHE_HOME`, disables auto-update, prompt-mode extensions, repo hooks, MCPs, remote operations, and model tools.
+
+This transport reuses the trust-boundary pattern already proven in `nrkno/mats-opencode-setup`.
+
+## Local usage
+
+Build once:
+
+```bash
+podman build -t opencode-eval-runner:local .
+```
+
+Prepare a prompt:
+
+```bash
+printf '%s\n' 'Respond with the production decision for this scenario.' > /tmp/prompt.txt
+```
+
+Run a real OpenCode invocation:
+
+```bash
+PYTHONPATH=. python3 bin/opencode-eval-runner invoke \
+  --engine podman \
+  --image opencode-eval-runner:local \
+  --transport opencode \
+  --workspace /path/to/evaluated/project \
+  --model openai/gpt-5.3-codex-spark \
+  --agent reviewer \
+  --prompt-file /tmp/prompt.txt \
+  --output /tmp/target.json
+```
+
+The wrapper automatically mounts the normal OpenCode `auth.json` and `opencode.json` when they exist. Override them with:
+
+```text
+--auth /path/to/auth.json
+--config /path/to/opencode.json
+```
+
+or:
+
+```text
+OPENCODE_EVAL_RUNNER_AUTH=/path/to/auth.json
+OPENCODE_EVAL_RUNNER_CONFIG=/path/to/opencode.json
+```
+
+### Copilot CLI locally
+
+```bash
+export COPILOT_GITHUB_TOKEN=...
+PYTHONPATH=. python3 bin/opencode-eval-runner invoke \
+  --engine podman \
+  --image opencode-eval-runner:local \
+  --transport github-copilot-cli \
+  --workspace /path/to/evaluated/project \
+  --model gpt-5.4 \
+  --prompt-file /tmp/prompt.txt \
+  --system-file /tmp/system.txt \
+  --output /tmp/judge.json
+```
+
+The token value is not placed on the container command line.
+
+## GitHub Actions
+
+The composite action sets up the runner CLI/image and can execute a repository-owned eval command.
+
+```yaml
+permissions:
+  contents: read
+  copilot-requests: write
+
+steps:
+  - uses: actions/checkout@v4
+
+  - uses: bateau84/opencode-eval-runner@main
+    with:
+      engine: docker
+      command: |
+        python3 scripts/run-evals.py \
+          --cases INTENT-01,WORK-01,REVIEW-01,CRITIC-01
+```
+
+When a consumer invokes the `github-copilot-cli` transport, the action exposes the workflow's built-in `GITHUB_TOKEN` to that command. The caller must grant `copilot-requests: write`. No additional Copilot secret is required when GitHub permits that token path.
+
+For OpenCode credentials in CI, materialize a protected secret as a file before the eval and point `OPENCODE_EVAL_RUNNER_AUTH` at it. Do not commit auth files.
+
+Example:
+
+```yaml
+- name: Materialize OpenCode auth
+  shell: bash
+  env:
+    OPENCODE_AUTH_JSON: ${{ secrets.OPENCODE_AUTH_JSON }}
+  run: |
+    install -m 700 -d "$RUNNER_TEMP/opencode-auth"
+    printf '%s' "$OPENCODE_AUTH_JSON" > "$RUNNER_TEMP/opencode-auth/auth.json"
+    chmod 600 "$RUNNER_TEMP/opencode-auth/auth.json"
+    echo "OPENCODE_EVAL_RUNNER_AUTH=$RUNNER_TEMP/opencode-auth/auth.json" >> "$GITHUB_ENV"
+```
+
+## Result contract
+
+Each invocation writes one JSON document:
+
+```json
+{
+  "schema": "opencode-eval-runner/v1",
+  "transport": "opencode",
+  "model": "openai/gpt-5.3-codex-spark",
+  "agent": "reviewer",
+  "exit_code": 0,
+  "session_id": "...",
+  "text": "...",
+  "tools": [],
+  "stderr": "",
+  "stdout": "..."
+}
+```
+
+The eval repository decides whether that observed behavior is PASS, FAIL, or non-evidence.
+
+## Image versions
+
+The image currently pins:
+
+- OpenCode CLI `2.0.11`
+- GitHub Copilot CLI `1.0.83`
+
+Pinning is deliberate: behavioral evidence should not silently change because a CLI auto-updated.
+
+`main` publishes:
+
+```text
+ghcr.io/bateau84/opencode-eval-runner:edge
+ghcr.io/bateau84/opencode-eval-runner:sha-...
+```
+
+Tags matching `v*` are also published.
+
+## Security boundary
+
+The runner:
+
+- drops Linux capabilities;
+- enables `no-new-privileges`;
+- uses a read-only container root filesystem with ephemeral `/tmp`;
+- mounts the evaluated workspace read-only unless `--workspace-mode rw` is explicitly selected;
+- mounts config/auth seed files read-only;
+- creates fresh OpenCode/Copilot state per invocation;
+- passes only explicit credential environment variables;
+- never treats infrastructure/provider failure as behavioral evidence.
+
+This is an eval isolation boundary, not a sandbox for hostile arbitrary code. A deliberately malicious evaluated plugin running inside an invocation still has the network and credentials granted to that invocation.

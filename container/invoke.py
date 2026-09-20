@@ -1,0 +1,300 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+from typing import Any
+
+RESULT_SCHEMA = "opencode-eval-runner/v1"
+COPILOT_AGENT_NAME = "eval-runner"
+COPILOT_AUTH_ENVS = ("COPILOT_GITHUB_TOKEN", "GH_TOKEN", "GITHUB_TOKEN")
+COPILOT_EXCLUDED_TOOLS = (
+    "bash", "powershell", "list_bash", "list_powershell", "read_bash",
+    "read_powershell", "stop_bash", "stop_powershell", "write_bash",
+    "write_powershell", "apply_patch", "create", "edit", "view",
+    "list_agents", "read_agent", "task", "write_agent", "ask_user",
+    "glob", "grep", "rg", "skill", "web_fetch", "web_search",
+)
+COPILOT_DENIED_PERMISSIONS = ("read", "shell", "write", "url", "memory")
+
+
+def run(command: list[str], cwd: Path, env: dict[str, str], timeout: int) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        command,
+        cwd=cwd,
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=max(timeout, 1),
+        check=False,
+    )
+
+
+def parse_events(text: str) -> list[dict[str, Any]]:
+    events: list[dict[str, Any]] = []
+    for line in text.splitlines():
+        try:
+            value = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(value, dict):
+            events.append(value)
+    return events
+
+
+def session_id(events: list[dict[str, Any]]) -> str | None:
+    for event in events:
+        value = event.get("sessionID") or event.get("sessionId")
+        if isinstance(value, str) and value:
+            return value
+    return None
+
+
+def extract_text(events: list[dict[str, Any]]) -> str:
+    parts: list[str] = []
+    for event in events:
+        part = event.get("part")
+        if isinstance(part, dict) and isinstance(part.get("text"), str):
+            if event.get("type") == "text" or part.get("type") == "text":
+                value = part["text"].strip()
+                if value:
+                    parts.append(value)
+        elif event.get("type") == "text" and isinstance(event.get("text"), str):
+            value = event["text"].strip()
+            if value:
+                parts.append(value)
+    return "\n\n".join(parts)
+
+
+def extract_tools(events: list[dict[str, Any]]) -> list[str]:
+    found: list[str] = []
+    for event in events:
+        part = event.get("part")
+        candidates = (event, part if isinstance(part, dict) else {})
+        for value in candidates:
+            tool = value.get("tool")
+            if isinstance(tool, str) and (
+                value.get("type") in {"tool", "tool_use", "tool-call", "tool_call"}
+                or event.get("type") in {"tool", "tool_use", "tool-call", "tool_call"}
+            ):
+                found.append(tool)
+    return list(dict.fromkeys(found))
+
+
+def assistant_from_export(exported: Any) -> tuple[str, list[str]]:
+    parts: list[str] = []
+    tools: list[str] = []
+    messages = exported if isinstance(exported, list) else exported.get("messages", []) if isinstance(exported, dict) else []
+    for message in messages:
+        if not isinstance(message, dict):
+            continue
+        info = message.get("info")
+        if not isinstance(info, dict) or info.get("role") != "assistant":
+            continue
+        for part in message.get("parts", []):
+            if not isinstance(part, dict):
+                continue
+            if part.get("type") == "text" and isinstance(part.get("text"), str):
+                value = part["text"].strip()
+                if value and part.get("synthetic") is not True and part.get("ignored") is not True:
+                    parts.append(value)
+            if part.get("type") == "tool" and isinstance(part.get("tool"), str):
+                tools.append(part["tool"])
+    return "\n\n".join(parts), list(dict.fromkeys(tools))
+
+
+def prepare_opencode_env() -> dict[str, str]:
+    env = dict(os.environ)
+    root = Path("/tmp/runtime")
+    home = root / "home"
+    config = root / "config" / "opencode"
+    data = root / "data" / "opencode"
+    cache = root / "cache"
+    for path in (home, config, data, cache):
+        path.mkdir(parents=True, exist_ok=True)
+
+    seed_config = Path("/seed/opencode.json")
+    seed_auth = Path("/seed/auth.json")
+    if seed_config.is_file():
+        shutil.copyfile(seed_config, config / "opencode.json")
+    else:
+        (config / "opencode.json").write_text(
+            json.dumps({"$schema": "https://opencode.ai/config.json"}) + "\n",
+            encoding="utf-8",
+        )
+    if seed_auth.is_file():
+        shutil.copyfile(seed_auth, data / "auth.json")
+
+    env.update({
+        "HOME": str(home),
+        "XDG_CONFIG_HOME": str(root / "config"),
+        "XDG_DATA_HOME": str(root / "data"),
+        "XDG_CACHE_HOME": str(cache),
+        "OPENCODE_DISABLE_AUTOUPDATE": "1",
+    })
+    return env
+
+
+def invoke_opencode(model: str, agent: str, prompt: str, timeout: int) -> dict[str, Any]:
+    env = prepare_opencode_env()
+    command = ["opencode", "run", "--standalone", "--format", "json", "--auto"]
+    if agent:
+        command += ["--agent", agent]
+    command += ["--model", model, prompt]
+    proc = run(command, Path("/workspace"), env, timeout)
+    events = parse_events(proc.stdout)
+    sid = session_id(events)
+    exported: Any = None
+
+    if sid:
+        exp = run(["opencode", "session", "export", sid, "--sanitize"], Path("/workspace"), env, timeout)
+        if exp.returncode == 0:
+            try:
+                exported = json.loads(exp.stdout)
+            except json.JSONDecodeError:
+                exported = None
+
+    exported_text, exported_tools = assistant_from_export(exported)
+    text = exported_text or extract_text(events)
+    tools = exported_tools or extract_tools(events)
+
+    return {
+        "schema": RESULT_SCHEMA,
+        "transport": "opencode",
+        "model": model,
+        "agent": agent or None,
+        "exit_code": proc.returncode,
+        "session_id": sid,
+        "text": text,
+        "tools": tools,
+        "stderr": proc.stderr[:20000],
+        "stdout": proc.stdout[:200000],
+    }
+
+
+def copilot_auth_source(env: dict[str, str]) -> str | None:
+    for name in COPILOT_AUTH_ENVS:
+        if env.get(name, "").strip():
+            return name
+    return None
+
+
+def copilot_profile(system: str) -> str:
+    return (
+        "---\n"
+        f"name: {COPILOT_AGENT_NAME}\n"
+        "description: Isolated behavioral-eval model transport.\n"
+        "tools: []\n"
+        "---\n\n"
+        + system.strip()
+        + "\n"
+    )
+
+
+def invoke_copilot(model: str, prompt: str, system: str, timeout: int) -> dict[str, Any]:
+    env = dict(os.environ)
+    auth_source = copilot_auth_source(env)
+    if not auth_source:
+        return {
+            "schema": RESULT_SCHEMA,
+            "transport": "github-copilot-cli",
+            "model": model,
+            "agent": COPILOT_AGENT_NAME,
+            "exit_code": 2,
+            "session_id": None,
+            "text": "",
+            "tools": [],
+            "stderr": "github-copilot-cli requires COPILOT_GITHUB_TOKEN, GH_TOKEN, or GITHUB_TOKEN",
+            "stdout": "",
+        }
+
+    root = Path("/tmp/copilot")
+    work = root / "work"
+    home = root / "home"
+    cache = root / "cache"
+    agent_dir = work / ".github" / "agents"
+    for path in (agent_dir, home, cache):
+        path.mkdir(parents=True, exist_ok=True)
+
+    (agent_dir / f"{COPILOT_AGENT_NAME}.agent.md").write_text(copilot_profile(system), encoding="utf-8")
+    env["COPILOT_HOME"] = str(home)
+    env["COPILOT_CACHE_HOME"] = str(cache)
+    env["COPILOT_AUTO_UPDATE"] = "false"
+    env["GITHUB_COPILOT_PROMPT_MODE_EXTENSIONS"] = "false"
+    env["GITHUB_COPILOT_PROMPT_MODE_REPO_HOOKS"] = "false"
+
+    command = [
+        "copilot",
+        "-C", str(work),
+        "--agent", COPILOT_AGENT_NAME,
+        "-p", prompt,
+        "-s",
+        "--model", model,
+        "--disable-builtin-mcps",
+        "--no-experimental",
+        "--no-remote",
+        "--no-remote-export",
+        "--excluded-tools", ",".join(COPILOT_EXCLUDED_TOOLS),
+        "--deny-tool", ",".join(COPILOT_DENIED_PERMISSIONS),
+    ]
+    proc = run(command, work, env, timeout)
+    return {
+        "schema": RESULT_SCHEMA,
+        "transport": "github-copilot-cli",
+        "model": model,
+        "agent": COPILOT_AGENT_NAME,
+        "credential_source": auth_source,
+        "exit_code": proc.returncode,
+        "session_id": None,
+        "text": proc.stdout.strip() if proc.returncode == 0 else "",
+        "tools": [],
+        "stderr": proc.stderr[:20000],
+        "stdout": proc.stdout[:200000],
+    }
+
+
+def main() -> int:
+    result_path = Path(os.environ.get("EVAL_RESULT_FILE", "/output/result.json"))
+    result_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        transport = os.environ.get("EVAL_TRANSPORT", "opencode")
+        model = os.environ["EVAL_MODEL"]
+        agent = os.environ.get("EVAL_AGENT", "")
+        timeout = int(os.environ.get("EVAL_TIMEOUT_SECONDS", "240"))
+        prompt = Path(os.environ.get("EVAL_PROMPT_FILE", "/input/prompt.txt")).read_text(encoding="utf-8")
+        system_path = Path(os.environ.get("EVAL_SYSTEM_FILE", "/input/system.txt"))
+        system = system_path.read_text(encoding="utf-8") if system_path.is_file() else ""
+
+        if transport == "opencode":
+            result = invoke_opencode(model, agent, prompt, timeout)
+        elif transport == "github-copilot-cli":
+            result = invoke_copilot(model, prompt, system, timeout)
+        else:
+            raise RuntimeError(f"unsupported transport: {transport}")
+
+        result_path.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
+        return 0
+    except Exception as exc:
+        result = {
+            "schema": RESULT_SCHEMA,
+            "transport": os.environ.get("EVAL_TRANSPORT"),
+            "model": os.environ.get("EVAL_MODEL"),
+            "exit_code": 2,
+            "session_id": None,
+            "text": "",
+            "tools": [],
+            "stderr": f"{type(exc).__name__}: {exc}",
+            "stdout": "",
+            "infrastructure_error": True,
+        }
+        result_path.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
+        return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
