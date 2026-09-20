@@ -135,7 +135,12 @@ def prepare_opencode_env() -> dict[str, str]:
     if seed_config_root.is_dir():
         # Loom itself can be an OpenCode global config root. Keep the eval's
         # minimal opencode.json, but expose the real plugin tree and its
-        # dependency tree from the read-only seed.
+        # dependency/package boundary from the read-only seed.
+        for name in ("package.json", "bun.lock"):
+            source = seed_config_root / name
+            target = config / name
+            if source.is_file() and not target.exists():
+                shutil.copyfile(source, target)
         for name in ("plugins", "node_modules"):
             source = seed_config_root / name
             target = config / name
