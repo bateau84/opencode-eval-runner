@@ -1,0 +1,41 @@
+from __future__ import annotations
+
+import unittest
+from unittest.mock import patch
+
+from container.invoke import invoke_opencode
+
+
+class OpenCodeTransportTests(unittest.TestCase):
+    def test_v2_invocation_does_not_use_models_refresh_preflight(self):
+        class Result:
+            returncode = 0
+            stdout = ""
+            stderr = ""
+
+        calls: list[list[str]] = []
+
+        def fake_run(command, cwd, env, timeout):
+            calls.append(command)
+            return Result()
+
+        with patch("container.invoke.prepare_opencode_env", return_value={}), patch(
+            "container.invoke.run", side_effect=fake_run
+        ):
+            result = invoke_opencode(
+                "openai/gpt-5.3-codex-spark",
+                "reviewer",
+                "test prompt",
+                30,
+            )
+
+        self.assertEqual(result["exit_code"], 0)
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(calls[0][0:2], ["opencode", "run"])
+        self.assertIn("--model", calls[0])
+        self.assertNotIn("--refresh", calls[0])
+        self.assertNotIn("models", calls[0][1:])
+
+
+if __name__ == "__main__":
+    unittest.main()
