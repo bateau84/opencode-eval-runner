@@ -160,8 +160,50 @@ def prepare_opencode_env() -> dict[str, str]:
     return env
 
 
+def plugin_diagnostic(env: dict[str, str], timeout: int) -> dict[str, Any]:
+    proc = run(
+        ["opencode", "plugin", "list"],
+        Path("/workspace"),
+        env,
+        min(max(timeout, 1), 30),
+    )
+    return {
+        "exit_code": proc.returncode,
+        "stdout": proc.stdout[:20000],
+        "stderr": proc.stderr[:20000],
+    }
+
+
 def invoke_opencode(model: str, agent: str, prompt: str, timeout: int) -> dict[str, Any]:
     env = prepare_opencode_env()
+    plugins = plugin_diagnostic(env, timeout)
+
+    expected_plugin = os.environ.get("EVAL_EXPECT_PLUGIN", "").strip()
+    if expected_plugin:
+        names = {
+            line.split()[0]
+            for line in plugins["stdout"].splitlines()
+            if line.strip() and not line.startswith("ID ")
+        }
+        if plugins["exit_code"] != 0 or expected_plugin not in names:
+            return {
+                "schema": RESULT_SCHEMA,
+                "transport": "opencode",
+                "model": model,
+                "agent": agent or None,
+                "exit_code": 2,
+                "session_id": None,
+                "text": "",
+                "tools": [],
+                "stderr": (
+                    f"required OpenCode plugin not loaded: {expected_plugin}; "
+                    f"plugin list exit={plugins['exit_code']}; "
+                    f"stdout={plugins['stdout']!r}; stderr={plugins['stderr']!r}"
+                )[:20000],
+                "stdout": "",
+                "infrastructure_error": True,
+                "plugin_diagnostic": plugins,
+            }
 
     # OpenCode V2 has no documented force-refresh command for the model
     # catalog. A fresh isolated process owns a fresh cache and resolves the
@@ -200,6 +242,7 @@ def invoke_opencode(model: str, agent: str, prompt: str, timeout: int) -> dict[s
         "tools": tools,
         "stderr": proc.stderr[:20000],
         "stdout": proc.stdout[:200000],
+        "plugin_diagnostic": plugins,
     }
 
 
