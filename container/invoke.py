@@ -145,7 +145,15 @@ def prepare_opencode_env() -> dict[str, str]:
 
 
 def available_models(env: dict[str, str], timeout: int) -> tuple[int, set[str], str]:
-    proc = run(["opencode", "models"], Path("/workspace"), env, timeout)
+    seed_models = Path("/seed/models.json")
+    if seed_models.is_file():
+        # Explicit catalog seeds are authoritative for custom/private provider
+        # cases. Do not refresh them away from models.dev.
+        proc = run(["opencode", "models"], Path("/workspace"), env, timeout)
+    else:
+        # Normal isolated runs own a writable cache under /tmp. Refresh it
+        # inside the container so host cache state is not required.
+        proc = run(["opencode", "models", "--refresh"], Path("/workspace"), env, timeout)
     models = {
         line.strip().split()[0]
         for line in proc.stdout.splitlines()
