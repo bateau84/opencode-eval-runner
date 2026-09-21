@@ -160,6 +160,46 @@ class OpenCodeTransportTests(unittest.TestCase):
         self.assertNotIn("--refresh", calls[0])
         self.assertNotIn("models", calls[0][1:])
 
+    def test_opencode_uses_event_stream_without_session_export(self):
+        class Result:
+            returncode = 0
+            stderr = ""
+            stdout = "\n".join([
+                '{"type":"step_start","sessionID":"ses_test","part":{"type":"step-start"}}',
+                '{"type":"tool_use","sessionID":"ses_test","part":{"type":"tool","tool":"skill","state":{"status":"completed","input":{"id":"web-ui-design"}}}}',
+                '{"type":"text","sessionID":"ses_test","part":{"type":"text","text":"done"}}',
+            ])
+
+        calls: list[list[str]] = []
+
+        def fake_run(command, cwd, env, timeout):
+            calls.append(command)
+            return Result()
+
+        with patch("container.invoke.prepare_opencode_env", return_value={}), patch(
+            "container.invoke.run", side_effect=fake_run
+        ):
+            result = invoke_opencode(
+                "openai/gpt-5.5",
+                "skill-eval",
+                "test prompt",
+                30,
+                "web-ui-design",
+            )
+
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(calls[0][0:2], ["opencode", "run"])
+        self.assertEqual(result["session_id"], "ses_test")
+        self.assertEqual(result["text"], "done")
+        self.assertEqual(result["tools"], ["skill"])
+        self.assertEqual(
+            result["actions"],
+            [{"tool": "skill", "args": {"id": "web-ui-design"}}],
+        )
+        self.assertEqual(result["skills_loaded"], ["web-ui-design"])
+        self.assertEqual(result["timing"]["export_seconds"], 0.0)
+        self.assertIsNone(result["timing"]["export_exit_code"])
+
     def test_opencode_eval_uses_fixed_title_to_avoid_title_agent(self):
         class Result:
             returncode = 0

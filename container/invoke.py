@@ -300,27 +300,18 @@ def invoke_opencode(
     run_seconds = time.perf_counter() - run_started
     events = parse_events(proc.stdout)
     sid = session_id(events)
-    exported: Any = None
+
+    # The structured `opencode run --format json` event stream is the
+    # authoritative evidence source. Starting a second OpenCode process to
+    # export the just-created session is redundant and can add a full timeout
+    # per invocation when export/session bootstrap fails. Keep eval latency
+    # bound to the requested target/judge execution only.
+    text = extract_text(events)
+    tools = extract_tools(events)
+    actions = extract_actions(events)
+    skills_loaded = extract_loaded_skills(events)
     export_seconds = 0.0
     export_exit_code: int | None = None
-
-    if sid:
-        export_started = time.perf_counter()
-        exp = run(["opencode", "session", "export", sid, "--sanitize"], Path("/workspace"), env, timeout)
-        export_seconds = time.perf_counter() - export_started
-        export_exit_code = exp.returncode
-        if exp.returncode == 0:
-            try:
-                exported = json.loads(exp.stdout)
-            except json.JSONDecodeError:
-                exported = None
-
-    exported_text, exported_tools, exported_actions = assistant_from_export(exported)
-    text = exported_text or extract_text(events)
-    tools = exported_tools or extract_tools(events)
-    actions = exported_actions or extract_actions(events)
-    exported_skills = loaded_skills_from_export(exported)
-    skills_loaded = exported_skills or extract_loaded_skills(events)
 
     return {
         "schema": RESULT_SCHEMA,
