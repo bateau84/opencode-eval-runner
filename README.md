@@ -120,7 +120,25 @@ PYTHONPATH=. python3 bin/opencode-eval-runner invoke \
   --output /tmp/target.json
 ```
 
-The wrapper automatically detects the normal OpenCode `auth.json`, `opencode.db`, and `models.json` when they exist. The database is always sanitized before it enters the container. Override the source files explicitly as needed:
+The wrapper automatically detects the normal OpenCode `auth.json`, `opencode.db`, and `models.json` when they exist. The database is always sanitized before it enters the container.
+
+Container networking uses the OCI engine's normal default unless explicitly overridden. For hosts where rootless Podman DNS is broken, an opt-in override can be supplied:
+
+```bash
+PYTHONPATH=. python3 bin/opencode-eval-runner invoke \
+  --engine podman \
+  --network host \
+  --transport opencode \
+  --workspace /path/to/evaluated/project \
+  --model openai/gpt-5.5 \
+  --agent general \
+  --prompt-file /tmp/prompt.txt \
+  --output /tmp/target.json
+```
+
+`--network` accepts the OCI engine's network mode or network name, such as `host`, `bridge`, `slirp4netns`, or a custom network. It is never enabled implicitly. In particular, `host` weakens network isolation by sharing the host network namespace and should be used only when explicitly required.
+
+Override the source files explicitly as needed:
 
 ```text
 --auth /path/to/auth.json

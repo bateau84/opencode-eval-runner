@@ -237,6 +237,68 @@ class RunnerCliTests(unittest.TestCase):
 
             self.assertIn(f"{node_modules.resolve()}:/workspace/node_modules:ro", command)
 
+    def test_explicit_network_is_forwarded_to_container_engine(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            workspace = root / "workspace"
+            input_dir = root / "input"
+            output_dir = root / "output"
+            for path in (workspace, input_dir, output_dir):
+                path.mkdir()
+            args = argparse.Namespace(
+                engine="podman",
+                network="host",
+                image="test-image",
+                workspace=str(workspace),
+                workspace_mode="ro",
+                output=str(root / "result.json"),
+                transport="opencode",
+                model="openai/test",
+                agent="reviewer",
+                timeout_seconds=120,
+                env=[],
+                auth=None,
+                config=None,
+                models_catalog=None,
+            )
+            with patch("runner.cli.shutil.which", return_value="/usr/bin/podman"), patch.dict(
+                os.environ, {}, clear=True
+            ):
+                command, _ = build_container_command(args, input_dir, output_dir)
+
+            self.assertIn("--network", command)
+            self.assertEqual(command[command.index("--network") + 1], "host")
+
+    def test_default_network_does_not_override_engine_networking(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            workspace = root / "workspace"
+            input_dir = root / "input"
+            output_dir = root / "output"
+            for path in (workspace, input_dir, output_dir):
+                path.mkdir()
+            args = argparse.Namespace(
+                engine="podman",
+                image="test-image",
+                workspace=str(workspace),
+                workspace_mode="ro",
+                output=str(root / "result.json"),
+                transport="opencode",
+                model="openai/test",
+                agent="reviewer",
+                timeout_seconds=120,
+                env=[],
+                auth=None,
+                config=None,
+                models_catalog=None,
+            )
+            with patch("runner.cli.shutil.which", return_value="/usr/bin/podman"), patch.dict(
+                os.environ, {}, clear=True
+            ):
+                command, _ = build_container_command(args, input_dir, output_dir)
+
+            self.assertNotIn("--network", command)
+
     def test_docker_does_not_add_podman_label_override(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
