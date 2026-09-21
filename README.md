@@ -143,14 +143,14 @@ OPENCODE_EVAL_RUNNER_CONFIG=/path/to/opencode.json
 Skills are evaluated through a normal OpenCode agent, not as a separate transport. Use `--skill` to identify the skill under test while keeping the prompt and grading semantics in the eval repository:
 
 ```bash
-PYTHONPATH=. python3 bin/opencode-eval-runner invoke \\
-  --engine podman \\
-  --transport opencode \\
-  --workspace /path/to/evaluated/project \\
-  --model openai/gpt-5.5 \\
-  --agent reviewer \\
-  --skill architectural-design \\
-  --prompt-file /tmp/prompt.txt \\
+PYTHONPATH=. python3 bin/opencode-eval-runner invoke \
+  --engine podman \
+  --transport opencode \
+  --workspace /path/to/evaluated/project \
+  --model openai/gpt-5.5 \
+  --agent reviewer \
+  --skill architectural-design \
+  --prompt-file /tmp/prompt.txt \
   --output /tmp/skill-target.json
 ```
 
@@ -224,7 +224,7 @@ Larger suites can use the action as the execution boundary and run their own cor
     with:
       engine: docker
       command: |
-        python3 scripts/run-evals.py \\
+        python3 scripts/run-evals.py \
           --cases INTENT-01,WORK-01,REVIEW-01,CRITIC-01
 ```
 
