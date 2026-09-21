@@ -17,6 +17,7 @@ from runner.cli import (
     default_auth_path,
     default_database_path,
     default_models_path,
+    extra_mount_arg,
     sanitize_database_seed,
     resolve_engine,
     host_environment_for_transport,
@@ -84,6 +85,25 @@ class RunnerCliTests(unittest.TestCase):
             self.assertIn('"type":"oauth"', credential[2])
             self.assertEqual(sessions, 0)
             self.assertEqual(migrations, 1)
+
+    def test_extra_mount_defaults_to_read_only_and_accepts_rw(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp) / "node_modules"
+            source.mkdir()
+            self.assertEqual(
+                extra_mount_arg(f"{source}:/workspace/node_modules"),
+                ["--volume", f"{source.resolve()}:/workspace/node_modules:ro"],
+            )
+            self.assertEqual(
+                extra_mount_arg(f"{source}:/workspace/node_modules:rw"),
+                ["--volume", f"{source.resolve()}:/workspace/node_modules:rw"],
+            )
+
+    def test_extra_mount_rejects_relative_container_target(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp)
+            with self.assertRaisesRegex(RunnerError, "absolute container target"):
+                extra_mount_arg(f"{source}:workspace/node_modules")
 
     def test_explicit_missing_engine_is_rejected(self):
         with patch("runner.cli.shutil.which", return_value=None):
@@ -183,6 +203,39 @@ class RunnerCliTests(unittest.TestCase):
             )
             with self.assertRaisesRegex(RunnerError, "--skill is only supported"):
                 build_container_command(args, input_dir, output_dir)
+
+    def test_additional_mount_is_added_to_container_command(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            workspace = root / "workspace"
+            input_dir = root / "input"
+            output_dir = root / "output"
+            node_modules = root / "node_modules"
+            for path in (workspace, input_dir, output_dir, node_modules):
+                path.mkdir()
+            args = argparse.Namespace(
+                engine="podman",
+                image="test-image",
+                workspace=str(workspace),
+                workspace_mode="ro",
+                mount=[f"{node_modules}:/workspace/node_modules:ro"],
+                output=str(root / "result.json"),
+                transport="opencode",
+                model="openai/test",
+                agent="reviewer",
+                skill=None,
+                timeout_seconds=120,
+                env=[],
+                auth=None,
+                config=None,
+                models_catalog=None,
+            )
+            with patch("runner.cli.shutil.which", return_value="/usr/bin/podman"), patch.dict(
+                os.environ, {}, clear=True
+            ):
+                command, _ = build_container_command(args, input_dir, output_dir)
+
+            self.assertIn(f"{node_modules.resolve()}:/workspace/node_modules:ro", command)
 
     def test_docker_does_not_add_podman_label_override(self):
         with tempfile.TemporaryDirectory() as tmp:

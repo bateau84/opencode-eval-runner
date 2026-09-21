@@ -179,7 +179,9 @@ The token value is not placed on the container command line.
 
 ## GitHub Actions
 
-The composite action sets up the runner CLI/image and can execute a repository-owned eval command.
+The repository is a composite GitHub Action. It supports either a single direct invocation or setup plus a repository-owned eval harness.
+
+For a direct Copilot invocation, the action uses the workflow's built-in `GITHUB_TOKEN`; no separate Copilot secret is needed. The calling workflow must grant `copilot-requests: write`:
 
 ```yaml
 permissions:
@@ -192,12 +194,41 @@ steps:
   - uses: bateau84/opencode-eval-runner@main
     with:
       engine: docker
+      prepare-opencode: false
+      transport: github-copilot-cli
+      model: gpt-5.4
+      workspace: .
+      prompt-file: .github/evals/prompt.txt
+      output: .opencode-evals/copilot-result.json
+```
+
+For an OpenCode skill eval, identify the skill explicitly while still letting the evaluated agent decide whether to load it:
+
+```yaml
+  - uses: bateau84/opencode-eval-runner@main
+    with:
+      engine: docker
+      prepare-copilot: false
+      transport: opencode
+      model: openai/gpt-5.5
+      agent: reviewer
+      skill: architectural-design
+      prompt-file: .github/evals/architecture-review.txt
+      output: .opencode-evals/architectural-design.json
+```
+
+Larger suites can use the action as the execution boundary and run their own corpus harness:
+
+```yaml
+  - uses: bateau84/opencode-eval-runner@main
+    with:
+      engine: docker
       command: |
-        python3 scripts/run-evals.py \
+        python3 scripts/run-evals.py \\
           --cases INTENT-01,WORK-01,REVIEW-01,CRITIC-01
 ```
 
-When a consumer invokes the `github-copilot-cli` transport, the action exposes the workflow's built-in `GITHUB_TOKEN` to that command. The caller must grant `copilot-requests: write`. No additional Copilot secret is required when GitHub permits that token path.
+The action exposes `GITHUB_TOKEN` to both direct Copilot invocations and repository-owned commands. The runner passes only the token variable name into the isolated Copilot container; the token value is not placed on the command line.
 
 For OpenCode credentials in CI, materialize a protected secret as a file before the eval and point `OPENCODE_EVAL_RUNNER_AUTH` at it. Do not commit auth files.
 
@@ -275,6 +306,7 @@ Tags matching `v*` are published with `opencode-` and `copilot-` prefixes.
 The runner:
 
 - drops Linux capabilities;
+- only adds extra bind mounts when the caller explicitly supplies `--mount SOURCE:TARGET[:ro|rw]`;
 - enables `no-new-privileges`;
 - uses a read-only container root filesystem with ephemeral `/tmp`;
 - mounts the evaluated workspace read-only unless `--workspace-mode rw` is explicitly selected;
