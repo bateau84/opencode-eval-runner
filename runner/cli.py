@@ -251,6 +251,9 @@ def build_container_command(
         "--security-opt",
         "no-new-privileges",
     ]
+    network = getattr(args, "network", None)
+    if network:
+        command += ["--network", network]
     if engine == "podman":
         # Map the invoking host user to the dedicated non-root runtime user so
         # private read-only seed files (for example auth.json mode 0600) remain
@@ -387,6 +390,11 @@ def parser() -> argparse.ArgumentParser:
     run = sub.add_parser("invoke", help="Run one isolated target or judge invocation.")
     run.add_argument("--transport", choices=("opencode", "github-copilot-cli"), default="opencode")
     run.add_argument("--engine", choices=("auto", "podman", "docker"), default="auto")
+    run.add_argument(
+        "--network",
+        metavar="MODE",
+        help="Optional OCI network mode/name (for example host, bridge, slirp4netns, or a custom network). Default keeps the engine's normal network isolation.",
+    )
     run.add_argument("--image")
     run.add_argument("--workspace", default=".")
     run.add_argument("--workspace-mode", choices=("ro", "rw"), default="ro")
