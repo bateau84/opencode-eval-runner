@@ -7,10 +7,12 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 from typing import Any
 
 RESULT_SCHEMA = "opencode-eval-runner/v1"
+OPENCODE_EVAL_TITLE = "opencode-eval-runner"
 COPILOT_AGENT_NAME = "eval-runner"
 COPILOT_AUTH_ENVS = ("COPILOT_GITHUB_TOKEN", "GH_TOKEN", "GITHUB_TOKEN")
 COPILOT_EXCLUDED_TOOLS = (
@@ -276,17 +278,37 @@ def invoke_opencode(
     # requested model through its normal provider/catalog startup path.
     # The real model invocation is authoritative; provider/model resolution
     # failures are reported as transport failures instead of preflight guesses.
-    command = ["opencode", "run", "--standalone", "--format", "json", "--auto"]
+    # Every eval invocation uses a fresh OpenCode session. Supplying a fixed
+    # title prevents OpenCode from launching its automatic title agent, which
+    # otherwise adds an unrelated model call (and any title-model retries) to
+    # every target and judge invocation.
+    command = [
+        "opencode",
+        "run",
+        "--standalone",
+        "--format",
+        "json",
+        "--auto",
+        "--title",
+        OPENCODE_EVAL_TITLE,
+    ]
     if agent:
         command += ["--agent", agent]
     command += ["--model", model, prompt]
+    run_started = time.perf_counter()
     proc = run(command, Path("/workspace"), env, timeout)
+    run_seconds = time.perf_counter() - run_started
     events = parse_events(proc.stdout)
     sid = session_id(events)
     exported: Any = None
+    export_seconds = 0.0
+    export_exit_code: int | None = None
 
     if sid:
+        export_started = time.perf_counter()
         exp = run(["opencode", "session", "export", sid, "--sanitize"], Path("/workspace"), env, timeout)
+        export_seconds = time.perf_counter() - export_started
+        export_exit_code = exp.returncode
         if exp.returncode == 0:
             try:
                 exported = json.loads(exp.stdout)
@@ -312,6 +334,12 @@ def invoke_opencode(
         "tools": tools,
         "actions": actions,
         "skills_loaded": skills_loaded,
+        "timing": {
+            "run_seconds": round(run_seconds, 3),
+            "export_seconds": round(export_seconds, 3),
+            "export_exit_code": export_exit_code,
+            "total_seconds": round(run_seconds + export_seconds, 3),
+        },
         "stderr": proc.stderr[:20000],
         "stdout": proc.stdout[:200000],
         "plugin_diagnostic": plugins,
