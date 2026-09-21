@@ -160,6 +160,33 @@ class OpenCodeTransportTests(unittest.TestCase):
         self.assertNotIn("--refresh", calls[0])
         self.assertNotIn("models", calls[0][1:])
 
+    def test_opencode_eval_uses_fixed_title_to_avoid_title_agent(self):
+        class Result:
+            returncode = 0
+            stdout = ""
+            stderr = ""
+
+        calls: list[list[str]] = []
+
+        def fake_run(command, cwd, env, timeout):
+            calls.append(command)
+            return Result()
+
+        with patch("container.invoke.prepare_opencode_env", return_value={}), patch(
+            "container.invoke.run", side_effect=fake_run
+        ):
+            invoke_opencode(
+                "openai/gpt-5.5",
+                "general",
+                "test prompt",
+                30,
+            )
+
+        self.assertEqual(len(calls), 1)
+        command = calls[0]
+        self.assertIn("--title", command)
+        self.assertEqual(command[command.index("--title") + 1], "opencode-eval-runner")
+
     def test_skill_under_test_is_reported_without_forcing_a_load(self):
         class Result:
             returncode = 0
