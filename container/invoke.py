@@ -86,9 +86,31 @@ def extract_tools(events: list[dict[str, Any]]) -> list[str]:
     return list(dict.fromkeys(found))
 
 
-def assistant_from_export(exported: Any) -> tuple[str, list[str]]:
+def tool_action(part: dict[str, Any]) -> dict[str, Any] | None:
+    tool = part.get("tool")
+    if part.get("type") != "tool" or not isinstance(tool, str):
+        return None
+    state = part.get("state")
+    args = state.get("input") if isinstance(state, dict) and isinstance(state.get("input"), dict) else {}
+    return {"tool": tool, "args": args}
+
+
+def extract_actions(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    actions: list[dict[str, Any]] = []
+    for event in events:
+        part = event.get("part")
+        if not isinstance(part, dict):
+            continue
+        action = tool_action(part)
+        if action:
+            actions.append(action)
+    return actions
+
+
+def assistant_from_export(exported: Any) -> tuple[str, list[str], list[dict[str, Any]]]:
     parts: list[str] = []
     tools: list[str] = []
+    actions: list[dict[str, Any]] = []
     messages = exported if isinstance(exported, list) else exported.get("messages", []) if isinstance(exported, dict) else []
     for message in messages:
         if not isinstance(message, dict):
@@ -105,7 +127,10 @@ def assistant_from_export(exported: Any) -> tuple[str, list[str]]:
                     parts.append(value)
             if part.get("type") == "tool" and isinstance(part.get("tool"), str):
                 tools.append(part["tool"])
-    return "\n\n".join(parts), list(dict.fromkeys(tools))
+                action = tool_action(part)
+                if action:
+                    actions.append(action)
+    return "\n\n".join(parts), list(dict.fromkeys(tools)), actions
 
 
 def prepare_opencode_env() -> dict[str, str]:
@@ -219,9 +244,10 @@ def invoke_opencode(model: str, agent: str, prompt: str, timeout: int) -> dict[s
             except json.JSONDecodeError:
                 exported = None
 
-    exported_text, exported_tools = assistant_from_export(exported)
+    exported_text, exported_tools, exported_actions = assistant_from_export(exported)
     text = exported_text or extract_text(events)
     tools = exported_tools or extract_tools(events)
+    actions = exported_actions or extract_actions(events)
 
     return {
         "schema": RESULT_SCHEMA,
@@ -232,6 +258,7 @@ def invoke_opencode(model: str, agent: str, prompt: str, timeout: int) -> dict[s
         "session_id": sid,
         "text": text,
         "tools": tools,
+        "actions": actions,
         "stderr": proc.stderr[:20000],
         "stdout": proc.stdout[:200000],
         "plugin_diagnostic": plugins,
@@ -270,6 +297,7 @@ def invoke_copilot(model: str, prompt: str, system: str, timeout: int) -> dict[s
             "session_id": None,
             "text": "",
             "tools": [],
+            "actions": [],
             "stderr": "github-copilot-cli requires COPILOT_GITHUB_TOKEN, GH_TOKEN, or GITHUB_TOKEN",
             "stdout": "",
         }
@@ -314,6 +342,7 @@ def invoke_copilot(model: str, prompt: str, system: str, timeout: int) -> dict[s
         "session_id": None,
         "text": proc.stdout.strip() if proc.returncode == 0 else "",
         "tools": [],
+        "actions": [],
         "stderr": proc.stderr[:20000],
         "stdout": proc.stdout[:200000],
     }
@@ -352,6 +381,7 @@ def main() -> int:
             "session_id": None,
             "text": "",
             "tools": [],
+            "actions": [],
             "stderr": f"{type(exc).__name__}: {exc}",
             "stdout": "",
             "infrastructure_error": True,
