@@ -8,6 +8,7 @@ from container.invoke import (
     assistant_from_export,
     extract_actions,
     extract_loaded_skills,
+    loaded_skills_from_export,
     invoke_opencode,
 )
 
@@ -37,17 +38,55 @@ class OpenCodeTransportTests(unittest.TestCase):
             ],
         )
 
-    def test_extract_loaded_skills_normalizes_id_and_name(self):
-        actions = [
-            {"tool": "skill", "args": {"name": "golang-concurrency"}},
-            {"tool": "skill", "args": {"id": "architectural-design"}},
-            {"tool": "skill", "args": {"id": "architectural-design"}},
-            {"tool": "read", "args": {"filePath": "/workspace/README.md"}},
+    def test_extract_loaded_skills_counts_only_completed_native_skill_calls(self):
+        events = [
+            {
+                "type": "tool_use",
+                "part": {
+                    "type": "tool",
+                    "tool": "skill",
+                    "state": {"status": "completed", "input": {"name": "golang-concurrency"}},
+                },
+            },
+            {
+                "type": "tool_use",
+                "part": {
+                    "type": "tool",
+                    "tool": "skill",
+                    "state": {"status": "error", "input": {"id": "missing-skill"}},
+                },
+            },
+            {
+                "type": "tool_use",
+                "part": {
+                    "type": "tool",
+                    "tool": "skill",
+                    "state": {"status": "completed", "input": {"id": "architectural-design"}},
+                },
+            },
         ]
         self.assertEqual(
-            extract_loaded_skills(actions),
+            extract_loaded_skills(events),
             ["golang-concurrency", "architectural-design"],
         )
+
+    def test_failed_exported_skill_call_is_not_reported_as_loaded(self):
+        exported = [
+            {
+                "info": {"role": "assistant"},
+                "parts": [
+                    {
+                        "type": "tool",
+                        "tool": "skill",
+                        "state": {
+                            "status": "error",
+                            "input": {"id": "missing-skill"},
+                        },
+                    }
+                ],
+            }
+        ]
+        self.assertEqual(loaded_skills_from_export(exported), [])
 
     def test_session_export_preserves_tool_inputs_as_actions(self):
         exported = [
