@@ -107,17 +107,46 @@ def extract_actions(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return actions
 
 
-def extract_loaded_skills(actions: list[dict[str, Any]]) -> list[str]:
+def completed_skill_from_part(part: dict[str, Any]) -> str | None:
+    if part.get("type") != "tool" or part.get("tool") != "skill":
+        return None
+    state = part.get("state")
+    if not isinstance(state, dict) or state.get("status") != "completed":
+        return None
+    args = state.get("input")
+    if not isinstance(args, dict):
+        return None
+    skill = args.get("id") or args.get("name")
+    return skill if isinstance(skill, str) and skill else None
+
+
+def extract_loaded_skills(events: list[dict[str, Any]]) -> list[str]:
     found: list[str] = []
-    for action in actions:
-        if action.get("tool") != "skill":
+    for event in events:
+        part = event.get("part")
+        if not isinstance(part, dict):
             continue
-        args = action.get("args")
-        if not isinstance(args, dict):
-            continue
-        skill = args.get("id") or args.get("name")
-        if isinstance(skill, str) and skill and skill not in found:
+        skill = completed_skill_from_part(part)
+        if skill and skill not in found:
             found.append(skill)
+    return found
+
+
+def loaded_skills_from_export(exported: Any) -> list[str]:
+    found: list[str] = []
+    messages = exported if isinstance(exported, list) else exported.get("messages", []) if isinstance(exported, dict) else []
+    for message in messages:
+        if not isinstance(message, dict):
+            continue
+        info = message.get("info")
+        if not isinstance(info, dict) or info.get("role") != "assistant":
+            continue
+        for part in message.get("parts", []):
+            if not isinstance(part, dict):
+                continue
+            skill = completed_skill_from_part(part)
+            if skill and skill not in found:
+                found.append(skill)
     return found
 
 
@@ -268,7 +297,8 @@ def invoke_opencode(
     text = exported_text or extract_text(events)
     tools = exported_tools or extract_tools(events)
     actions = exported_actions or extract_actions(events)
-    skills_loaded = extract_loaded_skills(actions)
+    exported_skills = loaded_skills_from_export(exported)
+    skills_loaded = exported_skills or extract_loaded_skills(events)
 
     return {
         "schema": RESULT_SCHEMA,
