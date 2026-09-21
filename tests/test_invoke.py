@@ -4,10 +4,77 @@ from pathlib import Path
 import unittest
 from unittest.mock import patch
 
-from container.invoke import invoke_opencode
+from container.invoke import assistant_from_export, extract_actions, invoke_opencode
 
 
 class OpenCodeTransportTests(unittest.TestCase):
+    def test_extracts_normalized_tool_actions_with_inputs(self):
+        events = [
+            {
+                "type": "tool_use",
+                "part": {
+                    "type": "tool",
+                    "tool": "read",
+                    "state": {
+                        "status": "completed",
+                        "input": {"filePath": "/workspace/ASSESSMENT.md"},
+                    },
+                },
+            }
+        ]
+        self.assertEqual(
+            extract_actions(events),
+            [
+                {
+                    "tool": "read",
+                    "args": {"filePath": "/workspace/ASSESSMENT.md"},
+                }
+            ],
+        )
+
+    def test_session_export_preserves_tool_inputs_as_actions(self):
+        exported = [
+            {
+                "info": {"role": "assistant"},
+                "parts": [
+                    {
+                        "type": "tool",
+                        "tool": "skill",
+                        "state": {
+                            "status": "completed",
+                            "input": {"name": "golang-concurrency"},
+                            "output": "omitted",
+                        },
+                    },
+                    {
+                        "type": "tool",
+                        "tool": "read",
+                        "state": {
+                            "status": "completed",
+                            "input": {
+                                "filePath": "/workspace/.opencode/skills/golang-concurrency/ASSESSMENT.md"
+                            },
+                        },
+                    },
+                ],
+            }
+        ]
+        text, tools, actions = assistant_from_export(exported)
+        self.assertEqual(text, "")
+        self.assertEqual(tools, ["skill", "read"])
+        self.assertEqual(
+            actions,
+            [
+                {"tool": "skill", "args": {"name": "golang-concurrency"}},
+                {
+                    "tool": "read",
+                    "args": {
+                        "filePath": "/workspace/.opencode/skills/golang-concurrency/ASSESSMENT.md"
+                    },
+                },
+            ],
+        )
+
     def test_v2_invocation_does_not_use_models_refresh_preflight(self):
         class Result:
             returncode = 0
