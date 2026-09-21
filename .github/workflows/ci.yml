@@ -19,6 +19,37 @@ jobs:
           python3 -m py_compile runner/cli.py container/invoke.py
           python3 -m unittest discover -s tests -p 'test_*.py'
 
+      - name: Build fake Copilot transport for action smoke test
+        run: |
+          cat > /tmp/Containerfile.fake-copilot <<'EOF'
+          FROM alpine:3.22
+          ENTRYPOINT ["/bin/sh", "-c", "if [ -z \"$GITHUB_TOKEN\" ]; then exit 42; fi; printf '%s\\n' '{\"schema\":\"opencode-eval-runner/v1\",\"transport\":\"github-copilot-cli\",\"model\":\"fake\",\"agent\":\"eval-runner\",\"skill\":null,\"exit_code\":0,\"session_id\":null,\"text\":\"fake action smoke\",\"tools\":[],\"actions\":[],\"skills_loaded\":[],\"stderr\":\"\",\"stdout\":\"\"}'"]
+          EOF
+          docker build -f /tmp/Containerfile.fake-copilot -t opencode-eval-runner:fake-copilot /tmp
+          printf '%s\n' 'action smoke prompt' > /tmp/action-smoke-prompt.txt
+
+      - name: Exercise direct GitHub Action token path
+        uses: ./
+        with:
+          engine: docker
+          prepare-opencode: false
+          prepare-copilot: false
+          copilot-image: opencode-eval-runner:fake-copilot
+          transport: github-copilot-cli
+          model: fake
+          prompt-file: /tmp/action-smoke-prompt.txt
+          output: /tmp/action-smoke-result.json
+
+      - name: Verify direct action result
+        run: |
+          python3 - <<'PY'
+          import json
+          result = json.load(open("/tmp/action-smoke-result.json", encoding="utf-8"))
+          assert result["exit_code"] == 0
+          assert result["transport"] == "github-copilot-cli"
+          assert result["text"] == "fake action smoke"
+          PY
+
       - name: Build OpenCode transport image
         run: docker build -f Containerfile --target opencode -t opencode-eval-runner:opencode-test .
 

@@ -4,7 +4,13 @@ from pathlib import Path
 import unittest
 from unittest.mock import patch
 
-from container.invoke import assistant_from_export, extract_actions, invoke_opencode
+from container.invoke import (
+    assistant_from_export,
+    extract_actions,
+    extract_loaded_skills,
+    loaded_skills_from_export,
+    invoke_opencode,
+)
 
 
 class OpenCodeTransportTests(unittest.TestCase):
@@ -31,6 +37,56 @@ class OpenCodeTransportTests(unittest.TestCase):
                 }
             ],
         )
+
+    def test_extract_loaded_skills_counts_only_completed_native_skill_calls(self):
+        events = [
+            {
+                "type": "tool_use",
+                "part": {
+                    "type": "tool",
+                    "tool": "skill",
+                    "state": {"status": "completed", "input": {"name": "golang-concurrency"}},
+                },
+            },
+            {
+                "type": "tool_use",
+                "part": {
+                    "type": "tool",
+                    "tool": "skill",
+                    "state": {"status": "error", "input": {"id": "missing-skill"}},
+                },
+            },
+            {
+                "type": "tool_use",
+                "part": {
+                    "type": "tool",
+                    "tool": "skill",
+                    "state": {"status": "completed", "input": {"id": "architectural-design"}},
+                },
+            },
+        ]
+        self.assertEqual(
+            extract_loaded_skills(events),
+            ["golang-concurrency", "architectural-design"],
+        )
+
+    def test_failed_exported_skill_call_is_not_reported_as_loaded(self):
+        exported = [
+            {
+                "info": {"role": "assistant"},
+                "parts": [
+                    {
+                        "type": "tool",
+                        "tool": "skill",
+                        "state": {
+                            "status": "error",
+                            "input": {"id": "missing-skill"},
+                        },
+                    }
+                ],
+            }
+        ]
+        self.assertEqual(loaded_skills_from_export(exported), [])
 
     def test_session_export_preserves_tool_inputs_as_actions(self):
         exported = [
@@ -103,6 +159,26 @@ class OpenCodeTransportTests(unittest.TestCase):
         self.assertIn("--model", calls[0])
         self.assertNotIn("--refresh", calls[0])
         self.assertNotIn("models", calls[0][1:])
+
+    def test_skill_under_test_is_reported_without_forcing_a_load(self):
+        class Result:
+            returncode = 0
+            stdout = ""
+            stderr = ""
+
+        with patch("container.invoke.prepare_opencode_env", return_value={}), patch(
+            "container.invoke.run", return_value=Result()
+        ):
+            result = invoke_opencode(
+                "openai/gpt-5.5",
+                "reviewer",
+                "review this change",
+                30,
+                "architectural-design",
+            )
+
+        self.assertEqual(result["skill"], "architectural-design")
+        self.assertEqual(result["skills_loaded"], [])
 
     def test_plugin_diagnostic_does_not_spawn_managed_service(self):
         calls = []

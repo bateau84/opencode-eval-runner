@@ -138,6 +138,25 @@ def bind_arg(source: Path, target: str, *, readonly: bool = True) -> list[str]:
     return ["--volume", f"{source}:{target}:{mode}"]
 
 
+def extra_mount_arg(spec: str) -> list[str]:
+    parts = spec.rsplit(":", 2)
+    readonly = True
+    if len(parts) == 2:
+        source_raw, target = parts
+    elif len(parts) == 3 and parts[2] in {"ro", "rw"}:
+        source_raw, target, mode = parts
+        readonly = mode == "ro"
+    else:
+        raise RunnerError("mount must be SOURCE:TARGET[:ro|rw]")
+
+    if not source_raw or not target.startswith("/"):
+        raise RunnerError("mount must use a non-empty source and absolute container target")
+    source = Path(source_raw).expanduser()
+    if not source.exists():
+        raise RunnerError(f"mount source not found: {source}")
+    return bind_arg(source, target, readonly=readonly)
+
+
 def existing_seed(explicit: str | None, env_name: str, fallback: Path | None = None) -> Path | None:
     raw = explicit or os.environ.get(env_name)
     if raw:
@@ -198,6 +217,9 @@ def build_container_command(
     database_seed: Path | None = None,
 ) -> tuple[list[str], Path]:
     host_env = dict(os.environ) if host_env is None else host_env
+    skill = getattr(args, "skill", None)
+    if skill and args.transport != "opencode":
+        raise RunnerError("--skill is only supported by the opencode transport")
     engine = resolve_engine(args.engine)
     transport_env = (
         "OPENCODE_EVAL_RUNNER_OPENCODE_IMAGE"
@@ -250,6 +272,8 @@ def build_container_command(
     ]
     command += bind_arg(workspace, "/workspace", readonly=args.workspace_mode == "ro")
     command += bind_arg(input_dir, "/input", readonly=True)
+    for spec in getattr(args, "mount", []):
+        command += extra_mount_arg(spec)
 
     auth = existing_seed(args.auth, "OPENCODE_EVAL_RUNNER_AUTH", default_auth_path())
     config = existing_seed(args.config, "OPENCODE_EVAL_RUNNER_CONFIG")
@@ -274,6 +298,7 @@ def build_container_command(
         "--env", f"EVAL_TRANSPORT={args.transport}",
         "--env", f"EVAL_MODEL={args.model}",
         "--env", f"EVAL_AGENT={args.agent or ''}",
+        "--env", f"EVAL_SKILL={skill or ''}",
         "--env", "EVAL_PROMPT_FILE=/input/prompt.txt",
         "--env", "EVAL_SYSTEM_FILE=/input/system.txt",
         "--env", f"EVAL_TIMEOUT_SECONDS={args.timeout_seconds}",
@@ -365,8 +390,19 @@ def parser() -> argparse.ArgumentParser:
     run.add_argument("--image")
     run.add_argument("--workspace", default=".")
     run.add_argument("--workspace-mode", choices=("ro", "rw"), default="ro")
+    run.add_argument(
+        "--mount",
+        action="append",
+        default=[],
+        metavar="SOURCE:TARGET[:ro|rw]",
+        help="Additional explicit bind mount. May be repeated.",
+    )
     run.add_argument("--model", required=True)
     run.add_argument("--agent")
+    run.add_argument(
+        "--skill",
+        help="Skill ID under test (OpenCode only; records intent but does not force the skill to load).",
+    )
     run.add_argument("--prompt-file", required=True)
     run.add_argument("--system-file")
     run.add_argument("--output", required=True)

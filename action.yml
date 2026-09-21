@@ -1,5 +1,5 @@
 name: OpenCode Eval Runner
-description: Set up isolated OCI eval transports and optionally execute a repository-owned eval command.
+description: Run isolated OpenCode or GitHub Copilot behavioral eval invocations, or set up the runner for a repository-owned eval harness.
 author: bateau84
 
 inputs:
@@ -20,15 +20,63 @@ inputs:
     required: false
     default: "true"
   engine:
-    description: Container engine used by repository eval harnesses.
+    description: Container engine used by eval invocations.
     required: false
     default: docker
   build:
     description: Build transport images from this action checkout instead of pulling published images.
     required: false
     default: "false"
+  transport:
+    description: Direct-invocation transport. Ignored when command is supplied.
+    required: false
+    default: opencode
+  model:
+    description: Direct-invocation model. When set and command is empty, the action runs one isolated invocation.
+    required: false
+    default: ""
+  agent:
+    description: Optional OpenCode agent for direct invocation.
+    required: false
+    default: ""
+  skill:
+    description: Optional OpenCode skill under test for direct invocation.
+    required: false
+    default: ""
+  workspace:
+    description: Workspace mounted into the direct invocation.
+    required: false
+    default: .
+  workspace-mode:
+    description: Workspace mount mode for direct invocation (ro or rw).
+    required: false
+    default: ro
+  prompt-file:
+    description: Prompt file for direct invocation. Required when model is set.
+    required: false
+    default: ""
+  system-file:
+    description: Optional system prompt file for direct invocation.
+    required: false
+    default: ""
+  output:
+    description: Result JSON path for direct invocation.
+    required: false
+    default: .opencode-evals/result.json
+  mounts:
+    description: Optional newline-separated SOURCE:TARGET[:ro|rw] extra mounts for direct invocation.
+    required: false
+    default: ""
+  timeout-seconds:
+    description: Model invocation timeout.
+    required: false
+    default: "240"
+  container-timeout:
+    description: Outer container timeout.
+    required: false
+    default: "300"
   command:
-    description: Optional repository-owned eval command to execute after runner setup.
+    description: Optional repository-owned eval command to execute after runner setup. Takes precedence over direct invocation inputs.
     required: false
     default: ""
   artifact-dir:
@@ -88,6 +136,53 @@ runs:
         echo "OPENCODE_EVAL_RUNNER_COPILOT_IMAGE=$copilot_image" >> "$GITHUB_ENV"
         echo "OPENCODE_EVAL_RUNNER_ENGINE=$INPUT_ENGINE" >> "$GITHUB_ENV"
         mkdir -p "$INPUT_ARTIFACT_DIR"
+
+    - name: Run direct isolated eval
+      if: ${{ inputs.command == '' && inputs.model != '' }}
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+        INPUT_ENGINE: ${{ inputs.engine }}
+        INPUT_TRANSPORT: ${{ inputs.transport }}
+        INPUT_MODEL: ${{ inputs.model }}
+        INPUT_AGENT: ${{ inputs.agent }}
+        INPUT_SKILL: ${{ inputs.skill }}
+        INPUT_WORKSPACE: ${{ inputs.workspace }}
+        INPUT_WORKSPACE_MODE: ${{ inputs.workspace-mode }}
+        INPUT_PROMPT_FILE: ${{ inputs.prompt-file }}
+        INPUT_SYSTEM_FILE: ${{ inputs.system-file }}
+        INPUT_OUTPUT: ${{ inputs.output }}
+        INPUT_MOUNTS: ${{ inputs.mounts }}
+        INPUT_TIMEOUT_SECONDS: ${{ inputs.timeout-seconds }}
+        INPUT_CONTAINER_TIMEOUT: ${{ inputs.container-timeout }}
+      run: |
+        set -euo pipefail
+        if [[ -z "$INPUT_PROMPT_FILE" ]]; then
+          echo "opencode-eval-runner action: prompt-file is required when model is set" >&2
+          exit 2
+        fi
+
+        args=(
+          opencode-eval-runner invoke
+          --engine "$INPUT_ENGINE"
+          --transport "$INPUT_TRANSPORT"
+          --workspace "$INPUT_WORKSPACE"
+          --workspace-mode "$INPUT_WORKSPACE_MODE"
+          --model "$INPUT_MODEL"
+          --prompt-file "$INPUT_PROMPT_FILE"
+          --output "$INPUT_OUTPUT"
+          --timeout-seconds "$INPUT_TIMEOUT_SECONDS"
+          --container-timeout "$INPUT_CONTAINER_TIMEOUT"
+        )
+        [[ -n "$INPUT_AGENT" ]] && args+=(--agent "$INPUT_AGENT")
+        [[ -n "$INPUT_SKILL" ]] && args+=(--skill "$INPUT_SKILL")
+        [[ -n "$INPUT_SYSTEM_FILE" ]] && args+=(--system-file "$INPUT_SYSTEM_FILE")
+        while IFS= read -r mount; do
+          [[ -z "$mount" ]] && continue
+          args+=(--mount "$mount")
+        done <<< "$INPUT_MOUNTS"
+
+        "${args[@]}"
 
     - name: Run repository eval command
       if: ${{ inputs.command != '' }}
