@@ -138,6 +138,26 @@ OPENCODE_EVAL_RUNNER_MODELS=/path/to/models.json
 OPENCODE_EVAL_RUNNER_CONFIG=/path/to/opencode.json
 ```
 
+### Evaluating a skill
+
+Skills are evaluated through a normal OpenCode agent, not as a separate transport. Use `--skill` to identify the skill under test while keeping the prompt and grading semantics in the eval repository:
+
+```bash
+PYTHONPATH=. python3 bin/opencode-eval-runner invoke \\
+  --engine podman \\
+  --transport opencode \\
+  --workspace /path/to/evaluated/project \\
+  --model openai/gpt-5.5 \\
+  --agent reviewer \\
+  --skill architectural-design \\
+  --prompt-file /tmp/prompt.txt \\
+  --output /tmp/skill-target.json
+```
+
+`--skill` does not force-load or inject the skill into the prompt. OpenCode discovers skills normally from the evaluated workspace/config, and the agent must load the skill through the native `skill` tool. The result records both the requested `skill` and normalized `skills_loaded`, derived from observed tool actions. This lets the repository-owned harness prove that the intended skill was actually used without moving PASS/FAIL policy into the runner.
+
+The runner accepts both the older `{"name":"..."}` and V2 `{"id":"..."}` skill-tool argument shapes when building `skills_loaded`.
+
 ### Copilot CLI locally
 
 ```bash
@@ -205,10 +225,13 @@ Each invocation writes one JSON document:
   "transport": "opencode",
   "model": "openai/gpt-5.3-codex-spark",
   "agent": "reviewer",
+  "skill": "architectural-design",
   "exit_code": 0,
   "session_id": "...",
   "text": "...",
-  "tools": [],
+  "tools": ["skill"],
+  "actions": [{"tool": "skill", "args": {"id": "architectural-design"}}],
+  "skills_loaded": ["architectural-design"],
   "stderr": "",
   "stdout": "..."
 }

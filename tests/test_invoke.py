@@ -4,7 +4,12 @@ from pathlib import Path
 import unittest
 from unittest.mock import patch
 
-from container.invoke import assistant_from_export, extract_actions, invoke_opencode
+from container.invoke import (
+    assistant_from_export,
+    extract_actions,
+    extract_loaded_skills,
+    invoke_opencode,
+)
 
 
 class OpenCodeTransportTests(unittest.TestCase):
@@ -30,6 +35,18 @@ class OpenCodeTransportTests(unittest.TestCase):
                     "args": {"filePath": "/workspace/ASSESSMENT.md"},
                 }
             ],
+        )
+
+    def test_extract_loaded_skills_normalizes_id_and_name(self):
+        actions = [
+            {"tool": "skill", "args": {"name": "golang-concurrency"}},
+            {"tool": "skill", "args": {"id": "architectural-design"}},
+            {"tool": "skill", "args": {"id": "architectural-design"}},
+            {"tool": "read", "args": {"filePath": "/workspace/README.md"}},
+        ]
+        self.assertEqual(
+            extract_loaded_skills(actions),
+            ["golang-concurrency", "architectural-design"],
         )
 
     def test_session_export_preserves_tool_inputs_as_actions(self):
@@ -103,6 +120,26 @@ class OpenCodeTransportTests(unittest.TestCase):
         self.assertIn("--model", calls[0])
         self.assertNotIn("--refresh", calls[0])
         self.assertNotIn("models", calls[0][1:])
+
+    def test_skill_under_test_is_reported_without_forcing_a_load(self):
+        class Result:
+            returncode = 0
+            stdout = ""
+            stderr = ""
+
+        with patch("container.invoke.prepare_opencode_env", return_value={}), patch(
+            "container.invoke.run", return_value=Result()
+        ):
+            result = invoke_opencode(
+                "openai/gpt-5.5",
+                "reviewer",
+                "review this change",
+                30,
+                "architectural-design",
+            )
+
+        self.assertEqual(result["skill"], "architectural-design")
+        self.assertEqual(result["skills_loaded"], [])
 
     def test_plugin_diagnostic_does_not_spawn_managed_service(self):
         calls = []

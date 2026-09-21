@@ -107,6 +107,20 @@ def extract_actions(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return actions
 
 
+def extract_loaded_skills(actions: list[dict[str, Any]]) -> list[str]:
+    found: list[str] = []
+    for action in actions:
+        if action.get("tool") != "skill":
+            continue
+        args = action.get("args")
+        if not isinstance(args, dict):
+            continue
+        skill = args.get("id") or args.get("name")
+        if isinstance(skill, str) and skill and skill not in found:
+            found.append(skill)
+    return found
+
+
 def assistant_from_export(exported: Any) -> tuple[str, list[str], list[dict[str, Any]]]:
     parts: list[str] = []
     tools: list[str] = []
@@ -218,7 +232,13 @@ def plugin_diagnostic(env: dict[str, str]) -> dict[str, Any]:
     }
 
 
-def invoke_opencode(model: str, agent: str, prompt: str, timeout: int) -> dict[str, Any]:
+def invoke_opencode(
+    model: str,
+    agent: str,
+    prompt: str,
+    timeout: int,
+    skill: str = "",
+) -> dict[str, Any]:
     env = prepare_opencode_env()
     plugins = plugin_diagnostic(env)
 
@@ -248,17 +268,20 @@ def invoke_opencode(model: str, agent: str, prompt: str, timeout: int) -> dict[s
     text = exported_text or extract_text(events)
     tools = exported_tools or extract_tools(events)
     actions = exported_actions or extract_actions(events)
+    skills_loaded = extract_loaded_skills(actions)
 
     return {
         "schema": RESULT_SCHEMA,
         "transport": "opencode",
         "model": model,
         "agent": agent or None,
+        "skill": skill or None,
         "exit_code": proc.returncode,
         "session_id": sid,
         "text": text,
         "tools": tools,
         "actions": actions,
+        "skills_loaded": skills_loaded,
         "stderr": proc.stderr[:20000],
         "stdout": proc.stdout[:200000],
         "plugin_diagnostic": plugins,
@@ -293,11 +316,13 @@ def invoke_copilot(model: str, prompt: str, system: str, timeout: int) -> dict[s
             "transport": "github-copilot-cli",
             "model": model,
             "agent": COPILOT_AGENT_NAME,
+            "skill": None,
             "exit_code": 2,
             "session_id": None,
             "text": "",
             "tools": [],
             "actions": [],
+            "skills_loaded": [],
             "stderr": "github-copilot-cli requires COPILOT_GITHUB_TOKEN, GH_TOKEN, or GITHUB_TOKEN",
             "stdout": "",
         }
@@ -337,12 +362,14 @@ def invoke_copilot(model: str, prompt: str, system: str, timeout: int) -> dict[s
         "transport": "github-copilot-cli",
         "model": model,
         "agent": COPILOT_AGENT_NAME,
+        "skill": None,
         "credential_source": auth_source,
         "exit_code": proc.returncode,
         "session_id": None,
         "text": proc.stdout.strip() if proc.returncode == 0 else "",
         "tools": [],
         "actions": [],
+        "skills_loaded": [],
         "stderr": proc.stderr[:20000],
         "stdout": proc.stdout[:200000],
     }
@@ -358,13 +385,14 @@ def main() -> int:
         transport = os.environ.get("EVAL_TRANSPORT", "opencode")
         model = os.environ["EVAL_MODEL"]
         agent = os.environ.get("EVAL_AGENT", "")
+        skill = os.environ.get("EVAL_SKILL", "")
         timeout = int(os.environ.get("EVAL_TIMEOUT_SECONDS", "240"))
         prompt = Path(os.environ.get("EVAL_PROMPT_FILE", "/input/prompt.txt")).read_text(encoding="utf-8")
         system_path = Path(os.environ.get("EVAL_SYSTEM_FILE", "/input/system.txt"))
         system = system_path.read_text(encoding="utf-8") if system_path.is_file() else ""
 
         if transport == "opencode":
-            result = invoke_opencode(model, agent, prompt, timeout)
+            result = invoke_opencode(model, agent, prompt, timeout, skill)
         elif transport == "github-copilot-cli":
             result = invoke_copilot(model, prompt, system, timeout)
         else:
@@ -377,11 +405,13 @@ def main() -> int:
             "schema": RESULT_SCHEMA,
             "transport": os.environ.get("EVAL_TRANSPORT"),
             "model": os.environ.get("EVAL_MODEL"),
+            "skill": os.environ.get("EVAL_SKILL") or None,
             "exit_code": 2,
             "session_id": None,
             "text": "",
             "tools": [],
             "actions": [],
+            "skills_loaded": [],
             "stderr": f"{type(exc).__name__}: {exc}",
             "stdout": "",
             "infrastructure_error": True,

@@ -198,6 +198,9 @@ def build_container_command(
     database_seed: Path | None = None,
 ) -> tuple[list[str], Path]:
     host_env = dict(os.environ) if host_env is None else host_env
+    skill = getattr(args, "skill", None)
+    if skill and args.transport != "opencode":
+        raise RunnerError("--skill is only supported by the opencode transport")
     engine = resolve_engine(args.engine)
     transport_env = (
         "OPENCODE_EVAL_RUNNER_OPENCODE_IMAGE"
@@ -274,6 +277,7 @@ def build_container_command(
         "--env", f"EVAL_TRANSPORT={args.transport}",
         "--env", f"EVAL_MODEL={args.model}",
         "--env", f"EVAL_AGENT={args.agent or ''}",
+        "--env", f"EVAL_SKILL={skill or ''}",
         "--env", "EVAL_PROMPT_FILE=/input/prompt.txt",
         "--env", "EVAL_SYSTEM_FILE=/input/system.txt",
         "--env", f"EVAL_TIMEOUT_SECONDS={args.timeout_seconds}",
@@ -367,6 +371,10 @@ def parser() -> argparse.ArgumentParser:
     run.add_argument("--workspace-mode", choices=("ro", "rw"), default="ro")
     run.add_argument("--model", required=True)
     run.add_argument("--agent")
+    run.add_argument(
+        "--skill",
+        help="Skill ID under test (OpenCode only; records intent but does not force the skill to load).",
+    )
     run.add_argument("--prompt-file", required=True)
     run.add_argument("--system-file")
     run.add_argument("--output", required=True)
