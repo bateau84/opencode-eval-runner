@@ -228,7 +228,7 @@ Larger suites can use the action as the execution boundary and run their own cor
           --cases INTENT-01,WORK-01,REVIEW-01,CRITIC-01
 ```
 
-The action exposes `GITHUB_TOKEN` to both direct Copilot invocations and repository-owned commands. The runner passes only the token variable name into the isolated Copilot container; the token value is not placed on the command line.
+The action exposes the workflow's built-in `GITHUB_TOKEN` to both direct Copilot invocations and repository-owned commands. In Action mode it deliberately clears inherited `COPILOT_GITHUB_TOKEN` and `GH_TOKEN` values so Copilot cannot silently select a higher-precedence credential. The runner passes only the selected token variable name into the isolated Copilot container; the token value is not placed on the command line.
 
 For OpenCode credentials in CI, materialize a protected secret as a file before the eval and point `OPENCODE_EVAL_RUNNER_AUTH` at it. Do not commit auth files.
 

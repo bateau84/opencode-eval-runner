@@ -23,13 +23,16 @@ jobs:
         run: |
           cat > /tmp/Containerfile.fake-copilot <<'EOF'
           FROM alpine:3.22
-          ENTRYPOINT ["/bin/sh", "-c", "if [ -z \"$GITHUB_TOKEN\" ]; then exit 42; fi; printf '%s\\n' '{\"schema\":\"opencode-eval-runner/v1\",\"transport\":\"github-copilot-cli\",\"model\":\"fake\",\"agent\":\"eval-runner\",\"skill\":null,\"exit_code\":0,\"session_id\":null,\"text\":\"fake action smoke\",\"tools\":[],\"actions\":[],\"skills_loaded\":[],\"stderr\":\"\",\"stdout\":\"\"}'"]
+          ENTRYPOINT ["/bin/sh", "-c", "if [ -z \"$GITHUB_TOKEN\" ] || [ -n \"$COPILOT_GITHUB_TOKEN\" ] || [ -n \"$GH_TOKEN\" ]; then exit 42; fi; printf '%s\\n' '{\"schema\":\"opencode-eval-runner/v1\",\"transport\":\"github-copilot-cli\",\"model\":\"fake\",\"agent\":\"eval-runner\",\"skill\":null,\"exit_code\":0,\"session_id\":null,\"text\":\"fake action smoke\",\"tools\":[],\"actions\":[],\"skills_loaded\":[],\"stderr\":\"\",\"stdout\":\"\"}'"]
           EOF
           docker build -f /tmp/Containerfile.fake-copilot -t opencode-eval-runner:fake-copilot /tmp
           printf '%s\n' 'action smoke prompt' > /tmp/action-smoke-prompt.txt
 
       - name: Exercise direct GitHub Action token path
         uses: ./
+        env:
+          COPILOT_GITHUB_TOKEN: should-not-win
+          GH_TOKEN: should-not-win
         with:
           engine: docker
           prepare-opencode: false
@@ -39,6 +42,16 @@ jobs:
           model: fake
           prompt-file: /tmp/action-smoke-prompt.txt
           output: /tmp/action-smoke-result.json
+
+      - name: Exercise repository command token sanitization
+        uses: ./
+        env:
+          COPILOT_GITHUB_TOKEN: should-not-win
+          GH_TOKEN: should-not-win
+        with:
+          prepare-opencode: false
+          prepare-copilot: false
+          command: test -n "$GITHUB_TOKEN" && test -z "$COPILOT_GITHUB_TOKEN" && test -z "$GH_TOKEN"
 
       - name: Verify direct action result
         run: |

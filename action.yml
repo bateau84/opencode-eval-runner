@@ -141,6 +141,11 @@ runs:
       if: ${{ inputs.command == '' && inputs.model != '' }}
       shell: bash
       env:
+        # Action mode deliberately forces GitHub's ephemeral workflow token.
+        # Copilot CLI prefers COPILOT_GITHUB_TOKEN and GH_TOKEN when present,
+        # so neutralize inherited higher-precedence credentials.
+        COPILOT_GITHUB_TOKEN: ""
+        GH_TOKEN: ""
         GITHUB_TOKEN: ${{ github.token }}
         INPUT_ENGINE: ${{ inputs.engine }}
         INPUT_TRANSPORT: ${{ inputs.transport }}
@@ -188,6 +193,9 @@ runs:
       if: ${{ inputs.command != '' }}
       shell: bash
       env:
+        # Repository-owned harnesses get the same deterministic auth contract.
+        COPILOT_GITHUB_TOKEN: ""
+        GH_TOKEN: ""
         GITHUB_TOKEN: ${{ github.token }}
         EVAL_COMMAND: ${{ inputs.command }}
       run: |
