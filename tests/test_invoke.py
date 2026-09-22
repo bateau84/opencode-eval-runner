@@ -250,7 +250,7 @@ class OpenCodeTransportTests(unittest.TestCase):
         self.assertEqual(result["skill"], "architectural-design")
         self.assertEqual(result["skills_loaded"], [])
 
-    def test_expected_plugin_preflight_accepts_active_inventory_plugin(self):
+    def test_expected_plugin_preflight_accepts_registered_tools(self):
         calls = []
 
         class Result:
@@ -262,12 +262,10 @@ class OpenCodeTransportTests(unittest.TestCase):
 
         def fake_run(command, cwd, env, timeout):
             calls.append(command)
+            self.assertEqual(env.get("OPENCODE_PRINT_LOGS"), "1")
             return Result(json.dumps({
                 "location": {"directory": "/workspace"},
-                "data": [
-                    {"id": "builtin", "state": {"status": "active"}},
-                    {"id": "loom", "state": {"status": "active"}},
-                ],
+                "data": ["read", "loom_start", "loom_route", "loom_status"],
             }))
 
         with tempfile.TemporaryDirectory() as tmp, patch(
@@ -283,32 +281,23 @@ class OpenCodeTransportTests(unittest.TestCase):
         self.assertEqual(result["expected"], "loom")
         self.assertEqual(result["agent"], "general")
         self.assertEqual(result["entrypoints"], ["plugins/loom.ts"])
-        self.assertEqual(result["plugin"]["id"], "loom")
-        self.assertEqual(result["plugin"]["state"]["status"], "active")
-        self.assertEqual(result["verification"], "plugin-entrypoint+plugin-inventory")
+        self.assertEqual(result["tools"], ["loom_route", "loom_start", "loom_status"])
+        self.assertEqual(result["verification"], "plugin-entrypoint+ready-tool-registry")
         self.assertEqual(
             calls,
-            [[
-                "opencode",
-                "api",
-                "--standalone",
-                "plugin.list",
-                "--param",
-                "directory=/workspace",
-            ]],
+            [["opencode", "api", "--standalone", "GET", "/experimental/tool/ids"]],
         )
 
-    def test_expected_plugin_preflight_bounds_inventory_timeout(self):
+    def test_expected_plugin_preflight_bounds_tool_timeout(self):
         seen = []
 
         class Result:
             returncode = 0
             stderr = ""
-            stdout = json.dumps([{"id": "loom", "state": {"status": "active"}}])
+            stdout = json.dumps(["loom_start"])
 
         def fake_run(command, cwd, env, timeout):
             seen.append(timeout)
-            self.assertEqual(env.get("OPENCODE_PRINT_LOGS"), "1")
             return Result()
 
         with tempfile.TemporaryDirectory() as tmp, patch(
@@ -328,10 +317,10 @@ class OpenCodeTransportTests(unittest.TestCase):
 
         self.assertEqual(seen, [30])
 
-    def test_expected_plugin_preflight_rejects_missing_inventory_plugin(self):
+    def test_expected_plugin_preflight_rejects_missing_registered_tools(self):
         class Result:
             returncode = 0
-            stderr = "inventory logs"
+            stderr = "plugin startup logs"
 
             def __init__(self, stdout):
                 self.stdout = stdout
@@ -340,7 +329,7 @@ class OpenCodeTransportTests(unittest.TestCase):
             "container.invoke.run",
             return_value=Result(json.dumps({
                 "location": {"directory": "/workspace"},
-                "data": [{"id": "builtin", "state": {"status": "active"}}],
+                "data": ["read", "grep", "execute"],
             })),
         ):
             config = Path(tmp)
@@ -348,40 +337,7 @@ class OpenCodeTransportTests(unittest.TestCase):
             plugins.mkdir()
             (plugins / "loom.ts").write_text("export default {}\n", encoding="utf-8")
             env = {"OPENCODE_CONFIG_DIR": tmp}
-            with self.assertRaisesRegex(RuntimeError, "not present in OpenCode plugin inventory"):
-                verify_expected_plugin(env, "general", "openai/gpt-5.5", "loom", 30)
-
-    def test_expected_plugin_preflight_surfaces_failed_plugin_error(self):
-        class Result:
-            returncode = 0
-            stderr = "server diagnostic output"
-
-            def __init__(self, stdout):
-                self.stdout = stdout
-
-        with tempfile.TemporaryDirectory() as tmp, patch(
-            "container.invoke.run",
-            return_value=Result(json.dumps({
-                "location": {"directory": "/workspace"},
-                "data": [{
-                    "id": "loom",
-                    "state": {
-                        "status": "failed",
-                        "error": "Cannot resolve @opencode/plugin/rpc",
-                        "ref": "err_fixture",
-                    },
-                }],
-            })),
-        ):
-            config = Path(tmp)
-            plugins = config / "plugins"
-            plugins.mkdir()
-            (plugins / "loom.ts").write_text("export default {}\n", encoding="utf-8")
-            env = {"OPENCODE_CONFIG_DIR": tmp}
-            with self.assertRaisesRegex(
-                RuntimeError,
-                "Cannot resolve @opencode/plugin/rpc",
-            ):
+            with self.assertRaisesRegex(RuntimeError, "registered no tools"):
                 verify_expected_plugin(env, "general", "openai/gpt-5.5", "loom", 30)
 
     def test_expected_plugin_preflight_rejects_missing_materialized_plugin(self):
@@ -390,11 +346,11 @@ class OpenCodeTransportTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "is not materialized"):
                 verify_expected_plugin(env, "general", "openai/gpt-5.5", "loom", 30)
 
-    def test_expected_plugin_preflight_rejects_inventory_failure(self):
+    def test_expected_plugin_preflight_rejects_tool_registry_failure(self):
         class Result:
             returncode = 1
             stdout = ""
-            stderr = "plugin inventory failed"
+            stderr = "plugin tool registry failed"
 
         with tempfile.TemporaryDirectory() as tmp, patch(
             "container.invoke.run", return_value=Result()
@@ -404,7 +360,7 @@ class OpenCodeTransportTests(unittest.TestCase):
             plugins.mkdir()
             (plugins / "loom.ts").write_text("export default {}\n", encoding="utf-8")
             env = {"OPENCODE_CONFIG_DIR": tmp}
-            with self.assertRaisesRegex(RuntimeError, "plugin inventory failed"):
+            with self.assertRaisesRegex(RuntimeError, "plugin tool registry failed"):
                 verify_expected_plugin(env, "general", "openai/gpt-5.5", "loom", 30)
 
     def test_plugin_diagnostic_does_not_spawn_managed_service(self):
