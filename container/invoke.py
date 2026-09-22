@@ -265,12 +265,45 @@ def verify_expected_plugin(
     timeout: int,
 ) -> dict[str, Any]:
     if not expected_plugin:
-        return {"expected": None, "matched_tools": []}
+        return {"expected": None, "agent": None, "entrypoints": []}
     if not agent:
         raise RuntimeError("expected plugin preflight requires an agent")
+    if not re.fullmatch(r"[A-Za-z0-9_.-]+", expected_plugin):
+        raise RuntimeError(f"invalid expected plugin name: {expected_plugin!r}")
 
     ensure_model_config(env, model)
-    command = ["opencode", "debug", "agent", agent]
+    config_root = Path(
+        env.get("OPENCODE_CONFIG_DIR")
+        or Path(env.get("XDG_CONFIG_HOME", "/tmp/runtime/config")) / "opencode"
+    )
+    plugins_root = config_root / "plugins"
+    candidates = [
+        plugins_root / expected_plugin,
+        plugins_root / f"{expected_plugin}.ts",
+        plugins_root / f"{expected_plugin}.js",
+        plugins_root / f"{expected_plugin}.mjs",
+    ]
+    entrypoints = sorted(
+        str(path.relative_to(config_root))
+        for path in candidates
+        if path.is_dir() or path.is_file()
+    )
+    if not entrypoints:
+        available = (
+            sorted(item.name for item in plugins_root.iterdir())
+            if plugins_root.is_dir()
+            else []
+        )
+        raise RuntimeError(
+            f"expected plugin {expected_plugin!r} is not materialized in {plugins_root}; "
+            f"available entries: {available[:80]}"
+        )
+
+    # OpenCode 2.0.12 removed the old singular `debug agent <id>` command
+    # that exposed a resolved tools map. `debug agents` is the supported
+    # zero-inference startup path. It proves the configured location starts
+    # successfully with plugins active and that the selected agent resolves.
+    command = ["opencode", "debug", "agents"]
     proc = run(command, Path("/workspace"), env, min(timeout, 60))
     if proc.returncode != 0:
         detail = " | ".join(part.strip() for part in (proc.stderr, proc.stdout) if part.strip())
@@ -279,27 +312,41 @@ def verify_expected_plugin(
             + (f": {detail[:2000]}" if detail else "")
         )
     try:
-        resolved = json.loads(proc.stdout)
+        agents = json.loads(proc.stdout)
     except json.JSONDecodeError as exc:
         raise RuntimeError(
-            f"expected plugin preflight returned invalid agent JSON for {expected_plugin!r}: {exc}"
+            f"expected plugin preflight returned invalid agent list JSON for {expected_plugin!r}: {exc}"
         ) from exc
-    tools = resolved.get("tools") if isinstance(resolved, dict) else None
-    if not isinstance(tools, dict):
-        raise RuntimeError(f"expected plugin preflight returned no resolved tools for {expected_plugin!r}")
-    prefix = expected_plugin.replace(".", "_") + "_"
-    matched = sorted(
-        name
-        for name, enabled in tools.items()
-        if isinstance(name, str) and name.startswith(prefix) and enabled is not False
-    )
-    if not matched:
-        available = sorted(str(name) for name in tools)[:80]
+    if not isinstance(agents, list):
         raise RuntimeError(
-            f"expected plugin {expected_plugin!r} is not loaded for agent {agent!r}; "
-            f"no enabled tools start with {prefix!r}. Resolved tools: {available}"
+            f"expected plugin preflight returned invalid agent list for {expected_plugin!r}"
         )
-    return {"expected": expected_plugin, "matched_tools": matched}
+    resolved = next(
+        (
+            value
+            for value in agents
+            if isinstance(value, dict)
+            and (value.get("id") == agent or value.get("name") == agent)
+        ),
+        None,
+    )
+    if resolved is None:
+        available = sorted(
+            str(value.get("id") or value.get("name"))
+            for value in agents
+            if isinstance(value, dict) and (value.get("id") or value.get("name"))
+        )
+        raise RuntimeError(
+            f"expected plugin preflight could not resolve agent {agent!r}; "
+            f"available agents: {available[:80]}"
+        )
+
+    return {
+        "expected": expected_plugin,
+        "agent": str(resolved.get("id") or resolved.get("name") or agent),
+        "entrypoints": entrypoints,
+        "verification": "plugin-entrypoint+opencode-startup",
+    }
 
 
 def plugin_diagnostic(env: dict[str, str]) -> dict[str, Any]:
