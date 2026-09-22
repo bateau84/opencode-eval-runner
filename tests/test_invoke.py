@@ -423,6 +423,12 @@ class OpenCodeTransportTests(unittest.TestCase):
         self.assertIn('plugin_root = config / "plugins"', invoke)
         self.assertIn("shutil.copytree(loom_source, module_root, dirs_exist_ok=True)", invoke)
         self.assertIn('(plugin_root / "loom.ts").write_text(', invoke)
+        self.assertIn('workspace_node_modules = Path("/workspace/node_modules")', invoke)
+        self.assertIn('config_node_modules = config / "node_modules"', invoke)
+        self.assertIn(
+            "config_node_modules.symlink_to(workspace_node_modules, target_is_directory=True)",
+            invoke,
+        )
         self.assertNotIn("target.symlink_to(source, target_is_directory=True)", invoke)
 
 
