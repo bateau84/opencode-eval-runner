@@ -42,6 +42,35 @@ def run(command: list[str], cwd: Path, env: dict[str, str], timeout: int) -> sub
     )
 
 
+def timeout_output(value: str | bytes | None) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, bytes):
+        return value.decode("utf-8", errors="replace")
+    return value
+
+
+def last_event_summary(events: list[dict[str, Any]]) -> dict[str, Any] | None:
+    if not events:
+        return None
+    event = events[-1]
+    part = event.get("part")
+    result: dict[str, Any] = {}
+    for key in ("type", "timestamp", "sessionID", "sessionId"):
+        value = event.get(key)
+        if value is not None:
+            result[key] = value
+    if isinstance(part, dict):
+        for key in ("type", "tool"):
+            value = part.get(key)
+            if value is not None:
+                result["part_" + key] = value
+        state = part.get("state")
+        if isinstance(state, dict) and state.get("status") is not None:
+            result["part_status"] = state.get("status")
+    return result
+
+
 def parse_events(text: str) -> list[dict[str, Any]]:
     events: list[dict[str, Any]] = []
     for line in text.splitlines():
@@ -595,7 +624,47 @@ def invoke_opencode(
         command += ["--agent", agent]
     command += ["--model", model, prompt]
     run_started = time.perf_counter()
-    proc = run(command, Path("/workspace"), env, timeout)
+    try:
+        proc = run(command, Path("/workspace"), env, timeout)
+    except subprocess.TimeoutExpired as exc:
+        run_seconds = time.perf_counter() - run_started
+        stdout = timeout_output(exc.stdout)
+        stderr = timeout_output(exc.stderr)
+        events = parse_events(stdout)
+        sid = session_id(events)
+        summary = last_event_summary(events)
+        detail = (
+            f"opencode run timed out after {timeout}s; "
+            f"partial_events={len(events)}"
+            + (f"; last_event={json.dumps(summary, sort_keys=True)}" if summary else "")
+        )
+        if stderr.strip():
+            detail += "\n" + stderr.strip()
+        return {
+            "schema": RESULT_SCHEMA,
+            "transport": "opencode",
+            "model": model,
+            "agent": agent or None,
+            "skill": skill or None,
+            "exit_code": 124,
+            "timed_out": True,
+            "session_id": sid,
+            "text": extract_text(events),
+            "tools": extract_tools(events),
+            "actions": extract_actions(events),
+            "skills_loaded": extract_loaded_skills(events),
+            "timing": {
+                "run_seconds": round(run_seconds, 3),
+                "export_seconds": 0.0,
+                "export_exit_code": None,
+                "total_seconds": round(run_seconds, 3),
+            },
+            "stderr": detail[:20000],
+            "stdout": stdout[:200000],
+            "plugin_diagnostic": plugins,
+            "plugin_preflight": plugin_preflight,
+        }
+
     run_seconds = time.perf_counter() - run_started
     events = parse_events(proc.stdout)
     sid = session_id(events)
