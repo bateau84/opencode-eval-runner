@@ -341,11 +341,58 @@ def verify_expected_plugin(
             f"available agents: {available[:80]}"
         )
 
+    tool_command = [
+        "opencode",
+        "api",
+        "--standalone",
+        "get",
+        "/api/experimental/tool/ids",
+    ]
+    tool_proc = run(tool_command, Path("/workspace"), env, min(timeout, 30))
+    if tool_proc.returncode != 0:
+        detail = " | ".join(
+            part.strip()
+            for part in (tool_proc.stderr, tool_proc.stdout)
+            if part.strip()
+        )
+        raise RuntimeError(
+            f"expected plugin tool preflight failed for {expected_plugin!r}"
+            + (f": {detail[:2000]}" if detail else "")
+        )
+    try:
+        tool_payload = json.loads(tool_proc.stdout)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(
+            f"expected plugin tool preflight returned invalid tool ID JSON for {expected_plugin!r}: {exc}"
+        ) from exc
+
+    if isinstance(tool_payload, list):
+        tool_ids = [str(value) for value in tool_payload if isinstance(value, str)]
+    elif isinstance(tool_payload, dict) and isinstance(tool_payload.get("ids"), list):
+        tool_ids = [
+            str(value)
+            for value in tool_payload["ids"]
+            if isinstance(value, str)
+        ]
+    else:
+        raise RuntimeError(
+            f"expected plugin tool preflight returned invalid tool ID payload for {expected_plugin!r}"
+        )
+
+    prefix = expected_plugin.replace(".", "_").replace("-", "_") + "_"
+    plugin_tools = sorted(tool for tool in tool_ids if tool.startswith(prefix))
+    if not plugin_tools:
+        raise RuntimeError(
+            f"expected plugin {expected_plugin!r} registered no tools with prefix {prefix!r}; "
+            f"available tool IDs: {sorted(tool_ids)[:120]}"
+        )
+
     return {
         "expected": expected_plugin,
         "agent": str(resolved.get("id") or resolved.get("name") or agent),
         "entrypoints": entrypoints,
-        "verification": "plugin-entrypoint+opencode-startup",
+        "tools": plugin_tools,
+        "verification": "plugin-entrypoint+opencode-startup+tool-registry",
     }
 
 
