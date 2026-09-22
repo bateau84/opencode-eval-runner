@@ -313,8 +313,8 @@ def verify_expected_plugin(
 
     tool_command = [
         "opencode",
-        "--standalone",
         "api",
+        "--standalone",
         "GET",
         "/experimental/tool/ids",
     ]

@@ -284,7 +284,7 @@ class OpenCodeTransportTests(unittest.TestCase):
         self.assertEqual(result["verification"], "plugin-entrypoint+tool-registry")
         self.assertEqual(
             calls,
-            [["opencode", "--standalone", "api", "GET", "/experimental/tool/ids"]],
+            [["opencode", "api", "--standalone", "GET", "/experimental/tool/ids"]],
         )
 
     def test_expected_plugin_preflight_bounds_tool_registry_timeout(self):
