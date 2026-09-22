@@ -309,7 +309,7 @@ def verify_expected_plugin(
     # service/daemon path and can hang in isolated eval containers. The API
     # command's explicit standalone mode starts a private in-process server,
     # still exercises location/plugin startup, and performs no model inference.
-    command = ["opencode", "api", "--standalone", "get", "/agent"]
+    command = ["opencode", "--standalone", "api", "GET", "/agent"]
     proc = run(command, Path("/workspace"), env, min(timeout, 30))
     if proc.returncode != 0:
         detail = " | ".join(part.strip() for part in (proc.stderr, proc.stdout) if part.strip())
@@ -349,9 +349,9 @@ def verify_expected_plugin(
 
     tool_command = [
         "opencode",
-        "api",
         "--standalone",
-        "get",
+        "api",
+        "GET",
         "/experimental/tool/ids",
     ]
     tool_proc = run(tool_command, Path("/workspace"), env, min(timeout, 30))
