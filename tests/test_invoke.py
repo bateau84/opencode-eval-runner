@@ -254,8 +254,9 @@ class OpenCodeTransportTests(unittest.TestCase):
         server = object()
         requests = []
 
-        def fake_request(base_url, path, *, method="GET", payload=None, timeout=5.0):
-            requests.append((base_url, path, method, payload, timeout))
+        def fake_request(base_url, path, *, method="GET", payload=None, timeout=5.0, authorization=None):
+            requests.append((base_url, path, method, payload, timeout, authorization))
+            self.assertEqual(authorization, "Basic test-auth")
             if path == "/api/session":
                 return {"data": {"id": "ses_test"}}
             if path == "/api/session/ses_test/prompt":
@@ -273,7 +274,7 @@ class OpenCodeTransportTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmp, patch(
             "container.invoke._start_preflight_server",
-            return_value=(server, "http://127.0.0.1:1234"),
+            return_value=(server, "http://127.0.0.1:1234", "Basic test-auth"),
         ), patch(
             "container.invoke._standalone_json_request",
             side_effect=fake_request,
@@ -297,6 +298,7 @@ class OpenCodeTransportTests(unittest.TestCase):
             result["verification"],
             "plugin-entrypoint+activation-barrier+plugin-inventory",
         )
+        self.assertTrue(all(request[5] == "Basic test-auth" for request in requests))
         self.assertEqual(
             [request[1] for request in requests],
             [
@@ -311,9 +313,9 @@ class OpenCodeTransportTests(unittest.TestCase):
 
         def fake_start(env, timeout):
             seen.append(timeout)
-            return object(), "http://127.0.0.1:1234"
+            return object(), "http://127.0.0.1:1234", "Basic test-auth"
 
-        def fake_request(base_url, path, *, method="GET", payload=None, timeout=5.0):
+        def fake_request(base_url, path, *, method="GET", payload=None, timeout=5.0, authorization=None):
             if path == "/api/session":
                 return {"data": {"id": "ses_test"}}
             if path == "/api/session/ses_test/prompt":
@@ -347,7 +349,7 @@ class OpenCodeTransportTests(unittest.TestCase):
     def test_expected_plugin_preflight_rejects_missing_plugin_after_activation(self):
         server = object()
 
-        def fake_request(base_url, path, *, method="GET", payload=None, timeout=5.0):
+        def fake_request(base_url, path, *, method="GET", payload=None, timeout=5.0, authorization=None):
             if path == "/api/session":
                 return {"data": {"id": "ses_test"}}
             if path == "/api/session/ses_test/prompt":
@@ -356,7 +358,7 @@ class OpenCodeTransportTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmp, patch(
             "container.invoke._start_preflight_server",
-            return_value=(server, "http://127.0.0.1:1234"),
+            return_value=(server, "http://127.0.0.1:1234", "Basic test-auth"),
         ), patch(
             "container.invoke._standalone_json_request",
             side_effect=fake_request,
@@ -378,7 +380,7 @@ class OpenCodeTransportTests(unittest.TestCase):
     def test_expected_plugin_preflight_surfaces_failed_plugin_error_after_activation(self):
         server = object()
 
-        def fake_request(base_url, path, *, method="GET", payload=None, timeout=5.0):
+        def fake_request(base_url, path, *, method="GET", payload=None, timeout=5.0, authorization=None):
             if path == "/api/session":
                 return {"data": {"id": "ses_test"}}
             if path == "/api/session/ses_test/prompt":
@@ -394,7 +396,7 @@ class OpenCodeTransportTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmp, patch(
             "container.invoke._start_preflight_server",
-            return_value=(server, "http://127.0.0.1:1234"),
+            return_value=(server, "http://127.0.0.1:1234", "Basic test-auth"),
         ), patch(
             "container.invoke._standalone_json_request",
             side_effect=fake_request,
