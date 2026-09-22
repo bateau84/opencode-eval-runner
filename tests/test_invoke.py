@@ -292,10 +292,10 @@ class OpenCodeTransportTests(unittest.TestCase):
         self.assertEqual(result["entrypoints"], ["plugins/loom.ts"])
         self.assertEqual(result["tools"], ["loom_route", "loom_start", "loom_status"])
         self.assertEqual(result["verification"], "plugin-entrypoint+opencode-startup+tool-registry")
-        self.assertEqual(calls[0], ["opencode", "api", "--standalone", "get", "/agent"])
+        self.assertEqual(calls[0], ["opencode", "--standalone", "api", "GET", "/agent"])
         self.assertEqual(
             calls[1],
-            ["opencode", "api", "--standalone", "get", "/experimental/tool/ids"],
+            ["opencode", "--standalone", "api", "GET", "/experimental/tool/ids"],
         )
 
     def test_expected_plugin_preflight_bounds_standalone_startup_timeout(self):
