@@ -305,46 +305,11 @@ def verify_expected_plugin(
             f"available entries: {available[:80]}"
         )
 
-    # Agent discovery is a local zero-inference diagnostic. Unlike the API
-    # transport, `opencode debug agents` returns the effective resolved agent
-    # definitions for the current project/config directly as JSON.
-    command = ["opencode", "debug", "agents"]
-    proc = run(command, Path("/workspace"), env, min(timeout, 30))
-    if proc.returncode != 0:
-        detail = " | ".join(part.strip() for part in (proc.stderr, proc.stdout) if part.strip())
-        raise RuntimeError(
-            f"expected plugin preflight failed for {expected_plugin!r}"
-            + (f": {detail[:2000]}" if detail else "")
-        )
-    try:
-        agents = unwrap_api_data(json.loads(proc.stdout))
-    except json.JSONDecodeError as exc:
-        raise RuntimeError(
-            f"expected plugin preflight returned invalid debug agent JSON for {expected_plugin!r}: {exc}"
-        ) from exc
-    if not isinstance(agents, list):
-        raise RuntimeError(
-            f"expected plugin preflight returned invalid agent list for {expected_plugin!r}"
-        )
-    resolved = next(
-        (
-            value
-            for value in agents
-            if isinstance(value, dict)
-            and (value.get("id") == agent or value.get("name") == agent)
-        ),
-        None,
-    )
-    if resolved is None:
-        available = sorted(
-            str(value.get("id") or value.get("name"))
-            for value in agents
-            if isinstance(value, dict) and (value.get("id") or value.get("name"))
-        )
-        raise RuntimeError(
-            f"expected plugin preflight could not resolve agent {agent!r}; "
-            f"available agents: {available[:80]}"
-        )
+    # Agent resolution is intentionally left to the real `opencode run --agent`
+    # invocation. `opencode debug agents` can hang in isolated OpenCode V2
+    # containers, and a second standalone agent API process has also proven
+    # unreliable. The eval workspace already materializes the requested agent
+    # definition; the real invocation is the authoritative resolution check.
 
     tool_command = [
         "opencode",
@@ -394,10 +359,10 @@ def verify_expected_plugin(
 
     return {
         "expected": expected_plugin,
-        "agent": str(resolved.get("id") or resolved.get("name") or agent),
+        "agent": agent,
         "entrypoints": entrypoints,
         "tools": plugin_tools,
-        "verification": "plugin-entrypoint+debug-agent-resolution+tool-registry",
+        "verification": "plugin-entrypoint+tool-registry",
     }
 
 
