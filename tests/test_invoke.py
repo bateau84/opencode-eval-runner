@@ -279,7 +279,36 @@ class OpenCodeTransportTests(unittest.TestCase):
         self.assertEqual(result["agent"], "general")
         self.assertEqual(result["entrypoints"], ["plugins/loom.ts"])
         self.assertEqual(result["verification"], "plugin-entrypoint+opencode-startup")
-        self.assertEqual(calls[0], ["opencode", "debug", "agents"])
+        self.assertEqual(calls[0], ["opencode", "api", "--standalone", "get", "/api/agent"])
+
+    def test_expected_plugin_preflight_bounds_standalone_startup_timeout(self):
+        seen = []
+
+        class Result:
+            returncode = 0
+            stdout = json.dumps([{"id": "general", "name": "general"}])
+            stderr = ""
+
+        def fake_run(command, cwd, env, timeout):
+            seen.append(timeout)
+            return Result()
+
+        with tempfile.TemporaryDirectory() as tmp, patch(
+            "container.invoke.run", side_effect=fake_run
+        ):
+            config = Path(tmp)
+            plugins = config / "plugins"
+            plugins.mkdir()
+            (plugins / "loom.ts").write_text("export default {}\n", encoding="utf-8")
+            verify_expected_plugin(
+                {"OPENCODE_CONFIG_DIR": tmp},
+                "general",
+                "openai/gpt-5.5",
+                "loom",
+                240,
+            )
+
+        self.assertEqual(seen, [30])
 
     def test_expected_plugin_preflight_rejects_missing_materialized_plugin(self):
         with tempfile.TemporaryDirectory() as tmp:
