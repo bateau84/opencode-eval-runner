@@ -218,6 +218,17 @@ def prepare_opencode_env() -> dict[str, str]:
                 'export { default } from "../loom-plugin/index.ts"\n',
                 encoding="utf-8",
             )
+
+            # OpenCode 2.0.12 resolves package imports for config-root local
+            # plugins from the config-root dependency context. Runtime evals
+            # mount the repository dependencies at /workspace/node_modules, so
+            # bridge that dependency tree into the isolated config root. This
+            # keeps the plugin source isolated while making imports such as
+            # @opencode/plugin/rpc resolvable from the materialized module tree.
+            workspace_node_modules = Path("/workspace/node_modules")
+            config_node_modules = config / "node_modules"
+            if workspace_node_modules.is_dir() and not config_node_modules.exists():
+                config_node_modules.symlink_to(workspace_node_modules, target_is_directory=True)
     if seed_auth.is_file():
         shutil.copyfile(seed_auth, data / "auth.json")
     if seed_models.is_file():

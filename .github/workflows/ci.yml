@@ -101,6 +101,69 @@ jobs:
           print(f"PASS standalone tool registry ({len(data)} tools)")
           PY
 
+      - name: Smoke test config plugin workspace dependency resolution
+        run: |
+          rm -rf /tmp/plugin-workspace /tmp/plugin-config-root
+          mkdir -p /tmp/plugin-workspace/node_modules/fixture-dep
+          mkdir -p /tmp/plugin-config-root/plugins/loom
+
+          cat > /tmp/plugin-workspace/node_modules/fixture-dep/package.json <<'EOF'
+          {
+            "name": "fixture-dep",
+            "version": "1.0.0",
+            "type": "module",
+            "exports": "./index.js"
+          }
+          EOF
+          cat > /tmp/plugin-workspace/node_modules/fixture-dep/index.js <<'EOF'
+          export const marker = "resolved-from-workspace-node-modules"
+          EOF
+          cat > /tmp/plugin-config-root/plugins/loom/index.ts <<'EOF'
+          import { writeFileSync } from "node:fs"
+          import { marker } from "fixture-dep"
+
+          writeFileSync("/tmp/config-plugin-loaded", marker)
+          export default async () => ({})
+          EOF
+
+          docker run --rm \
+            --volume /tmp/plugin-workspace:/workspace:ro \
+            --volume /tmp/plugin-config-root:/seed/opencode-config:ro \
+            --entrypoint python3 \
+            opencode-eval-runner:opencode-test - <<'PY'
+          from pathlib import Path
+          import subprocess
+          import sys
+
+          sys.path.insert(0, "/opt/opencode-eval-runner")
+          from container.invoke import prepare_opencode_env
+
+          env = prepare_opencode_env()
+          bridge = Path(env["OPENCODE_CONFIG_DIR"]) / "node_modules"
+          if not bridge.is_symlink():
+              raise SystemExit(f"config dependency bridge missing: {bridge}")
+
+          proc = subprocess.run(
+              ["opencode", "api", "--standalone", "GET", "/experimental/tool/ids"],
+              cwd="/workspace",
+              env=env,
+              capture_output=True,
+              text=True,
+              timeout=30,
+              check=False,
+          )
+          marker = Path("/tmp/config-plugin-loaded")
+          if not marker.is_file():
+              raise SystemExit(
+                  "config-root plugin did not load with workspace dependency; "
+                  f"exit={proc.returncode} stdout={proc.stdout!r} stderr={proc.stderr!r}"
+              )
+          value = marker.read_text(encoding="utf-8")
+          if value != "resolved-from-workspace-node-modules":
+              raise SystemExit(f"unexpected dependency marker: {value!r}")
+          print("PASS config-root plugin dependency bridge")
+          PY
+
       - name: Verify pinned tools
         run: |
           docker run --rm --entrypoint opencode opencode-eval-runner:opencode-test --version
