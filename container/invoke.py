@@ -329,10 +329,15 @@ def _start_preflight_server(
 ) -> tuple[subprocess.Popen[str], str, str]:
     server_env = dict(env)
     server_env["OPENCODE_PRINT_LOGS"] = "1"
+    username = "opencode"
     password = secrets.token_urlsafe(32)
-    server_env["OPENCODE_PASSWORD"] = password
+    server_env["OPENCODE_SERVER_USERNAME"] = username
+    server_env["OPENCODE_SERVER_PASSWORD"] = password
+    # Do not inherit legacy/alternate auth variables into the dedicated
+    # preflight server. The request token below must match this exact pair.
+    server_env.pop("OPENCODE_PASSWORD", None)
     authorization = "Basic " + base64.b64encode(
-        f"opencode:{password}".encode("utf-8")
+        f"{username}:{password}".encode("utf-8")
     ).decode("ascii")
     proc = subprocess.Popen(
         ["opencode", "serve", "--stdio", "--port", "0"],
