@@ -263,12 +263,18 @@ class OpenCodeTransportTests(unittest.TestCase):
         def fake_run(command, cwd, env, timeout):
             calls.append(command)
             if command[-1] == "/api/agent":
-                return Result(json.dumps([
-                    {"id": "general", "name": "general"},
-                    {"id": "reviewer", "name": "reviewer"},
-                ]))
+                return Result(json.dumps({
+                    "location": {"directory": "/workspace"},
+                    "data": [
+                        {"id": "general", "name": "general"},
+                        {"id": "reviewer", "name": "reviewer"},
+                    ],
+                }))
             if command[-1] == "/api/experimental/tool/ids":
-                return Result(json.dumps(["read", "loom_start", "loom_route", "loom_status"]))
+                return Result(json.dumps({
+                    "location": {"directory": "/workspace"},
+                    "data": ["read", "loom_start", "loom_route", "loom_status"],
+                }))
             raise AssertionError(command)
 
         with tempfile.TemporaryDirectory() as tmp, patch(
@@ -335,8 +341,14 @@ class OpenCodeTransportTests(unittest.TestCase):
 
         def fake_run(command, cwd, env, timeout):
             if command[-1] == "/api/agent":
-                return Result(json.dumps([{"id": "general", "name": "general"}]))
-            return Result(json.dumps(["read", "grep", "execute"]))
+                return Result(json.dumps({
+                    "location": {"directory": "/workspace"},
+                    "data": [{"id": "general", "name": "general"}],
+                }))
+            return Result(json.dumps({
+                "location": {"directory": "/workspace"},
+                "data": ["read", "grep", "execute"],
+            }))
 
         with tempfile.TemporaryDirectory() as tmp, patch(
             "container.invoke.run", side_effect=fake_run
@@ -358,7 +370,10 @@ class OpenCodeTransportTests(unittest.TestCase):
     def test_expected_plugin_preflight_rejects_missing_agent(self):
         class Result:
             returncode = 0
-            stdout = json.dumps([{"id": "reviewer", "name": "reviewer"}])
+            stdout = json.dumps({
+                "location": {"directory": "/workspace"},
+                "data": [{"id": "reviewer", "name": "reviewer"}],
+            })
             stderr = ""
 
         with tempfile.TemporaryDirectory() as tmp, patch(

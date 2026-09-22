@@ -257,6 +257,12 @@ def ensure_model_config(env: dict[str, str], model: str) -> None:
     config_file.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
 
 
+def unwrap_api_data(value: Any) -> Any:
+    if isinstance(value, dict) and "data" in value:
+        return value["data"]
+    return value
+
+
 def verify_expected_plugin(
     env: dict[str, str],
     agent: str,
@@ -312,7 +318,7 @@ def verify_expected_plugin(
             + (f": {detail[:2000]}" if detail else "")
         )
     try:
-        agents = json.loads(proc.stdout)
+        agents = unwrap_api_data(json.loads(proc.stdout))
     except json.JSONDecodeError as exc:
         raise RuntimeError(
             f"expected plugin preflight returned invalid standalone agent list JSON for {expected_plugin!r}: {exc}"
@@ -360,7 +366,7 @@ def verify_expected_plugin(
             + (f": {detail[:2000]}" if detail else "")
         )
     try:
-        tool_payload = json.loads(tool_proc.stdout)
+        tool_payload = unwrap_api_data(json.loads(tool_proc.stdout))
     except json.JSONDecodeError as exc:
         raise RuntimeError(
             f"expected plugin tool preflight returned invalid tool ID JSON for {expected_plugin!r}: {exc}"
