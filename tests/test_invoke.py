@@ -255,15 +255,21 @@ class OpenCodeTransportTests(unittest.TestCase):
 
         class Result:
             returncode = 0
-            stdout = json.dumps([
-                {"id": "general", "name": "general"},
-                {"id": "reviewer", "name": "reviewer"},
-            ])
             stderr = ""
+
+            def __init__(self, stdout):
+                self.stdout = stdout
 
         def fake_run(command, cwd, env, timeout):
             calls.append(command)
-            return Result()
+            if command[-1] == "/api/agent":
+                return Result(json.dumps([
+                    {"id": "general", "name": "general"},
+                    {"id": "reviewer", "name": "reviewer"},
+                ]))
+            if command[-1] == "/api/experimental/tool/ids":
+                return Result(json.dumps(["read", "loom_start", "loom_route", "loom_status"]))
+            raise AssertionError(command)
 
         with tempfile.TemporaryDirectory() as tmp, patch(
             "container.invoke.run", side_effect=fake_run
@@ -278,20 +284,29 @@ class OpenCodeTransportTests(unittest.TestCase):
         self.assertEqual(result["expected"], "loom")
         self.assertEqual(result["agent"], "general")
         self.assertEqual(result["entrypoints"], ["plugins/loom.ts"])
-        self.assertEqual(result["verification"], "plugin-entrypoint+opencode-startup")
+        self.assertEqual(result["tools"], ["loom_route", "loom_start", "loom_status"])
+        self.assertEqual(result["verification"], "plugin-entrypoint+opencode-startup+tool-registry")
         self.assertEqual(calls[0], ["opencode", "api", "--standalone", "get", "/api/agent"])
+        self.assertEqual(
+            calls[1],
+            ["opencode", "api", "--standalone", "get", "/api/experimental/tool/ids"],
+        )
 
     def test_expected_plugin_preflight_bounds_standalone_startup_timeout(self):
         seen = []
 
         class Result:
             returncode = 0
-            stdout = json.dumps([{"id": "general", "name": "general"}])
             stderr = ""
+
+            def __init__(self, stdout):
+                self.stdout = stdout
 
         def fake_run(command, cwd, env, timeout):
             seen.append(timeout)
-            return Result()
+            if command[-1] == "/api/agent":
+                return Result(json.dumps([{"id": "general", "name": "general"}]))
+            return Result(json.dumps(["loom_start"]))
 
         with tempfile.TemporaryDirectory() as tmp, patch(
             "container.invoke.run", side_effect=fake_run
@@ -308,7 +323,31 @@ class OpenCodeTransportTests(unittest.TestCase):
                 240,
             )
 
-        self.assertEqual(seen, [30])
+        self.assertEqual(seen, [30, 30])
+
+    def test_expected_plugin_preflight_rejects_plugin_without_registered_tools(self):
+        class Result:
+            returncode = 0
+            stderr = ""
+
+            def __init__(self, stdout):
+                self.stdout = stdout
+
+        def fake_run(command, cwd, env, timeout):
+            if command[-1] == "/api/agent":
+                return Result(json.dumps([{"id": "general", "name": "general"}]))
+            return Result(json.dumps(["read", "grep", "execute"]))
+
+        with tempfile.TemporaryDirectory() as tmp, patch(
+            "container.invoke.run", side_effect=fake_run
+        ):
+            config = Path(tmp)
+            plugins = config / "plugins"
+            plugins.mkdir()
+            (plugins / "loom.ts").write_text("export default {}\n", encoding="utf-8")
+            env = {"OPENCODE_CONFIG_DIR": tmp}
+            with self.assertRaisesRegex(RuntimeError, "registered no tools"):
+                verify_expected_plugin(env, "general", "openai/gpt-5.5", "loom", 30)
 
     def test_expected_plugin_preflight_rejects_missing_materialized_plugin(self):
         with tempfile.TemporaryDirectory() as tmp:
