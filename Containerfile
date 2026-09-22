@@ -1,5 +1,5 @@
 FROM node:24-bookworm-slim AS opencode-builder
-ARG OPENCODE_VERSION=2.0.11
+ARG OPENCODE_VERSION=2.0.12
 RUN npm install --global "@opencode/cli@${OPENCODE_VERSION}" \
     && resolved="$(readlink -f "$(command -v opencode)")" \
     && test -x "$resolved" \
