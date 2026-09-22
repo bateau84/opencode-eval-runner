@@ -156,6 +156,20 @@ OPENCODE_EVAL_RUNNER_MODELS=/path/to/models.json
 OPENCODE_EVAL_RUNNER_CONFIG=/path/to/opencode.json
 ```
 
+### Requiring a runtime plugin
+
+Runtime evals can fail closed before inference when a specific plugin namespace is load-bearing:
+
+```bash
+opencode-eval-runner invoke \
+  --transport opencode \
+  --expected-plugin loom \
+  --agent general \
+  ...
+```
+
+The runner resolves the selected agent through OpenCode's zero-inference debug path and requires at least one enabled tool whose name starts with the namespace prefix (for `loom`, `loom_*`). Missing or failed plugin resolution is infrastructure/non-evidence, never a behavioral FAIL.
+
 ### Evaluating a skill
 
 Skills are evaluated through a normal OpenCode agent, not as a separate transport. Use `--skill` to identify the skill under test while keeping the prompt and grading semantics in the eval repository:
@@ -294,7 +308,7 @@ The eval repository decides whether that observed behavior is PASS, FAIL, or non
 
 The transport images currently pin:
 
-- OpenCode CLI `2.0.11`
+- OpenCode CLI `2.0.12`
 - GitHub Copilot CLI `1.0.83`
 
 The two CLIs are not bundled together. OpenCode's npm package is used only as a build-time native-binary selector; GitHub Copilot CLI is installed from its native release installer. Node/npm are absent from the final runtime images.
