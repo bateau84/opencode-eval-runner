@@ -250,7 +250,7 @@ class OpenCodeTransportTests(unittest.TestCase):
         self.assertEqual(result["skill"], "architectural-design")
         self.assertEqual(result["skills_loaded"], [])
 
-    def test_expected_plugin_preflight_accepts_materialized_plugin_and_agent(self):
+    def test_expected_plugin_preflight_accepts_materialized_plugin_and_tools(self):
         calls = []
 
         class Result:
@@ -262,20 +262,10 @@ class OpenCodeTransportTests(unittest.TestCase):
 
         def fake_run(command, cwd, env, timeout):
             calls.append(command)
-            if command == ["opencode", "debug", "agents"]:
-                return Result(json.dumps({
-                    "location": {"directory": "/workspace"},
-                    "data": [
-                        {"id": "general", "name": "general"},
-                        {"id": "reviewer", "name": "reviewer"},
-                    ],
-                }))
-            if command[-1] == "/experimental/tool/ids":
-                return Result(json.dumps({
-                    "location": {"directory": "/workspace"},
-                    "data": ["read", "loom_start", "loom_route", "loom_status"],
-                }))
-            raise AssertionError(command)
+            return Result(json.dumps({
+                "location": {"directory": "/workspace"},
+                "data": ["read", "loom_start", "loom_route", "loom_status"],
+            }))
 
         with tempfile.TemporaryDirectory() as tmp, patch(
             "container.invoke.run", side_effect=fake_run
@@ -291,28 +281,23 @@ class OpenCodeTransportTests(unittest.TestCase):
         self.assertEqual(result["agent"], "general")
         self.assertEqual(result["entrypoints"], ["plugins/loom.ts"])
         self.assertEqual(result["tools"], ["loom_route", "loom_start", "loom_status"])
-        self.assertEqual(result["verification"], "plugin-entrypoint+debug-agent-resolution+tool-registry")
-        self.assertEqual(calls[0], ["opencode", "debug", "agents"])
+        self.assertEqual(result["verification"], "plugin-entrypoint+tool-registry")
         self.assertEqual(
-            calls[1],
-            ["opencode", "--standalone", "api", "GET", "/experimental/tool/ids"],
+            calls,
+            [["opencode", "--standalone", "api", "GET", "/experimental/tool/ids"]],
         )
 
-    def test_expected_plugin_preflight_bounds_standalone_startup_timeout(self):
+    def test_expected_plugin_preflight_bounds_tool_registry_timeout(self):
         seen = []
 
         class Result:
             returncode = 0
             stderr = ""
-
-            def __init__(self, stdout):
-                self.stdout = stdout
+            stdout = json.dumps(["loom_start"])
 
         def fake_run(command, cwd, env, timeout):
             seen.append(timeout)
-            if command == ["opencode", "debug", "agents"]:
-                return Result(json.dumps([{"id": "general", "name": "general"}]))
-            return Result(json.dumps(["loom_start"]))
+            return Result()
 
         with tempfile.TemporaryDirectory() as tmp, patch(
             "container.invoke.run", side_effect=fake_run
@@ -329,7 +314,7 @@ class OpenCodeTransportTests(unittest.TestCase):
                 240,
             )
 
-        self.assertEqual(seen, [30, 30])
+        self.assertEqual(seen, [30])
 
     def test_expected_plugin_preflight_rejects_plugin_without_registered_tools(self):
         class Result:
@@ -339,19 +324,12 @@ class OpenCodeTransportTests(unittest.TestCase):
             def __init__(self, stdout):
                 self.stdout = stdout
 
-        def fake_run(command, cwd, env, timeout):
-            if command == ["opencode", "debug", "agents"]:
-                return Result(json.dumps({
-                    "location": {"directory": "/workspace"},
-                    "data": [{"id": "general", "name": "general"}],
-                }))
-            return Result(json.dumps({
+        with tempfile.TemporaryDirectory() as tmp, patch(
+            "container.invoke.run",
+            return_value=Result(json.dumps({
                 "location": {"directory": "/workspace"},
                 "data": ["read", "grep", "execute"],
-            }))
-
-        with tempfile.TemporaryDirectory() as tmp, patch(
-            "container.invoke.run", side_effect=fake_run
+            })),
         ):
             config = Path(tmp)
             plugins = config / "plugins"
@@ -367,27 +345,7 @@ class OpenCodeTransportTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "is not materialized"):
                 verify_expected_plugin(env, "general", "openai/gpt-5.5", "loom", 30)
 
-    def test_expected_plugin_preflight_rejects_missing_agent(self):
-        class Result:
-            returncode = 0
-            stdout = json.dumps({
-                "location": {"directory": "/workspace"},
-                "data": [{"id": "reviewer", "name": "reviewer"}],
-            })
-            stderr = ""
-
-        with tempfile.TemporaryDirectory() as tmp, patch(
-            "container.invoke.run", return_value=Result()
-        ):
-            config = Path(tmp)
-            plugins = config / "plugins"
-            plugins.mkdir()
-            (plugins / "loom.ts").write_text("export default {}\n", encoding="utf-8")
-            env = {"OPENCODE_CONFIG_DIR": tmp}
-            with self.assertRaisesRegex(RuntimeError, "could not resolve agent 'general'"):
-                verify_expected_plugin(env, "general", "openai/gpt-5.5", "loom", 30)
-
-    def test_expected_plugin_preflight_rejects_opencode_startup_failure(self):
+    def test_expected_plugin_preflight_rejects_tool_registry_failure(self):
         class Result:
             returncode = 1
             stdout = ""
