@@ -397,7 +397,7 @@ def verify_expected_plugin(
         "agent": str(resolved.get("id") or resolved.get("name") or agent),
         "entrypoints": entrypoints,
         "tools": plugin_tools,
-        "verification": "plugin-entrypoint+opencode-startup+tool-registry",
+        "verification": "plugin-entrypoint+debug-agent-resolution+tool-registry",
     }
 
 
