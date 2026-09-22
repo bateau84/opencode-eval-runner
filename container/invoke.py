@@ -349,9 +349,9 @@ def verify_expected_plugin(
 
     tool_command = [
         "opencode",
-        "api",
         "--standalone",
-        "get",
+        "api",
+        "GET",
         "/experimental/tool/ids",
     ]
     tool_proc = run(tool_command, Path("/workspace"), env, min(timeout, 30))
