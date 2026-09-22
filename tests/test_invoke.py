@@ -203,6 +203,46 @@ class OpenCodeTransportTests(unittest.TestCase):
         self.assertEqual(result["timing"]["export_seconds"], 0.0)
         self.assertIsNone(result["timing"]["export_exit_code"])
 
+    def test_opencode_timeout_preserves_partial_runtime_progress(self):
+        stdout = "\n".join([
+            '{"type":"step_start","sessionID":"ses_timeout","part":{"type":"step-start"}}',
+            '{"type":"tool_use","sessionID":"ses_timeout","part":{"type":"tool","tool":"loom_start","state":{"status":"completed","input":{"request":"tracked investigation"}}}}',
+            '{"type":"tool_use","sessionID":"ses_timeout","part":{"type":"tool","tool":"subagent","state":{"status":"running","input":{"agent":"diagnostic"}}}}',
+        ])
+
+        def fake_run(command, cwd, env, timeout):
+            raise subprocess.TimeoutExpired(
+                command,
+                timeout,
+                output=stdout,
+                stderr="provider still running",
+            )
+
+        with patch("container.invoke.prepare_opencode_env", return_value={}), patch(
+            "container.invoke.run", side_effect=fake_run
+        ), patch.dict(os.environ, {"EVAL_EXPECT_PLUGIN": ""}, clear=False):
+            result = invoke_opencode(
+                "openai/gpt-5.6-luna",
+                "general",
+                "test prompt",
+                240,
+            )
+
+        self.assertEqual(result["exit_code"], 124)
+        self.assertTrue(result["timed_out"])
+        self.assertEqual(result["session_id"], "ses_timeout")
+        self.assertEqual(result["tools"], ["loom_start", "subagent"])
+        self.assertEqual(
+            result["actions"],
+            [
+                {"tool": "loom_start", "args": {"request": "tracked investigation"}},
+                {"tool": "subagent", "args": {"agent": "diagnostic"}},
+            ],
+        )
+        self.assertIn("partial_events=3", result["stderr"])
+        self.assertIn('"part_tool": "subagent"', result["stderr"])
+        self.assertIn("provider still running", result["stderr"])
+
     def test_opencode_eval_uses_fixed_title_to_avoid_title_agent(self):
         class Result:
             returncode = 0
