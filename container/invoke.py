@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import base64
 import json
 import os
 import re
+import secrets
 import selectors
 import shutil
 import subprocess
@@ -284,9 +286,12 @@ def _standalone_json_request(
     method: str = "GET",
     payload: dict[str, Any] | None = None,
     timeout: float = 5.0,
+    authorization: str | None = None,
 ) -> Any:
     data = None
     headers: dict[str, str] = {}
+    if authorization:
+        headers["authorization"] = authorization
     if payload is not None:
         data = json.dumps(payload).encode("utf-8")
         headers["content-type"] = "application/json"
@@ -321,9 +326,14 @@ def _standalone_json_request(
 def _start_preflight_server(
     env: dict[str, str],
     timeout: float,
-) -> tuple[subprocess.Popen[str], str]:
+) -> tuple[subprocess.Popen[str], str, str]:
     server_env = dict(env)
     server_env["OPENCODE_PRINT_LOGS"] = "1"
+    password = secrets.token_urlsafe(32)
+    server_env["OPENCODE_PASSWORD"] = password
+    authorization = "Basic " + base64.b64encode(
+        f"opencode:{password}".encode("utf-8")
+    ).decode("ascii")
     proc = subprocess.Popen(
         ["opencode", "serve", "--stdio", "--port", "0"],
         cwd="/workspace",
@@ -362,7 +372,7 @@ def _start_preflight_server(
     if not isinstance(url, str) or not url:
         proc.kill()
         raise RuntimeError(f"OpenCode preflight server readiness payload has no URL: {ready!r}")
-    return proc, url
+    return proc, url, authorization
 
 
 def _stop_preflight_server(proc: subprocess.Popen[str]) -> str:
@@ -431,7 +441,10 @@ def verify_expected_plugin(
     # the plugin inventory on that same server.
     preflight_timeout = min(timeout, 30)
     started = time.monotonic()
-    server, base_url = _start_preflight_server(inventory_env := dict(env), preflight_timeout)
+    server, base_url, authorization = _start_preflight_server(
+        inventory_env := dict(env),
+        preflight_timeout,
+    )
     logs = ""
     try:
         remaining = lambda: max(0.5, preflight_timeout - (time.monotonic() - started))
@@ -445,6 +458,7 @@ def verify_expected_plugin(
                 "location": {"directory": "/workspace"},
             },
             timeout=remaining(),
+            authorization=authorization,
         )
         session_payload = unwrap_api_data(created)
         if not isinstance(session_payload, dict) or not isinstance(session_payload.get("id"), str):
@@ -461,11 +475,13 @@ def verify_expected_plugin(
                 "resume": False,
             },
             timeout=remaining(),
+            authorization=authorization,
         )
         inventory = _standalone_json_request(
             base_url,
             "/api/plugin?location%5Bdirectory%5D=%2Fworkspace",
             timeout=remaining(),
+            authorization=authorization,
         )
         inventory_payload = unwrap_api_data(inventory)
         if not isinstance(inventory_payload, list):
