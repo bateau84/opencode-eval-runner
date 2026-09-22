@@ -250,26 +250,36 @@ class OpenCodeTransportTests(unittest.TestCase):
         self.assertEqual(result["skill"], "architectural-design")
         self.assertEqual(result["skills_loaded"], [])
 
-    def test_expected_plugin_preflight_accepts_registered_tools(self):
-        calls = []
+    def test_expected_plugin_preflight_waits_for_activation_then_accepts_active_plugin(self):
+        server = object()
+        requests = []
 
-        class Result:
-            returncode = 0
-            stderr = ""
-
-            def __init__(self, stdout):
-                self.stdout = stdout
-
-        def fake_run(command, cwd, env, timeout):
-            calls.append(command)
-            self.assertEqual(env.get("OPENCODE_PRINT_LOGS"), "1")
-            return Result(json.dumps({
-                "location": {"directory": "/workspace"},
-                "data": ["read", "loom_start", "loom_route", "loom_status"],
-            }))
+        def fake_request(base_url, path, *, method="GET", payload=None, timeout=5.0):
+            requests.append((base_url, path, method, payload, timeout))
+            if path == "/api/session":
+                return {"data": {"id": "ses_test"}}
+            if path == "/api/session/ses_test/prompt":
+                self.assertEqual(payload, {"text": "plugin activation preflight", "resume": False})
+                return {"data": {"id": "msg_test"}}
+            if path.startswith("/api/plugin?"):
+                return {
+                    "location": {"directory": "/workspace"},
+                    "data": [
+                        {"id": "builtin", "state": {"status": "active"}},
+                        {"id": "loom", "state": {"status": "active"}},
+                    ],
+                }
+            raise AssertionError(path)
 
         with tempfile.TemporaryDirectory() as tmp, patch(
-            "container.invoke.run", side_effect=fake_run
+            "container.invoke._start_preflight_server",
+            return_value=(server, "http://127.0.0.1:1234"),
+        ), patch(
+            "container.invoke._standalone_json_request",
+            side_effect=fake_request,
+        ), patch(
+            "container.invoke._stop_preflight_server",
+            return_value="server logs",
         ):
             config = Path(tmp)
             plugins = config / "plugins"
@@ -281,27 +291,44 @@ class OpenCodeTransportTests(unittest.TestCase):
         self.assertEqual(result["expected"], "loom")
         self.assertEqual(result["agent"], "general")
         self.assertEqual(result["entrypoints"], ["plugins/loom.ts"])
-        self.assertEqual(result["tools"], ["loom_route", "loom_start", "loom_status"])
-        self.assertEqual(result["verification"], "plugin-entrypoint+ready-tool-registry")
+        self.assertEqual(result["plugin"]["id"], "loom")
+        self.assertEqual(result["plugin"]["state"]["status"], "active")
         self.assertEqual(
-            calls,
-            [["opencode", "api", "--standalone", "GET", "/experimental/tool/ids"]],
+            result["verification"],
+            "plugin-entrypoint+activation-barrier+plugin-inventory",
+        )
+        self.assertEqual(
+            [request[1] for request in requests],
+            [
+                "/api/session",
+                "/api/session/ses_test/prompt",
+                "/api/plugin?location%5Bdirectory%5D=%2Fworkspace",
+            ],
         )
 
-    def test_expected_plugin_preflight_bounds_tool_timeout(self):
+    def test_expected_plugin_preflight_uses_bounded_server_timeout(self):
         seen = []
 
-        class Result:
-            returncode = 0
-            stderr = ""
-            stdout = json.dumps(["loom_start"])
-
-        def fake_run(command, cwd, env, timeout):
+        def fake_start(env, timeout):
             seen.append(timeout)
-            return Result()
+            return object(), "http://127.0.0.1:1234"
+
+        def fake_request(base_url, path, *, method="GET", payload=None, timeout=5.0):
+            if path == "/api/session":
+                return {"data": {"id": "ses_test"}}
+            if path == "/api/session/ses_test/prompt":
+                return {"data": {"id": "msg_test"}}
+            return {"data": [{"id": "loom", "state": {"status": "active"}}]}
 
         with tempfile.TemporaryDirectory() as tmp, patch(
-            "container.invoke.run", side_effect=fake_run
+            "container.invoke._start_preflight_server",
+            side_effect=fake_start,
+        ), patch(
+            "container.invoke._standalone_json_request",
+            side_effect=fake_request,
+        ), patch(
+            "container.invoke._stop_preflight_server",
+            return_value="",
         ):
             config = Path(tmp)
             plugins = config / "plugins"
@@ -317,50 +344,79 @@ class OpenCodeTransportTests(unittest.TestCase):
 
         self.assertEqual(seen, [30])
 
-    def test_expected_plugin_preflight_rejects_missing_registered_tools(self):
-        class Result:
-            returncode = 0
-            stderr = "plugin startup logs"
+    def test_expected_plugin_preflight_rejects_missing_plugin_after_activation(self):
+        server = object()
 
-            def __init__(self, stdout):
-                self.stdout = stdout
+        def fake_request(base_url, path, *, method="GET", payload=None, timeout=5.0):
+            if path == "/api/session":
+                return {"data": {"id": "ses_test"}}
+            if path == "/api/session/ses_test/prompt":
+                return {"data": {"id": "msg_test"}}
+            return {"data": [{"id": "builtin", "state": {"status": "active"}}]}
 
         with tempfile.TemporaryDirectory() as tmp, patch(
-            "container.invoke.run",
-            return_value=Result(json.dumps({
-                "location": {"directory": "/workspace"},
-                "data": ["read", "grep", "execute"],
-            })),
+            "container.invoke._start_preflight_server",
+            return_value=(server, "http://127.0.0.1:1234"),
+        ), patch(
+            "container.invoke._standalone_json_request",
+            side_effect=fake_request,
+        ), patch(
+            "container.invoke._stop_preflight_server",
+            return_value="activation logs",
         ):
             config = Path(tmp)
             plugins = config / "plugins"
             plugins.mkdir()
             (plugins / "loom.ts").write_text("export default {}\n", encoding="utf-8")
             env = {"OPENCODE_CONFIG_DIR": tmp}
-            with self.assertRaisesRegex(RuntimeError, "registered no tools"):
+            with self.assertRaisesRegex(
+                RuntimeError,
+                "not present in OpenCode plugin inventory after activation",
+            ):
+                verify_expected_plugin(env, "general", "openai/gpt-5.5", "loom", 30)
+
+    def test_expected_plugin_preflight_surfaces_failed_plugin_error_after_activation(self):
+        server = object()
+
+        def fake_request(base_url, path, *, method="GET", payload=None, timeout=5.0):
+            if path == "/api/session":
+                return {"data": {"id": "ses_test"}}
+            if path == "/api/session/ses_test/prompt":
+                return {"data": {"id": "msg_test"}}
+            return {"data": [{
+                "id": "loom",
+                "state": {
+                    "status": "failed",
+                    "error": "Cannot resolve @opencode/plugin/rpc",
+                    "ref": "err_fixture",
+                },
+            }]}
+
+        with tempfile.TemporaryDirectory() as tmp, patch(
+            "container.invoke._start_preflight_server",
+            return_value=(server, "http://127.0.0.1:1234"),
+        ), patch(
+            "container.invoke._standalone_json_request",
+            side_effect=fake_request,
+        ), patch(
+            "container.invoke._stop_preflight_server",
+            return_value="server diagnostic output",
+        ):
+            config = Path(tmp)
+            plugins = config / "plugins"
+            plugins.mkdir()
+            (plugins / "loom.ts").write_text("export default {}\n", encoding="utf-8")
+            env = {"OPENCODE_CONFIG_DIR": tmp}
+            with self.assertRaisesRegex(
+                RuntimeError,
+                "Cannot resolve @opencode/plugin/rpc",
+            ):
                 verify_expected_plugin(env, "general", "openai/gpt-5.5", "loom", 30)
 
     def test_expected_plugin_preflight_rejects_missing_materialized_plugin(self):
         with tempfile.TemporaryDirectory() as tmp:
             env = {"OPENCODE_CONFIG_DIR": tmp}
             with self.assertRaisesRegex(RuntimeError, "is not materialized"):
-                verify_expected_plugin(env, "general", "openai/gpt-5.5", "loom", 30)
-
-    def test_expected_plugin_preflight_rejects_tool_registry_failure(self):
-        class Result:
-            returncode = 1
-            stdout = ""
-            stderr = "plugin tool registry failed"
-
-        with tempfile.TemporaryDirectory() as tmp, patch(
-            "container.invoke.run", return_value=Result()
-        ):
-            config = Path(tmp)
-            plugins = config / "plugins"
-            plugins.mkdir()
-            (plugins / "loom.ts").write_text("export default {}\n", encoding="utf-8")
-            env = {"OPENCODE_CONFIG_DIR": tmp}
-            with self.assertRaisesRegex(RuntimeError, "plugin tool registry failed"):
                 verify_expected_plugin(env, "general", "openai/gpt-5.5", "loom", 30)
 
     def test_plugin_diagnostic_does_not_spawn_managed_service(self):

@@ -4,10 +4,13 @@ from __future__ import annotations
 import json
 import os
 import re
+import selectors
 import shutil
 import subprocess
 import sys
 import time
+import urllib.error
+import urllib.request
 from pathlib import Path
 from typing import Any
 
@@ -274,6 +277,109 @@ def unwrap_api_data(value: Any) -> Any:
     return value
 
 
+def _standalone_json_request(
+    base_url: str,
+    path: str,
+    *,
+    method: str = "GET",
+    payload: dict[str, Any] | None = None,
+    timeout: float = 5.0,
+) -> Any:
+    data = None
+    headers: dict[str, str] = {}
+    if payload is not None:
+        data = json.dumps(payload).encode("utf-8")
+        headers["content-type"] = "application/json"
+    request = urllib.request.Request(
+        base_url.rstrip("/") + path,
+        data=data,
+        headers=headers,
+        method=method,
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            body = response.read().decode("utf-8")
+    except urllib.error.HTTPError as exc:
+        body = exc.read().decode("utf-8", errors="replace")
+        raise RuntimeError(
+            f"OpenCode preflight request {method} {path} failed: HTTP {exc.code}: {body[:2000]}"
+        ) from exc
+    except urllib.error.URLError as exc:
+        raise RuntimeError(
+            f"OpenCode preflight request {method} {path} failed: {exc}"
+        ) from exc
+    if not body.strip():
+        return None
+    try:
+        return json.loads(body)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(
+            f"OpenCode preflight request {method} {path} returned non-JSON: {body[:2000]}"
+        ) from exc
+
+
+def _start_preflight_server(
+    env: dict[str, str],
+    timeout: float,
+) -> tuple[subprocess.Popen[str], str]:
+    server_env = dict(env)
+    server_env["OPENCODE_PRINT_LOGS"] = "1"
+    proc = subprocess.Popen(
+        ["opencode", "serve", "--stdio", "--port", "0"],
+        cwd="/workspace",
+        env=server_env,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        bufsize=1,
+    )
+    if proc.stdout is None:
+        proc.kill()
+        raise RuntimeError("OpenCode preflight server has no stdout pipe")
+    selector = selectors.DefaultSelector()
+    selector.register(proc.stdout, selectors.EVENT_READ)
+    events = selector.select(timeout=max(timeout, 0.1))
+    selector.close()
+    if not events:
+        proc.kill()
+        stderr = proc.stderr.read() if proc.stderr is not None else ""
+        raise RuntimeError(
+            "OpenCode preflight server did not report readiness"
+            + (f": {stderr[:3000]}" if stderr.strip() else "")
+        )
+    line = proc.stdout.readline()
+    try:
+        ready = json.loads(line)
+    except json.JSONDecodeError as exc:
+        proc.kill()
+        stderr = proc.stderr.read() if proc.stderr is not None else ""
+        raise RuntimeError(
+            f"OpenCode preflight server returned invalid readiness JSON: {line!r}"
+            + (f"; logs: {stderr[:3000]}" if stderr.strip() else "")
+        ) from exc
+    url = ready.get("url") if isinstance(ready, dict) else None
+    if not isinstance(url, str) or not url:
+        proc.kill()
+        raise RuntimeError(f"OpenCode preflight server readiness payload has no URL: {ready!r}")
+    return proc, url
+
+
+def _stop_preflight_server(proc: subprocess.Popen[str]) -> str:
+    try:
+        if proc.stdin is not None:
+            proc.stdin.close()
+        proc.wait(timeout=3)
+    except subprocess.TimeoutExpired:
+        proc.terminate()
+        try:
+            proc.wait(timeout=3)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait(timeout=3)
+    return proc.stderr.read() if proc.stderr is not None else ""
+
+
 def verify_expected_plugin(
     env: dict[str, str],
     agent: str,
@@ -317,77 +423,99 @@ def verify_expected_plugin(
         )
 
     # Agent resolution is intentionally left to the real `opencode run --agent`
-    # invocation. OpenCode 2.0.12 activates config plugins asynchronously, and
-    # plugin.list can observe a cold empty inventory before activation settles.
-    # The tool registry endpoint is the readiness boundary we need here because
-    # it exposes plugin-provided tools only after the location tool state is ready.
-    tool_command = [
-        "opencode",
-        "api",
-        "--standalone",
-        "GET",
-        "/experimental/tool/ids",
-    ]
-    tool_env = dict(env)
-    tool_env["OPENCODE_PRINT_LOGS"] = "1"
-    tool_proc = run(
-        tool_command,
-        Path("/workspace"),
-        tool_env,
-        min(timeout, 30),
-    )
-    detail = " | ".join(
-        part.strip()
-        for part in (tool_proc.stderr, tool_proc.stdout)
-        if part.strip()
-    )
-    if tool_proc.returncode != 0:
-        raise RuntimeError(
-            f"expected plugin tool preflight failed for {expected_plugin!r}"
-            + (f": {detail[:4000]}" if detail else "")
-        )
-    if not tool_proc.stdout.strip():
-        raise RuntimeError(
-            f"expected plugin tool preflight returned empty output for {expected_plugin!r}"
-            + (f": {detail[:4000]}" if detail else "")
-        )
+    # invocation. OpenCode 2.0.12 activates plugins asynchronously for a cold
+    # Location. The raw plugin.list endpoint can therefore observe an empty
+    # inventory before activation settles. Start one private server, submit a
+    # non-resuming Session prompt (SessionPrompt.prepare waits on
+    # Plugin.awaitActivation without starting model inference), then inspect
+    # the plugin inventory on that same server.
+    preflight_timeout = min(timeout, 30)
+    started = time.monotonic()
+    server, base_url = _start_preflight_server(inventory_env := dict(env), preflight_timeout)
+    logs = ""
     try:
-        tool_payload = unwrap_api_data(json.loads(tool_proc.stdout))
-    except json.JSONDecodeError as exc:
+        remaining = lambda: max(0.5, preflight_timeout - (time.monotonic() - started))
+        created = _standalone_json_request(
+            base_url,
+            "/api/session",
+            method="POST",
+            payload={
+                "title": "opencode-eval-runner plugin preflight",
+                "agent": agent,
+                "location": {"directory": "/workspace"},
+            },
+            timeout=remaining(),
+        )
+        session_payload = unwrap_api_data(created)
+        if not isinstance(session_payload, dict) or not isinstance(session_payload.get("id"), str):
+            raise RuntimeError(
+                f"OpenCode preflight session.create returned invalid payload: {created!r}"
+            )
+        session_id = session_payload["id"]
+        _standalone_json_request(
+            base_url,
+            f"/api/session/{session_id}/prompt",
+            method="POST",
+            payload={
+                "text": "plugin activation preflight",
+                "resume": False,
+            },
+            timeout=remaining(),
+        )
+        inventory = _standalone_json_request(
+            base_url,
+            "/api/plugin?location%5Bdirectory%5D=%2Fworkspace",
+            timeout=remaining(),
+        )
+        inventory_payload = unwrap_api_data(inventory)
+        if not isinstance(inventory_payload, list):
+            raise RuntimeError(
+                f"expected plugin inventory preflight returned invalid payload for {expected_plugin!r}: "
+                f"{inventory_payload!r}"
+            )
+        plugin = next(
+            (
+                value
+                for value in inventory_payload
+                if isinstance(value, dict) and value.get("id") == expected_plugin
+            ),
+            None,
+        )
+        if plugin is None:
+            available = sorted(
+                str(value.get("id"))
+                for value in inventory_payload
+                if isinstance(value, dict) and value.get("id")
+            )
+            raise RuntimeError(
+                f"expected plugin {expected_plugin!r} is not present in OpenCode plugin inventory "
+                f"after activation; available plugins: {available[:120]}"
+            )
+        state = plugin.get("state")
+        status = state.get("status") if isinstance(state, dict) else None
+        if status != "active":
+            error = state.get("error") if isinstance(state, dict) else None
+            ref = state.get("ref") if isinstance(state, dict) else None
+            raise RuntimeError(
+                f"expected plugin {expected_plugin!r} is not active"
+                + (f": {error}" if error else f"; state={state!r}")
+                + (f" ({ref})" if ref else "")
+            )
+    except Exception as exc:
+        logs = _stop_preflight_server(server)
         raise RuntimeError(
-            f"expected plugin tool preflight returned invalid JSON for {expected_plugin!r}: {exc}"
-            + (f": {detail[:4000]}" if detail else "")
+            str(exc)
+            + (f"; server logs: {logs.strip()[:4000]}" if logs.strip() else "")
         ) from exc
-
-    if isinstance(tool_payload, list):
-        tool_ids = [str(value) for value in tool_payload if isinstance(value, str)]
-    elif isinstance(tool_payload, dict) and isinstance(tool_payload.get("ids"), list):
-        tool_ids = [
-            str(value)
-            for value in tool_payload["ids"]
-            if isinstance(value, str)
-        ]
     else:
-        raise RuntimeError(
-            f"expected plugin tool preflight returned invalid payload for {expected_plugin!r}: "
-            f"{tool_payload!r}"
-        )
-
-    prefix = expected_plugin.replace(".", "_").replace("-", "_") + "_"
-    plugin_tools = sorted(tool for tool in tool_ids if tool.startswith(prefix))
-    if not plugin_tools:
-        raise RuntimeError(
-            f"expected plugin {expected_plugin!r} registered no tools with prefix {prefix!r}; "
-            f"available tool IDs: {sorted(tool_ids)[:120]}"
-            + (f"; logs: {tool_proc.stderr.strip()[:3000]}" if tool_proc.stderr.strip() else "")
-        )
+        logs = _stop_preflight_server(server)
 
     return {
         "expected": expected_plugin,
         "agent": agent,
         "entrypoints": entrypoints,
-        "tools": plugin_tools,
-        "verification": "plugin-entrypoint+ready-tool-registry",
+        "plugin": plugin,
+        "verification": "plugin-entrypoint+activation-barrier+plugin-inventory",
     }
 
 

@@ -69,36 +69,41 @@ jobs:
       - name: Build Copilot transport image
         run: docker build -f Containerfile --target copilot -t opencode-eval-runner:copilot-test .
 
-      - name: Smoke test OpenCode standalone tool registry
+      - name: Smoke test OpenCode plugin activation preflight
         run: |
-          docker run --rm --entrypoint python3 opencode-eval-runner:opencode-test - <<'PY'
-          import json
-          import subprocess
+          rm -rf /tmp/preflight-workspace /tmp/preflight-config-root
+          mkdir -p /tmp/preflight-workspace
+          mkdir -p /tmp/preflight-config-root/plugins/loom
+          cat > /tmp/preflight-config-root/plugins/loom/index.ts <<'EOF'
+          export default {
+            id: "loom",
+            async setup() {},
+          }
+          EOF
 
-          proc = subprocess.run(
-              ["opencode", "api", "--standalone", "GET", "/experimental/tool/ids"],
-              cwd="/tmp",
-              capture_output=True,
-              text=True,
-              timeout=30,
-              check=False,
+          docker run --rm \
+            --workdir /workspace \
+            --volume /tmp/preflight-workspace:/workspace:ro \
+            --volume /tmp/preflight-config-root:/seed/opencode-config:ro \
+            --entrypoint python3 \
+            opencode-eval-runner:opencode-test - <<'PY'
+          import sys
+
+          sys.path.insert(0, "/opt/opencode-eval-runner")
+          from container.invoke import prepare_opencode_env, verify_expected_plugin
+
+          env = prepare_opencode_env()
+          result = verify_expected_plugin(
+              env,
+              "general",
+              "openai/preflight-no-inference",
+              "loom",
+              30,
           )
-          if proc.returncode != 0:
-              raise SystemExit(
-                  f"tool registry command failed ({proc.returncode}): {proc.stderr or proc.stdout}"
-              )
-          try:
-              payload = json.loads(proc.stdout)
-          except json.JSONDecodeError as exc:
-              raise SystemExit(
-                  f"tool registry command did not return JSON: {exc}; "
-                  f"stdout={proc.stdout!r}; stderr={proc.stderr!r}"
-              ) from exc
-
-          data = payload.get("data") if isinstance(payload, dict) and "data" in payload else payload
-          if not isinstance(data, list):
-              raise SystemExit(f"tool registry payload is not a list: {payload!r}")
-          print(f"PASS standalone tool registry ({len(data)} tools)")
+          assert result["plugin"]["id"] == "loom", result
+          assert result["plugin"]["state"]["status"] == "active", result
+          assert result["verification"] == "plugin-entrypoint+activation-barrier+plugin-inventory", result
+          print("PASS OpenCode plugin activation preflight")
           PY
 
       - name: Smoke test config plugin workspace dependency resolution
