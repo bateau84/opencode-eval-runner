@@ -250,19 +250,15 @@ class OpenCodeTransportTests(unittest.TestCase):
         self.assertEqual(result["skill"], "architectural-design")
         self.assertEqual(result["skills_loaded"], [])
 
-    def test_expected_plugin_preflight_accepts_resolved_namespace_tools(self):
+    def test_expected_plugin_preflight_accepts_materialized_plugin_and_agent(self):
         calls = []
 
         class Result:
             returncode = 0
-            stdout = json.dumps({
-                "name": "general",
-                "tools": {
-                    "read": True,
-                    "loom_start": True,
-                    "loom_status": True,
-                },
-            })
+            stdout = json.dumps([
+                {"id": "general", "name": "general"},
+                {"id": "reviewer", "name": "reviewer"},
+            ])
             stderr = ""
 
         def fake_run(command, cwd, env, timeout):
@@ -272,27 +268,57 @@ class OpenCodeTransportTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp, patch(
             "container.invoke.run", side_effect=fake_run
         ):
+            config = Path(tmp)
+            plugins = config / "plugins"
+            plugins.mkdir()
+            (plugins / "loom.ts").write_text("export default {}\n", encoding="utf-8")
             env = {"OPENCODE_CONFIG_DIR": tmp}
             result = verify_expected_plugin(env, "general", "openai/gpt-5.5", "loom", 30)
 
         self.assertEqual(result["expected"], "loom")
-        self.assertEqual(result["matched_tools"], ["loom_start", "loom_status"])
-        self.assertEqual(calls[0], ["opencode", "debug", "agent", "general"])
+        self.assertEqual(result["agent"], "general")
+        self.assertEqual(result["entrypoints"], ["plugins/loom.ts"])
+        self.assertEqual(result["verification"], "plugin-entrypoint+opencode-startup")
+        self.assertEqual(calls[0], ["opencode", "debug", "agents"])
 
-    def test_expected_plugin_preflight_rejects_missing_namespace_tools(self):
+    def test_expected_plugin_preflight_rejects_missing_materialized_plugin(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            env = {"OPENCODE_CONFIG_DIR": tmp}
+            with self.assertRaisesRegex(RuntimeError, "is not materialized"):
+                verify_expected_plugin(env, "general", "openai/gpt-5.5", "loom", 30)
+
+    def test_expected_plugin_preflight_rejects_missing_agent(self):
         class Result:
             returncode = 0
-            stdout = json.dumps({
-                "name": "general",
-                "tools": {"read": True, "execute": True},
-            })
+            stdout = json.dumps([{"id": "reviewer", "name": "reviewer"}])
             stderr = ""
 
         with tempfile.TemporaryDirectory() as tmp, patch(
             "container.invoke.run", return_value=Result()
         ):
+            config = Path(tmp)
+            plugins = config / "plugins"
+            plugins.mkdir()
+            (plugins / "loom.ts").write_text("export default {}\n", encoding="utf-8")
             env = {"OPENCODE_CONFIG_DIR": tmp}
-            with self.assertRaisesRegex(RuntimeError, "expected plugin 'loom' is not loaded"):
+            with self.assertRaisesRegex(RuntimeError, "could not resolve agent 'general'"):
+                verify_expected_plugin(env, "general", "openai/gpt-5.5", "loom", 30)
+
+    def test_expected_plugin_preflight_rejects_opencode_startup_failure(self):
+        class Result:
+            returncode = 1
+            stdout = ""
+            stderr = "plugin initialization failed"
+
+        with tempfile.TemporaryDirectory() as tmp, patch(
+            "container.invoke.run", return_value=Result()
+        ):
+            config = Path(tmp)
+            plugins = config / "plugins"
+            plugins.mkdir()
+            (plugins / "loom.ts").write_text("export default {}\n", encoding="utf-8")
+            env = {"OPENCODE_CONFIG_DIR": tmp}
+            with self.assertRaisesRegex(RuntimeError, "plugin initialization failed"):
                 verify_expected_plugin(env, "general", "openai/gpt-5.5", "loom", 30)
 
     def test_plugin_diagnostic_does_not_spawn_managed_service(self):
