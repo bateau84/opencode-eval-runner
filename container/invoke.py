@@ -299,12 +299,12 @@ def verify_expected_plugin(
             f"available entries: {available[:80]}"
         )
 
-    # OpenCode 2.0.12 removed the old singular `debug agent <id>` command
-    # that exposed a resolved tools map. `debug agents` is the supported
-    # zero-inference startup path. It proves the configured location starts
-    # successfully with plugins active and that the selected agent resolves.
-    command = ["opencode", "debug", "agents"]
-    proc = run(command, Path("/workspace"), env, min(timeout, 60))
+    # OpenCode 2.0.12's `debug agents` resolves through the background
+    # service/daemon path and can hang in isolated eval containers. The API
+    # command's explicit standalone mode starts a private in-process server,
+    # still exercises location/plugin startup, and performs no model inference.
+    command = ["opencode", "api", "--standalone", "get", "/api/agent"]
+    proc = run(command, Path("/workspace"), env, min(timeout, 30))
     if proc.returncode != 0:
         detail = " | ".join(part.strip() for part in (proc.stderr, proc.stdout) if part.strip())
         raise RuntimeError(
@@ -315,7 +315,7 @@ def verify_expected_plugin(
         agents = json.loads(proc.stdout)
     except json.JSONDecodeError as exc:
         raise RuntimeError(
-            f"expected plugin preflight returned invalid agent list JSON for {expected_plugin!r}: {exc}"
+            f"expected plugin preflight returned invalid standalone agent list JSON for {expected_plugin!r}: {exc}"
         ) from exc
     if not isinstance(agents, list):
         raise RuntimeError(
