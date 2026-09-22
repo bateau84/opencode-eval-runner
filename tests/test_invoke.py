@@ -262,7 +262,7 @@ class OpenCodeTransportTests(unittest.TestCase):
 
         def fake_run(command, cwd, env, timeout):
             calls.append(command)
-            if command[-1] == "/api/agent":
+            if command[-1] == "/agent":
                 return Result(json.dumps({
                     "location": {"directory": "/workspace"},
                     "data": [
@@ -270,7 +270,7 @@ class OpenCodeTransportTests(unittest.TestCase):
                         {"id": "reviewer", "name": "reviewer"},
                     ],
                 }))
-            if command[-1] == "/api/experimental/tool/ids":
+            if command[-1] == "/experimental/tool/ids":
                 return Result(json.dumps({
                     "location": {"directory": "/workspace"},
                     "data": ["read", "loom_start", "loom_route", "loom_status"],
@@ -292,10 +292,10 @@ class OpenCodeTransportTests(unittest.TestCase):
         self.assertEqual(result["entrypoints"], ["plugins/loom.ts"])
         self.assertEqual(result["tools"], ["loom_route", "loom_start", "loom_status"])
         self.assertEqual(result["verification"], "plugin-entrypoint+opencode-startup+tool-registry")
-        self.assertEqual(calls[0], ["opencode", "api", "--standalone", "get", "/api/agent"])
+        self.assertEqual(calls[0], ["opencode", "api", "--standalone", "get", "/agent"])
         self.assertEqual(
             calls[1],
-            ["opencode", "api", "--standalone", "get", "/api/experimental/tool/ids"],
+            ["opencode", "api", "--standalone", "get", "/experimental/tool/ids"],
         )
 
     def test_expected_plugin_preflight_bounds_standalone_startup_timeout(self):
@@ -310,7 +310,7 @@ class OpenCodeTransportTests(unittest.TestCase):
 
         def fake_run(command, cwd, env, timeout):
             seen.append(timeout)
-            if command[-1] == "/api/agent":
+            if command[-1] == "/agent":
                 return Result(json.dumps([{"id": "general", "name": "general"}]))
             return Result(json.dumps(["loom_start"]))
 
@@ -340,7 +340,7 @@ class OpenCodeTransportTests(unittest.TestCase):
                 self.stdout = stdout
 
         def fake_run(command, cwd, env, timeout):
-            if command[-1] == "/api/agent":
+            if command[-1] == "/agent":
                 return Result(json.dumps({
                     "location": {"directory": "/workspace"},
                     "data": [{"id": "general", "name": "general"}],
