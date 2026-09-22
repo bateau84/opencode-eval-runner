@@ -317,93 +317,77 @@ def verify_expected_plugin(
         )
 
     # Agent resolution is intentionally left to the real `opencode run --agent`
-    # invocation. For plugin readiness, OpenCode 2.0.12 exposes a plugin
-    # inventory with explicit active/failed state. This is a better fail-fast
-    # boundary than probing tool IDs: it reports plugin load failures directly
-    # and does not infer registration from an unrelated agent/tool projection.
-    inventory_command = [
+    # invocation. OpenCode 2.0.12 activates config plugins asynchronously, and
+    # plugin.list can observe a cold empty inventory before activation settles.
+    # The tool registry endpoint is the readiness boundary we need here because
+    # it exposes plugin-provided tools only after the location tool state is ready.
+    tool_command = [
         "opencode",
         "api",
         "--standalone",
-        "plugin.list",
-        "--param",
-        "directory=/workspace",
+        "GET",
+        "/experimental/tool/ids",
     ]
-    inventory_env = dict(env)
-    inventory_env["OPENCODE_PRINT_LOGS"] = "1"
-    inventory_proc = run(
-        inventory_command,
+    tool_env = dict(env)
+    tool_env["OPENCODE_PRINT_LOGS"] = "1"
+    tool_proc = run(
+        tool_command,
         Path("/workspace"),
-        inventory_env,
+        tool_env,
         min(timeout, 30),
     )
     detail = " | ".join(
         part.strip()
-        for part in (inventory_proc.stderr, inventory_proc.stdout)
+        for part in (tool_proc.stderr, tool_proc.stdout)
         if part.strip()
     )
-    if inventory_proc.returncode != 0:
+    if tool_proc.returncode != 0:
         raise RuntimeError(
-            f"expected plugin inventory preflight failed for {expected_plugin!r}"
+            f"expected plugin tool preflight failed for {expected_plugin!r}"
             + (f": {detail[:4000]}" if detail else "")
         )
-    if not inventory_proc.stdout.strip():
+    if not tool_proc.stdout.strip():
         raise RuntimeError(
-            f"expected plugin inventory preflight returned empty output for {expected_plugin!r}"
+            f"expected plugin tool preflight returned empty output for {expected_plugin!r}"
             + (f": {detail[:4000]}" if detail else "")
         )
     try:
-        inventory_payload = unwrap_api_data(json.loads(inventory_proc.stdout))
+        tool_payload = unwrap_api_data(json.loads(tool_proc.stdout))
     except json.JSONDecodeError as exc:
         raise RuntimeError(
-            f"expected plugin inventory preflight returned invalid JSON for {expected_plugin!r}: {exc}"
+            f"expected plugin tool preflight returned invalid JSON for {expected_plugin!r}: {exc}"
             + (f": {detail[:4000]}" if detail else "")
         ) from exc
 
-    if not isinstance(inventory_payload, list):
+    if isinstance(tool_payload, list):
+        tool_ids = [str(value) for value in tool_payload if isinstance(value, str)]
+    elif isinstance(tool_payload, dict) and isinstance(tool_payload.get("ids"), list):
+        tool_ids = [
+            str(value)
+            for value in tool_payload["ids"]
+            if isinstance(value, str)
+        ]
+    else:
         raise RuntimeError(
-            f"expected plugin inventory preflight returned invalid payload for {expected_plugin!r}: "
-            f"{inventory_payload!r}"
+            f"expected plugin tool preflight returned invalid payload for {expected_plugin!r}: "
+            f"{tool_payload!r}"
         )
 
-    plugin = next(
-        (
-            value
-            for value in inventory_payload
-            if isinstance(value, dict) and value.get("id") == expected_plugin
-        ),
-        None,
-    )
-    if plugin is None:
-        available = sorted(
-            str(value.get("id"))
-            for value in inventory_payload
-            if isinstance(value, dict) and value.get("id")
-        )
+    prefix = expected_plugin.replace(".", "_").replace("-", "_") + "_"
+    plugin_tools = sorted(tool for tool in tool_ids if tool.startswith(prefix))
+    if not plugin_tools:
         raise RuntimeError(
-            f"expected plugin {expected_plugin!r} is not present in OpenCode plugin inventory; "
-            f"available plugins: {available[:120]}"
-            + (f"; logs: {inventory_proc.stderr.strip()[:3000]}" if inventory_proc.stderr.strip() else "")
-        )
-
-    state = plugin.get("state")
-    status = state.get("status") if isinstance(state, dict) else None
-    if status != "active":
-        error = state.get("error") if isinstance(state, dict) else None
-        ref = state.get("ref") if isinstance(state, dict) else None
-        raise RuntimeError(
-            f"expected plugin {expected_plugin!r} is not active"
-            + (f": {error}" if error else f"; state={state!r}")
-            + (f" ({ref})" if ref else "")
-            + (f"; logs: {inventory_proc.stderr.strip()[:3000]}" if inventory_proc.stderr.strip() else "")
+            f"expected plugin {expected_plugin!r} registered no tools with prefix {prefix!r}; "
+            f"available tool IDs: {sorted(tool_ids)[:120]}"
+            + (f"; logs: {tool_proc.stderr.strip()[:3000]}" if tool_proc.stderr.strip() else "")
         )
 
     return {
         "expected": expected_plugin,
         "agent": agent,
         "entrypoints": entrypoints,
-        "plugin": plugin,
-        "verification": "plugin-entrypoint+plugin-inventory",
+        "tools": plugin_tools,
+        "verification": "plugin-entrypoint+ready-tool-registry",
     }
 
 
