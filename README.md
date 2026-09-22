@@ -168,7 +168,7 @@ opencode-eval-runner invoke \
   ...
 ```
 
-The runner resolves the selected agent through OpenCode's zero-inference debug path and requires at least one enabled tool whose name starts with the namespace prefix (for `loom`, `loom_*`). Missing or failed plugin resolution is infrastructure/non-evidence, never a behavioral FAIL.
+OpenCode 2.0.12 no longer exposes the old singular `debug agent <id>` command that returned a resolved tool map. The runner therefore performs the strongest supported zero-inference preflight: it requires the expected plugin entrypoint to be materialized in the isolated OpenCode config, runs `opencode debug agents` to prove the configured location starts successfully with plugins active, and requires the selected agent to resolve. Missing plugin materialization, plugin/startup failure, or missing agent is infrastructure/non-evidence, never a behavioral FAIL. Actual tool use remains a repository-owned behavioral assertion in the eval corpus.
 
 ### Evaluating a skill
 
