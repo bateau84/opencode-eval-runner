@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import json
 import unittest
 from unittest.mock import patch
 
@@ -10,6 +11,7 @@ from container.invoke import (
     extract_loaded_skills,
     loaded_skills_from_export,
     invoke_opencode,
+    verify_expected_plugin,
 )
 
 
