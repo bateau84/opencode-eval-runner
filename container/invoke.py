@@ -238,6 +238,70 @@ def prepare_opencode_env() -> dict[str, str]:
     return env
 
 
+def ensure_model_config(env: dict[str, str], model: str) -> None:
+    config_root = Path(
+        env.get("OPENCODE_CONFIG_DIR")
+        or Path(env.get("XDG_CONFIG_HOME", "/tmp/runtime/config")) / "opencode"
+    )
+    config_file = config_root / "opencode.json"
+    data: dict[str, Any] = {}
+    if config_file.is_file():
+        try:
+            parsed = json.loads(config_file.read_text(encoding="utf-8"))
+            if isinstance(parsed, dict):
+                data = parsed
+        except json.JSONDecodeError:
+            pass
+    data["$schema"] = data.get("$schema") or "https://opencode.ai/config.json"
+    data["model"] = model
+    config_file.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+
+
+def verify_expected_plugin(
+    env: dict[str, str],
+    agent: str,
+    model: str,
+    expected_plugin: str,
+    timeout: int,
+) -> dict[str, Any]:
+    if not expected_plugin:
+        return {"expected": None, "matched_tools": []}
+    if not agent:
+        raise RuntimeError("expected plugin preflight requires an agent")
+
+    ensure_model_config(env, model)
+    command = ["opencode", "debug", "agent", agent]
+    proc = run(command, Path("/workspace"), env, min(timeout, 60))
+    if proc.returncode != 0:
+        detail = " | ".join(part.strip() for part in (proc.stderr, proc.stdout) if part.strip())
+        raise RuntimeError(
+            f"expected plugin preflight failed for {expected_plugin!r}"
+            + (f": {detail[:2000]}" if detail else "")
+        )
+    try:
+        resolved = json.loads(proc.stdout)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(
+            f"expected plugin preflight returned invalid agent JSON for {expected_plugin!r}: {exc}"
+        ) from exc
+    tools = resolved.get("tools") if isinstance(resolved, dict) else None
+    if not isinstance(tools, dict):
+        raise RuntimeError(f"expected plugin preflight returned no resolved tools for {expected_plugin!r}")
+    prefix = expected_plugin.replace(".", "_") + "_"
+    matched = sorted(
+        name
+        for name, enabled in tools.items()
+        if isinstance(name, str) and name.startswith(prefix) and enabled is not False
+    )
+    if not matched:
+        available = sorted(str(name) for name in tools)[:80]
+        raise RuntimeError(
+            f"expected plugin {expected_plugin!r} is not loaded for agent {agent!r}; "
+            f"no enabled tools start with {prefix!r}. Resolved tools: {available}"
+        )
+    return {"expected": expected_plugin, "matched_tools": matched}
+
+
 def plugin_diagnostic(env: dict[str, str]) -> dict[str, Any]:
     config_root = Path(
         env.get("OPENCODE_CONFIG_DIR")
@@ -272,6 +336,8 @@ def invoke_opencode(
 ) -> dict[str, Any]:
     env = prepare_opencode_env()
     plugins = plugin_diagnostic(env)
+    expected_plugin = os.environ.get("EVAL_EXPECT_PLUGIN", "").strip()
+    plugin_preflight = verify_expected_plugin(env, agent, model, expected_plugin, timeout)
 
     # OpenCode V2 has no documented force-refresh command for the model
     # catalog. A fresh isolated process owns a fresh cache and resolves the
@@ -334,6 +400,7 @@ def invoke_opencode(
         "stderr": proc.stderr[:20000],
         "stdout": proc.stdout[:200000],
         "plugin_diagnostic": plugins,
+        "plugin_preflight": plugin_preflight,
     }
 
 

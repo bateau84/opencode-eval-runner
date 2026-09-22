@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from pathlib import Path
+import json
+import tempfile
 import unittest
 from unittest.mock import patch
 
@@ -10,6 +12,7 @@ from container.invoke import (
     extract_loaded_skills,
     loaded_skills_from_export,
     invoke_opencode,
+    verify_expected_plugin,
 )
 
 
@@ -246,6 +249,51 @@ class OpenCodeTransportTests(unittest.TestCase):
 
         self.assertEqual(result["skill"], "architectural-design")
         self.assertEqual(result["skills_loaded"], [])
+
+    def test_expected_plugin_preflight_accepts_resolved_namespace_tools(self):
+        calls = []
+
+        class Result:
+            returncode = 0
+            stdout = json.dumps({
+                "name": "general",
+                "tools": {
+                    "read": True,
+                    "loom_start": True,
+                    "loom_status": True,
+                },
+            })
+            stderr = ""
+
+        def fake_run(command, cwd, env, timeout):
+            calls.append(command)
+            return Result()
+
+        with tempfile.TemporaryDirectory() as tmp, patch(
+            "container.invoke.run", side_effect=fake_run
+        ):
+            env = {"OPENCODE_CONFIG_DIR": tmp}
+            result = verify_expected_plugin(env, "general", "openai/gpt-5.5", "loom", 30)
+
+        self.assertEqual(result["expected"], "loom")
+        self.assertEqual(result["matched_tools"], ["loom_start", "loom_status"])
+        self.assertEqual(calls[0], ["opencode", "debug", "agent", "general"])
+
+    def test_expected_plugin_preflight_rejects_missing_namespace_tools(self):
+        class Result:
+            returncode = 0
+            stdout = json.dumps({
+                "name": "general",
+                "tools": {"read": True, "execute": True},
+            })
+            stderr = ""
+
+        with tempfile.TemporaryDirectory() as tmp, patch(
+            "container.invoke.run", return_value=Result()
+        ):
+            env = {"OPENCODE_CONFIG_DIR": tmp}
+            with self.assertRaisesRegex(RuntimeError, "expected plugin 'loom' is not loaded"):
+                verify_expected_plugin(env, "general", "openai/gpt-5.5", "loom", 30)
 
     def test_plugin_diagnostic_does_not_spawn_managed_service(self):
         calls = []
