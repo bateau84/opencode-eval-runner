@@ -168,7 +168,7 @@ opencode-eval-runner invoke \
   ...
 ```
 
-OpenCode 2.0.12 no longer exposes the old singular `debug agent <id>` command that returned a resolved tool map. The runner therefore performs the strongest supported zero-inference preflight: it requires the expected plugin entrypoint to be materialized in the isolated OpenCode config, runs `opencode debug agents` to prove the configured location starts successfully with plugins active, and requires the selected agent to resolve. Missing plugin materialization, plugin/startup failure, or missing agent is infrastructure/non-evidence, never a behavioral FAIL. Actual tool use remains a repository-owned behavioral assertion in the eval corpus.
+OpenCode 2.0.15 no longer exposes the old singular `debug agent <id>` command that returned a resolved tool map. The runner therefore performs the strongest supported zero-inference preflight: it requires the expected plugin entrypoint to be materialized in the isolated OpenCode config, runs `opencode debug agents` to prove the configured location starts successfully with plugins active, and requires the selected agent to resolve. Missing plugin materialization, plugin/startup failure, or missing agent is infrastructure/non-evidence, never a behavioral FAIL. Actual tool use remains a repository-owned behavioral assertion in the eval corpus.
 
 ### Evaluating a skill
 
@@ -308,7 +308,7 @@ The eval repository decides whether that observed behavior is PASS, FAIL, or non
 
 The transport images currently pin:
 
-- OpenCode CLI `2.0.12`
+- OpenCode CLI `2.0.15`
 - GitHub Copilot CLI `1.0.83`
 
 The two CLIs are not bundled together. OpenCode's npm package is used only as a build-time native-binary selector; GitHub Copilot CLI is installed from its native release installer. Node/npm are absent from the final runtime images.
