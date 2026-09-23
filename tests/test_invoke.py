@@ -574,6 +574,24 @@ class OpenCodeTransportTests(unittest.TestCase):
         self.assertIn("ARG OPENCODE_VERSION=2.0.15", containerfile)
         self.assertNotIn("ARG OPENCODE_VERSION=2.0.12", containerfile)
 
+    def test_container_pins_base_images_and_copilot_release_asset(self):
+        containerfile = (Path(__file__).resolve().parents[1] / "Containerfile").read_text(
+            encoding="utf-8"
+        )
+        for expected in (
+            "node:24-bookworm-slim@sha256:0e0ff40c39bc087845bfb27465a0df4ea419520094bc35842ff83dd8cbe6f9b6",
+            "debian:bookworm-slim@sha256:3783cc01769c7b2b1b83a5c5ad96c815348e28ed7da68e2e3687004faa906251",
+            "python:3.12-slim-bookworm@sha256:392307d22300de8b5986851a12d9176dfc0fc073e65bf6523ebd7dcbeb23564e",
+            "ffbe1c429664b8a05efed67ecdb467123e40fcaa3c6c14ef9a98ba74da4687b7",
+            "213b3a267042dbac3cd8ae22c82f5ea04ff3cabc008108c0f895055d46be4473",
+            "sha256sum -c -",
+            "github.com/github/copilot-cli/releases/download/v${COPILOT_VERSION}/$asset",
+        ):
+            self.assertIn(expected, containerfile)
+        self.assertNotIn("curl -fsSL https://gh.io/copilot-install", containerfile)
+        self.assertNotIn("FROM node:24-bookworm-slim AS", containerfile)
+        self.assertNotIn("FROM debian:bookworm-slim AS", containerfile)
+        self.assertNotIn("FROM python:3.12-slim-bookworm AS", containerfile)
     def test_container_routes_default_runtime_state_to_tmpfs(self):
         containerfile = (Path(__file__).resolve().parents[1] / "Containerfile").read_text(
             encoding="utf-8"
