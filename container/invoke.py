@@ -147,6 +147,7 @@ TOOL_RESULT_FIELD_LIMIT = 6000
 TOOL_RESULT_EVENT_LIMIT = 64
 TOOL_RESULT_TOTAL_LIMIT = 48000
 STDOUT_CAPTURE_LIMIT = 200000
+STDERR_CAPTURE_LIMIT = 20000
 
 
 def _tool_result_text(value: Any, limit: int) -> tuple[str, bool]:
@@ -726,7 +727,9 @@ def invoke_opencode(
                 "export_exit_code": None,
                 "total_seconds": round(run_seconds, 3),
             },
-            "stderr": detail[:20000],
+            "stderr": detail[:STDERR_CAPTURE_LIMIT],
+            "stderr_truncated": len(detail) > STDERR_CAPTURE_LIMIT,
+            "stderr_total_chars": len(detail),
             "stdout": stdout[:STDOUT_CAPTURE_LIMIT],
             "stdout_truncated": len(stdout) > STDOUT_CAPTURE_LIMIT,
             "stdout_total_chars": len(stdout),
@@ -769,7 +772,9 @@ def invoke_opencode(
             "export_exit_code": export_exit_code,
             "total_seconds": round(run_seconds + export_seconds, 3),
         },
-        "stderr": proc.stderr[:20000],
+        "stderr": proc.stderr[:STDERR_CAPTURE_LIMIT],
+        "stderr_truncated": len(proc.stderr) > STDERR_CAPTURE_LIMIT,
+        "stderr_total_chars": len(proc.stderr),
         "stdout": proc.stdout[:STDOUT_CAPTURE_LIMIT],
         "stdout_truncated": len(proc.stdout) > STDOUT_CAPTURE_LIMIT,
         "stdout_total_chars": len(proc.stdout),
@@ -861,8 +866,12 @@ def invoke_copilot(model: str, prompt: str, system: str, timeout: int) -> dict[s
         "tools": [],
         "actions": [],
         "skills_loaded": [],
-        "stderr": proc.stderr[:20000],
-        "stdout": proc.stdout[:200000],
+        "stderr": proc.stderr[:STDERR_CAPTURE_LIMIT],
+        "stderr_truncated": len(proc.stderr) > STDERR_CAPTURE_LIMIT,
+        "stderr_total_chars": len(proc.stderr),
+        "stdout": proc.stdout[:STDOUT_CAPTURE_LIMIT],
+        "stdout_truncated": len(proc.stdout) > STDOUT_CAPTURE_LIMIT,
+        "stdout_total_chars": len(proc.stdout),
     }
 
 
