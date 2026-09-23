@@ -257,6 +257,26 @@ class OpenCodeTransportTests(unittest.TestCase):
         self.assertEqual(result["tool_result_evidence"]["observed_events"], 1)
         self.assertEqual(result["tool_result_evidence"]["omitted_events"], 0)
 
+    def test_opencode_reports_stderr_truncation_metadata(self):
+        class Result:
+            returncode = 1
+            stdout = ""
+            stderr = "x" * 21000
+
+        with patch("container.invoke.prepare_opencode_env", return_value={}), patch(
+            "container.invoke.run", return_value=Result()
+        ):
+            result = invoke_opencode(
+                "openai/gpt-5.6-luna",
+                "general",
+                "test prompt",
+                30,
+            )
+
+        self.assertTrue(result["stderr_truncated"])
+        self.assertEqual(result["stderr_total_chars"], 21000)
+        self.assertEqual(len(result["stderr"]), 20000)
+
     def test_opencode_timeout_preserves_partial_runtime_progress(self):
         stdout = "\n".join([
             '{"type":"step_start","sessionID":"ses_timeout","part":{"type":"step-start"}}',
