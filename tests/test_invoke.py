@@ -547,6 +547,26 @@ class OpenCodeTransportTests(unittest.TestCase):
         )
 
 
+    def test_workflows_pin_external_actions_by_commit(self):
+        root = Path(__file__).resolve().parents[1]
+        ci = (root / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+        publish = (root / ".github" / "workflows" / "publish.yml").read_text(encoding="utf-8")
+        expected = {
+            "actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+            "docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9",
+            "docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051",
+            "docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8",
+        }
+        for value in expected:
+            self.assertIn(value, ci + publish)
+        for mutable in (
+            "actions/checkout@v4",
+            "docker/login-action@v3",
+            "docker/metadata-action@v5",
+            "docker/build-push-action@v6",
+        ):
+            self.assertNotIn(mutable, ci + publish)
+
     def test_container_pins_opencode_2_0_15(self):
         containerfile = (Path(__file__).resolve().parents[1] / "Containerfile").read_text(
             encoding="utf-8"
