@@ -253,7 +253,7 @@ def prepare_opencode_env() -> dict[str, str]:
                 encoding="utf-8",
             )
 
-            # OpenCode 2.0.12 resolves package imports for config-root local
+            # OpenCode V2 resolves package imports for config-root local
             # plugins from the config-root dependency context. Runtime evals
             # mount the repository dependencies at /workspace/node_modules, so
             # bridge that dependency tree into the isolated config root. This
@@ -462,7 +462,7 @@ def verify_expected_plugin(
         )
 
     # Agent resolution is intentionally left to the real `opencode run --agent`
-    # invocation. OpenCode 2.0.12 activates plugins asynchronously for a cold
+    # invocation. OpenCode V2 activates plugins asynchronously for a cold
     # Location. The raw plugin.list endpoint can therefore observe an empty
     # inventory before activation settles. Start one private server, submit a
     # non-resuming Session prompt (SessionPrompt.prepare waits on

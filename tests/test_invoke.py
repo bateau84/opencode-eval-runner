@@ -495,6 +495,13 @@ class OpenCodeTransportTests(unittest.TestCase):
         )
 
 
+    def test_container_pins_opencode_2_0_15(self):
+        containerfile = (Path(__file__).resolve().parents[1] / "Containerfile").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("ARG OPENCODE_VERSION=2.0.15", containerfile)
+        self.assertNotIn("ARG OPENCODE_VERSION=2.0.12", containerfile)
+
     def test_container_routes_default_runtime_state_to_tmpfs(self):
         containerfile = (Path(__file__).resolve().parents[1] / "Containerfile").read_text(
             encoding="utf-8"
