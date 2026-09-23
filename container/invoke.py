@@ -143,6 +143,73 @@ def extract_actions(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return actions
 
 
+TOOL_RESULT_FIELD_LIMIT = 6000
+TOOL_RESULT_EVENT_LIMIT = 64
+TOOL_RESULT_TOTAL_LIMIT = 48000
+STDOUT_CAPTURE_LIMIT = 200000
+
+
+def _tool_result_text(value: Any, limit: int) -> tuple[str, bool]:
+    text = value if isinstance(value, str) else json.dumps(value, ensure_ascii=False, sort_keys=True)
+    if len(text) <= limit:
+        return text, False
+    marker = "\n[... tool-result field truncated ...]\n"
+    retained = limit - len(marker)
+    head = retained // 2
+    return text[:head] + marker + text[-(retained - head):], True
+
+
+def extract_tool_result_evidence(events: list[dict[str, Any]]) -> dict[str, Any]:
+    """Bound tool results from the full structured event stream before stdout clipping."""
+    evidence: dict[str, Any] = {
+        "schema": "opencode-eval-runner/tool-results/v1",
+        "source": "opencode.event-stream.full",
+        "observed_events": 0,
+        "omitted_events": 0,
+        "events": [],
+    }
+    recent: list[dict[str, Any]] = []
+    for event in events:
+        if event.get("type") != "tool_use":
+            continue
+        part = event.get("part")
+        if not isinstance(part, dict) or part.get("type") != "tool" or not isinstance(part.get("tool"), str):
+            continue
+        state = part.get("state")
+        if not isinstance(state, dict):
+            continue
+        evidence["observed_events"] += 1
+        item: dict[str, Any] = {
+            "sequence": evidence["observed_events"],
+            "truncated_fields": [],
+        }
+        fields: dict[str, tuple[Any, int]] = {
+            "tool": (part["tool"], 256),
+            "status": (state.get("status", "unknown"), 256),
+            "input": (state.get("input", {}), 2000),
+        }
+        for key, value in (("call_id", part.get("callID")), ("session_id", event.get("sessionID"))):
+            if value is not None:
+                fields[key] = (value, 256)
+        for key in ("output", "error"):
+            if key in state:
+                fields[key] = (state[key], TOOL_RESULT_FIELD_LIMIT)
+        for key, (value, limit) in fields.items():
+            item[key], clipped = _tool_result_text(value, limit)
+            if clipped:
+                item["truncated_fields"].append(key)
+        recent.append(item)
+        if len(recent) > TOOL_RESULT_EVENT_LIMIT:
+            recent.pop(0)
+
+    evidence["events"] = recent
+    evidence["omitted_events"] = evidence["observed_events"] - len(recent)
+    while len(json.dumps(evidence, ensure_ascii=False)) > TOOL_RESULT_TOTAL_LIMIT and evidence["events"]:
+        evidence["events"].pop(0)
+        evidence["omitted_events"] += 1
+    return evidence
+
+
 def completed_skill_from_part(part: dict[str, Any]) -> str | None:
     if part.get("type") != "tool" or part.get("tool") != "skill":
         return None
@@ -660,7 +727,10 @@ def invoke_opencode(
                 "total_seconds": round(run_seconds, 3),
             },
             "stderr": detail[:20000],
-            "stdout": stdout[:200000],
+            "stdout": stdout[:STDOUT_CAPTURE_LIMIT],
+            "stdout_truncated": len(stdout) > STDOUT_CAPTURE_LIMIT,
+            "stdout_total_chars": len(stdout),
+            "tool_result_evidence": extract_tool_result_evidence(events),
             "plugin_diagnostic": plugins,
             "plugin_preflight": plugin_preflight,
         }
@@ -700,7 +770,10 @@ def invoke_opencode(
             "total_seconds": round(run_seconds + export_seconds, 3),
         },
         "stderr": proc.stderr[:20000],
-        "stdout": proc.stdout[:200000],
+        "stdout": proc.stdout[:STDOUT_CAPTURE_LIMIT],
+        "stdout_truncated": len(proc.stdout) > STDOUT_CAPTURE_LIMIT,
+        "stdout_total_chars": len(proc.stdout),
+        "tool_result_evidence": extract_tool_result_evidence(events),
         "plugin_diagnostic": plugins,
         "plugin_preflight": plugin_preflight,
     }

@@ -12,6 +12,7 @@ from container.invoke import (
     assistant_from_export,
     extract_actions,
     extract_loaded_skills,
+    extract_tool_result_evidence,
     loaded_skills_from_export,
     invoke_opencode,
     verify_expected_plugin,
@@ -204,6 +205,57 @@ class OpenCodeTransportTests(unittest.TestCase):
         self.assertEqual(result["skills_loaded"], ["web-ui-design"])
         self.assertEqual(result["timing"]["export_seconds"], 0.0)
         self.assertIsNone(result["timing"]["export_exit_code"])
+
+
+    def test_full_tool_result_projection_survives_raw_stdout_clipping(self):
+        class Result:
+            returncode = 0
+            stderr = ""
+            stdout = "\n".join(
+                [
+                    json.dumps({
+                        "type": "step_start",
+                        "sessionID": "ses_long",
+                        "part": {"type": "step-start", "padding": "x" * 1000},
+                    })
+                    for _ in range(240)
+                ]
+                + [
+                    json.dumps({
+                        "type": "tool_use",
+                        "sessionID": "ses_long",
+                        "part": {
+                            "type": "tool",
+                            "tool": "loom_status",
+                            "state": {
+                                "status": "completed",
+                                "input": {"workflowId": "wf-long"},
+                                "output": "FINAL COMPLETE 3/3",
+                            },
+                        },
+                    })
+                ]
+            )
+
+        with patch("container.invoke.prepare_opencode_env", return_value={}), patch(
+            "container.invoke.run", return_value=Result()
+        ):
+            result = invoke_opencode(
+                "openai/gpt-5.6-luna",
+                "general",
+                "test prompt",
+                30,
+            )
+
+        self.assertTrue(result["stdout_truncated"])
+        self.assertGreater(result["stdout_total_chars"], len(result["stdout"]))
+        self.assertNotIn("FINAL COMPLETE 3/3", result["stdout"])
+        self.assertIn(
+            "FINAL COMPLETE 3/3",
+            json.dumps(result["tool_result_evidence"]),
+        )
+        self.assertEqual(result["tool_result_evidence"]["observed_events"], 1)
+        self.assertEqual(result["tool_result_evidence"]["omitted_events"], 0)
 
     def test_opencode_timeout_preserves_partial_runtime_progress(self):
         stdout = "\n".join([
