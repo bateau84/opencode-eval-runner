@@ -243,6 +243,20 @@ class OpenCodeTransportTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "empty #variant"):
             resolve_opencode_reasoning("openai/gpt-5.6-luna#", "")
 
+    def test_copilot_auth_failure_preserves_reasoning_provenance(self):
+        with patch.dict(os.environ, {}, clear=True):
+            result = invoke_copilot(
+                "gpt-5.6-luna",
+                "test prompt",
+                "system",
+                30,
+                reasoning="high",
+            )
+
+        self.assertEqual(result["exit_code"], 2)
+        self.assertEqual(result["reasoning"], "high")
+        self.assertEqual(result["reasoning_source"], "explicit")
+
     def test_copilot_maps_reasoning_to_effort(self):
         class Result:
             returncode = 0
