@@ -89,7 +89,7 @@ When no token environment variable is set, the host wrapper uses an authenticate
 
 The container uses fresh `COPILOT_HOME` and `COPILOT_CACHE_HOME`, disables auto-update, prompt-mode extensions, repo hooks, MCPs, remote operations, and model tools.
 
-Reasoning can be pinned with the same `--reasoning LEVEL` runner option. Copilot maps this to its native `--effort LEVEL`. If the selected model does not support that effort, the invocation fails as transport/non-evidence rather than silently falling back. When omitted, the result records `"reasoning": "provider-default"`.
+Reasoning can be pinned with the same `--reasoning LEVEL` runner option. Copilot maps this to its native `--effort LEVEL`. The runner forwards the requested value exactly and never substitutes another level; acceptance or rejection of a model/effort combination remains the pinned Copilot CLI's responsibility and is surfaced through its normal exit status/output. When omitted, the result records `"reasoning": "provider-default"`. Results also include `"reasoning_source": "explicit"` or `"provider-default"` so consumers do not confuse a requested level with an inferred provider default.
 
 This transport reuses the trust-boundary pattern already proven in `nrkno/mats-opencode-setup`.
 
@@ -293,6 +293,7 @@ Each invocation writes one JSON document:
   "transport": "opencode",
   "model": "openai/gpt-5.3-codex-spark",
   "reasoning": "medium",
+  "reasoning_source": "explicit",
   "agent": "reviewer",
   "skill": "architectural-design",
   "exit_code": 0,

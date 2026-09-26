@@ -168,6 +168,7 @@ class OpenCodeTransportTests(unittest.TestCase):
         self.assertNotIn("models", calls[0][1:])
         self.assertNotIn("--variant", calls[0])
         self.assertEqual(result["reasoning"], "provider-default")
+        self.assertEqual(result["reasoning_source"], "provider-default")
 
     def test_opencode_maps_reasoning_to_variant(self):
         class Result:
@@ -195,6 +196,7 @@ class OpenCodeTransportTests(unittest.TestCase):
         self.assertIn("--variant", calls[0])
         self.assertEqual(calls[0][calls[0].index("--variant") + 1], "high")
         self.assertEqual(result["reasoning"], "high")
+        self.assertEqual(result["reasoning_source"], "explicit")
 
     def test_copilot_maps_reasoning_to_effort(self):
         class Result:
@@ -222,6 +224,7 @@ class OpenCodeTransportTests(unittest.TestCase):
         self.assertIn("--effort", calls[0])
         self.assertEqual(calls[0][calls[0].index("--effort") + 1], "xhigh")
         self.assertEqual(result["reasoning"], "xhigh")
+        self.assertEqual(result["reasoning_source"], "explicit")
 
     def test_opencode_uses_event_stream_without_session_export(self):
         class Result:
