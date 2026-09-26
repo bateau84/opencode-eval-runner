@@ -174,6 +174,11 @@ jobs:
           docker run --rm --entrypoint opencode opencode-eval-runner:opencode-test --version
           docker run --rm --entrypoint copilot opencode-eval-runner:copilot-test --version
 
+      - name: Verify pinned reasoning controls
+        run: |
+          docker run --rm --entrypoint opencode opencode-eval-runner:opencode-test run --help             | grep -F -- '--variant'
+          docker run --rm --entrypoint copilot opencode-eval-runner:copilot-test --help             | grep -F -- '--effort'
+
       - name: Report image sizes
         run: |
           docker image inspect opencode-eval-runner:opencode-test --format 'OpenCode image: {{.Size}} bytes'
