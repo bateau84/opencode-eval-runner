@@ -23,7 +23,7 @@ jobs:
         run: |
           cat > /tmp/Containerfile.fake-copilot <<'EOF'
           FROM alpine:3.22
-          ENTRYPOINT ["/bin/sh", "-c", "if [ -z \"$GITHUB_TOKEN\" ] || [ -n \"$COPILOT_GITHUB_TOKEN\" ] || [ -n \"$GH_TOKEN\" ]; then exit 42; fi; printf '%s\\n' '{\"schema\":\"opencode-eval-runner/v1\",\"transport\":\"github-copilot-cli\",\"model\":\"fake\",\"agent\":\"eval-runner\",\"skill\":null,\"exit_code\":0,\"session_id\":null,\"text\":\"fake action smoke\",\"tools\":[],\"actions\":[],\"skills_loaded\":[],\"stderr\":\"\",\"stdout\":\"\"}'"]
+          ENTRYPOINT ["/bin/sh", "-c", "if [ -z \"$GITHUB_TOKEN\" ] || [ -n \"$COPILOT_GITHUB_TOKEN\" ] || [ -n \"$GH_TOKEN\" ] || [ \"$EVAL_REASONING\" != \"medium\" ]; then exit 42; fi; printf '%s\\n' '{\"schema\":\"opencode-eval-runner/v1\",\"transport\":\"github-copilot-cli\",\"model\":\"fake\",\"reasoning\":\"medium\",\"reasoning_source\":\"explicit\",\"agent\":\"eval-runner\",\"skill\":null,\"exit_code\":0,\"session_id\":null,\"text\":\"fake action smoke\",\"tools\":[],\"actions\":[],\"skills_loaded\":[],\"stderr\":\"\",\"stdout\":\"\"}'"]
           EOF
           docker build -f /tmp/Containerfile.fake-copilot -t opencode-eval-runner:fake-copilot /tmp
           printf '%s\n' 'action smoke prompt' > /tmp/action-smoke-prompt.txt
@@ -40,6 +40,7 @@ jobs:
           copilot-image: opencode-eval-runner:fake-copilot
           transport: github-copilot-cli
           model: fake
+          reasoning: medium
           prompt-file: /tmp/action-smoke-prompt.txt
           output: /tmp/action-smoke-result.json
 
@@ -60,6 +61,8 @@ jobs:
           result = json.load(open("/tmp/action-smoke-result.json", encoding="utf-8"))
           assert result["exit_code"] == 0
           assert result["transport"] == "github-copilot-cli"
+          assert result["reasoning"] == "medium"
+          assert result["reasoning_source"] == "explicit"
           assert result["text"] == "fake action smoke"
           PY
 
@@ -173,6 +176,12 @@ jobs:
         run: |
           docker run --rm --entrypoint opencode opencode-eval-runner:opencode-test --version
           docker run --rm --entrypoint copilot opencode-eval-runner:copilot-test --version
+
+      - name: Verify pinned reasoning controls
+        run: |
+          docker run --rm --entrypoint opencode opencode-eval-runner:opencode-test run --help \
+            | grep -F -- 'provider/model#variant'
+          docker run --rm --entrypoint copilot opencode-eval-runner:copilot-test --help             | grep -F -- '--effort'
 
       - name: Report image sizes
         run: |

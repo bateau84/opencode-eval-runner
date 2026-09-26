@@ -657,17 +657,36 @@ def plugin_diagnostic(env: dict[str, str]) -> dict[str, Any]:
     }
 
 
+def resolve_opencode_reasoning(model: str, reasoning: str) -> tuple[str, str, str]:
+    if reasoning:
+        if "#" in model:
+            raise RuntimeError(
+                "OpenCode reasoning is ambiguous: --model already contains a #variant while --reasoning was also supplied"
+            )
+        return model + "#" + reasoning, reasoning, "explicit"
+
+    if "#" in model:
+        _, variant = model.rsplit("#", 1)
+        if not variant:
+            raise RuntimeError("OpenCode model reference has an empty #variant")
+        return model, variant, "model-variant"
+
+    return model, "provider-default", "provider-default"
+
+
 def invoke_opencode(
     model: str,
     agent: str,
     prompt: str,
     timeout: int,
     skill: str = "",
+    reasoning: str = "",
 ) -> dict[str, Any]:
     env = prepare_opencode_env()
     plugins = plugin_diagnostic(env)
     expected_plugin = os.environ.get("EVAL_EXPECT_PLUGIN", "").strip()
     plugin_preflight = verify_expected_plugin(env, agent, model, expected_plugin, timeout)
+    invoked_model, reasoning_label, reasoning_source = resolve_opencode_reasoning(model, reasoning)
 
     # OpenCode V2 has no documented force-refresh command for the model
     # catalog. A fresh isolated process owns a fresh cache and resolves the
@@ -690,7 +709,7 @@ def invoke_opencode(
     ]
     if agent:
         command += ["--agent", agent]
-    command += ["--model", model, prompt]
+    command += ["--model", invoked_model, prompt]
     run_started = time.perf_counter()
     try:
         proc = run(command, Path("/workspace"), env, timeout)
@@ -712,6 +731,8 @@ def invoke_opencode(
             "schema": RESULT_SCHEMA,
             "transport": "opencode",
             "model": model,
+            "reasoning": reasoning_label,
+            "reasoning_source": reasoning_source,
             "agent": agent or None,
             "skill": skill or None,
             "exit_code": 124,
@@ -758,6 +779,8 @@ def invoke_opencode(
         "schema": RESULT_SCHEMA,
         "transport": "opencode",
         "model": model,
+        "reasoning": reasoning_label,
+        "reasoning_source": reasoning_source,
         "agent": agent or None,
         "skill": skill or None,
         "exit_code": proc.returncode,
@@ -803,7 +826,13 @@ def copilot_profile(system: str) -> str:
     )
 
 
-def invoke_copilot(model: str, prompt: str, system: str, timeout: int) -> dict[str, Any]:
+def invoke_copilot(
+    model: str,
+    prompt: str,
+    system: str,
+    timeout: int,
+    reasoning: str = "",
+) -> dict[str, Any]:
     env = dict(os.environ)
     auth_source = copilot_auth_source(env)
     if not auth_source:
@@ -811,6 +840,8 @@ def invoke_copilot(model: str, prompt: str, system: str, timeout: int) -> dict[s
             "schema": RESULT_SCHEMA,
             "transport": "github-copilot-cli",
             "model": model,
+            "reasoning": reasoning or "provider-default",
+            "reasoning_source": "explicit" if reasoning else "provider-default",
             "agent": COPILOT_AGENT_NAME,
             "skill": None,
             "exit_code": 2,
@@ -845,6 +876,7 @@ def invoke_copilot(model: str, prompt: str, system: str, timeout: int) -> dict[s
         "-p", prompt,
         "-s",
         "--model", model,
+        *(["--effort", reasoning] if reasoning else []),
         "--disable-builtin-mcps",
         "--no-experimental",
         "--no-remote",
@@ -857,6 +889,8 @@ def invoke_copilot(model: str, prompt: str, system: str, timeout: int) -> dict[s
         "schema": RESULT_SCHEMA,
         "transport": "github-copilot-cli",
         "model": model,
+        "reasoning": reasoning or "provider-default",
+        "reasoning_source": "explicit" if reasoning else "provider-default",
         "agent": COPILOT_AGENT_NAME,
         "skill": None,
         "credential_source": auth_source,
@@ -884,6 +918,7 @@ def main() -> int:
     try:
         transport = os.environ.get("EVAL_TRANSPORT", "opencode")
         model = os.environ["EVAL_MODEL"]
+        reasoning = os.environ.get("EVAL_REASONING", "").strip()
         agent = os.environ.get("EVAL_AGENT", "")
         skill = os.environ.get("EVAL_SKILL", "")
         timeout = int(os.environ.get("EVAL_TIMEOUT_SECONDS", "240"))
@@ -892,9 +927,9 @@ def main() -> int:
         system = system_path.read_text(encoding="utf-8") if system_path.is_file() else ""
 
         if transport == "opencode":
-            result = invoke_opencode(model, agent, prompt, timeout, skill)
+            result = invoke_opencode(model, agent, prompt, timeout, skill, reasoning)
         elif transport == "github-copilot-cli":
-            result = invoke_copilot(model, prompt, system, timeout)
+            result = invoke_copilot(model, prompt, system, timeout, reasoning)
         else:
             raise RuntimeError(f"unsupported transport: {transport}")
 
@@ -905,6 +940,8 @@ def main() -> int:
             "schema": RESULT_SCHEMA,
             "transport": os.environ.get("EVAL_TRANSPORT"),
             "model": os.environ.get("EVAL_MODEL"),
+            "reasoning": os.environ.get("EVAL_REASONING") or "provider-default",
+            "reasoning_source": "explicit" if os.environ.get("EVAL_REASONING") else "provider-default",
             "skill": os.environ.get("EVAL_SKILL") or None,
             "exit_code": 2,
             "session_id": None,

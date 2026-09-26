@@ -219,6 +219,7 @@ def build_container_command(
     host_env = dict(os.environ) if host_env is None else host_env
     skill = getattr(args, "skill", None)
     expected_plugin = getattr(args, "expected_plugin", None)
+    reasoning = getattr(args, "reasoning", None)
     if skill and args.transport != "opencode":
         raise RunnerError("--skill is only supported by the opencode transport")
     if expected_plugin and args.transport != "opencode":
@@ -303,6 +304,7 @@ def build_container_command(
     command += [
         "--env", f"EVAL_TRANSPORT={args.transport}",
         "--env", f"EVAL_MODEL={args.model}",
+        "--env", f"EVAL_REASONING={reasoning or ''}",
         "--env", f"EVAL_AGENT={args.agent or ''}",
         "--env", f"EVAL_SKILL={skill or ''}",
         "--env", f"EVAL_EXPECT_PLUGIN={expected_plugin or ''}",
@@ -410,6 +412,11 @@ def parser() -> argparse.ArgumentParser:
         help="Additional explicit bind mount. May be repeated.",
     )
     run.add_argument("--model", required=True)
+    run.add_argument(
+        "--reasoning",
+        metavar="LEVEL",
+        help="Optional reasoning level. OpenCode maps this to the model #variant; Copilot maps it to --effort. Omit to use the transport/provider default.",
+    )
     run.add_argument("--agent")
     run.add_argument(
         "--skill",

@@ -14,7 +14,9 @@ from container.invoke import (
     extract_loaded_skills,
     extract_tool_result_evidence,
     loaded_skills_from_export,
+    invoke_copilot,
     invoke_opencode,
+    resolve_opencode_reasoning,
     verify_expected_plugin,
 )
 
@@ -165,6 +167,123 @@ class OpenCodeTransportTests(unittest.TestCase):
         self.assertIn("--model", calls[0])
         self.assertNotIn("--refresh", calls[0])
         self.assertNotIn("models", calls[0][1:])
+        self.assertEqual(calls[0][calls[0].index("--model") + 1], "openai/gpt-5.3-codex-spark")
+        self.assertEqual(result["reasoning"], "provider-default")
+        self.assertEqual(result["reasoning_source"], "provider-default")
+
+    def test_opencode_maps_reasoning_to_model_variant(self):
+        class Result:
+            returncode = 0
+            stdout = ""
+            stderr = ""
+
+        calls: list[list[str]] = []
+
+        def fake_run(command, cwd, env, timeout):
+            calls.append(command)
+            return Result()
+
+        with patch("container.invoke.prepare_opencode_env", return_value={}), patch(
+            "container.invoke.run", side_effect=fake_run
+        ):
+            result = invoke_opencode(
+                "openai/gpt-5.6-luna",
+                "reviewer",
+                "test prompt",
+                30,
+                reasoning="high",
+            )
+
+        self.assertNotIn("--variant", calls[0])
+        self.assertEqual(calls[0][calls[0].index("--model") + 1], "openai/gpt-5.6-luna#high")
+        self.assertEqual(result["reasoning"], "high")
+        self.assertEqual(result["reasoning_source"], "explicit")
+
+    def test_opencode_reports_model_embedded_variant(self):
+        class Result:
+            returncode = 0
+            stdout = ""
+            stderr = ""
+
+        calls: list[list[str]] = []
+
+        def fake_run(command, cwd, env, timeout):
+            calls.append(command)
+            return Result()
+
+        with patch("container.invoke.prepare_opencode_env", return_value={}), patch(
+            "container.invoke.run", side_effect=fake_run
+        ):
+            result = invoke_opencode(
+                "openai/gpt-5.6-luna#high",
+                "reviewer",
+                "test prompt",
+                30,
+            )
+
+        self.assertEqual(calls[0][calls[0].index("--model") + 1], "openai/gpt-5.6-luna#high")
+        self.assertEqual(result["reasoning"], "high")
+        self.assertEqual(result["reasoning_source"], "model-variant")
+
+    def test_opencode_reasoning_provenance_and_double_authority(self):
+        self.assertEqual(
+            resolve_opencode_reasoning("openai/gpt-5.6-luna", "medium"),
+            ("openai/gpt-5.6-luna#medium", "medium", "explicit"),
+        )
+        self.assertEqual(
+            resolve_opencode_reasoning("openai/gpt-5.6-luna#high", ""),
+            ("openai/gpt-5.6-luna#high", "high", "model-variant"),
+        )
+        self.assertEqual(
+            resolve_opencode_reasoning("openai/gpt-5.6-luna", ""),
+            ("openai/gpt-5.6-luna", "provider-default", "provider-default"),
+        )
+        with self.assertRaisesRegex(RuntimeError, "already contains a #variant"):
+            resolve_opencode_reasoning("openai/gpt-5.6-luna#high", "medium")
+        with self.assertRaisesRegex(RuntimeError, "empty #variant"):
+            resolve_opencode_reasoning("openai/gpt-5.6-luna#", "")
+
+    def test_copilot_auth_failure_preserves_reasoning_provenance(self):
+        with patch.dict(os.environ, {}, clear=True):
+            result = invoke_copilot(
+                "gpt-5.6-luna",
+                "test prompt",
+                "system",
+                30,
+                reasoning="high",
+            )
+
+        self.assertEqual(result["exit_code"], 2)
+        self.assertEqual(result["reasoning"], "high")
+        self.assertEqual(result["reasoning_source"], "explicit")
+
+    def test_copilot_maps_reasoning_to_effort(self):
+        class Result:
+            returncode = 0
+            stdout = "done"
+            stderr = ""
+
+        calls: list[list[str]] = []
+
+        def fake_run(command, cwd, env, timeout):
+            calls.append(command)
+            return Result()
+
+        with patch.dict(os.environ, {"GITHUB_TOKEN": "test-token"}, clear=True), patch(
+            "container.invoke.run", side_effect=fake_run
+        ):
+            result = invoke_copilot(
+                "gpt-5.6-luna",
+                "test prompt",
+                "system",
+                30,
+                reasoning="xhigh",
+            )
+
+        self.assertIn("--effort", calls[0])
+        self.assertEqual(calls[0][calls[0].index("--effort") + 1], "xhigh")
+        self.assertEqual(result["reasoning"], "xhigh")
+        self.assertEqual(result["reasoning_source"], "explicit")
 
     def test_opencode_uses_event_stream_without_session_export(self):
         class Result:

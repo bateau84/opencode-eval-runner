@@ -35,6 +35,10 @@ inputs:
     description: Direct-invocation model. When set and command is empty, the action runs one isolated invocation.
     required: false
     default: ""
+  reasoning:
+    description: Optional reasoning level. OpenCode maps this to its model variant; Copilot maps it to reasoning effort. Empty uses the provider default.
+    required: false
+    default: ""
   agent:
     description: Optional OpenCode agent for direct invocation.
     required: false
@@ -150,6 +154,7 @@ runs:
         INPUT_ENGINE: ${{ inputs.engine }}
         INPUT_TRANSPORT: ${{ inputs.transport }}
         INPUT_MODEL: ${{ inputs.model }}
+        INPUT_REASONING: ${{ inputs.reasoning }}
         INPUT_AGENT: ${{ inputs.agent }}
         INPUT_SKILL: ${{ inputs.skill }}
         INPUT_WORKSPACE: ${{ inputs.workspace }}
@@ -179,6 +184,7 @@ runs:
           --timeout-seconds "$INPUT_TIMEOUT_SECONDS"
           --container-timeout "$INPUT_CONTAINER_TIMEOUT"
         )
+        [[ -n "$INPUT_REASONING" ]] && args+=(--reasoning "$INPUT_REASONING")
         [[ -n "$INPUT_AGENT" ]] && args+=(--agent "$INPUT_AGENT")
         [[ -n "$INPUT_SKILL" ]] && args+=(--skill "$INPUT_SKILL")
         [[ -n "$INPUT_SYSTEM_FILE" ]] && args+=(--system-file "$INPUT_SYSTEM_FILE")

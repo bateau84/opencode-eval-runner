@@ -72,6 +72,8 @@ Known API-key environment variables are passed when present:
 
 Additional variables require explicit `--env NAME`.
 
+Reasoning can be pinned explicitly with `--reasoning LEVEL`. The pinned OpenCode 2.0.15 CLI represents a model variant in the model reference, so the runner maps `--model provider/model --reasoning LEVEL` to `opencode run --model provider/model#LEVEL`. Supplying both a `#variant` in `--model` and `--reasoning` is rejected as ambiguous. If the model reference already contains a variant and `--reasoning` is omitted, the result records that variant with `"reasoning_source": "model-variant"`. If neither form supplies a level, the runner leaves OpenCode's provider/model default untouched and records `"reasoning": "provider-default"`.
+
 ### `github-copilot-cli`
 
 Use this for pure model/role/judge execution when OpenCode runtime tools are not required.
@@ -86,6 +88,8 @@ Authentication precedence for container execution is:
 When no token environment variable is set, the host wrapper uses an authenticated GitHub CLI session if `gh` is available. The token is injected into the container as `COPILOT_GITHUB_TOKEN` via the child-process environment; its value is not written to disk or placed on the command line.
 
 The container uses fresh `COPILOT_HOME` and `COPILOT_CACHE_HOME`, disables auto-update, prompt-mode extensions, repo hooks, MCPs, remote operations, and model tools.
+
+Reasoning can be pinned with the same `--reasoning LEVEL` runner option. Copilot maps this to its native `--effort LEVEL`. The runner forwards the requested value exactly and never substitutes another level; acceptance or rejection of a model/effort combination remains the pinned Copilot CLI's responsibility and is surfaced through its normal exit status/output. When omitted, the result records `"reasoning": "provider-default"`. Results also include `"reasoning_source": "explicit"` or `"provider-default"` so consumers do not confuse a requested level with an inferred provider default.
 
 This transport reuses the trust-boundary pattern already proven in `nrkno/mats-opencode-setup`.
 
@@ -115,6 +119,7 @@ PYTHONPATH=. python3 bin/opencode-eval-runner invoke \
   --transport opencode \
   --workspace /path/to/evaluated/project \
   --model openai/gpt-5.3-codex-spark \
+  --reasoning medium \
   --agent reviewer \
   --prompt-file /tmp/prompt.txt \
   --output /tmp/target.json
@@ -287,6 +292,8 @@ Each invocation writes one JSON document:
   "schema": "opencode-eval-runner/v1",
   "transport": "opencode",
   "model": "openai/gpt-5.3-codex-spark",
+  "reasoning": "medium",
+  "reasoning_source": "explicit",
   "agent": "reviewer",
   "skill": "architectural-design",
   "exit_code": 0,
