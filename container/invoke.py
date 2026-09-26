@@ -657,6 +657,16 @@ def plugin_diagnostic(env: dict[str, str]) -> dict[str, Any]:
     }
 
 
+def opencode_model_ref(model: str, reasoning: str) -> str:
+    if not reasoning:
+        return model
+    if "#" in model:
+        raise RuntimeError(
+            "OpenCode reasoning is ambiguous: --model already contains a #variant while --reasoning was also supplied"
+        )
+    return model + "#" + reasoning
+
+
 def invoke_opencode(
     model: str,
     agent: str,
@@ -691,9 +701,7 @@ def invoke_opencode(
     ]
     if agent:
         command += ["--agent", agent]
-    if reasoning:
-        command += ["--variant", reasoning]
-    command += ["--model", model, prompt]
+    command += ["--model", opencode_model_ref(model, reasoning), prompt]
     run_started = time.perf_counter()
     try:
         proc = run(command, Path("/workspace"), env, timeout)

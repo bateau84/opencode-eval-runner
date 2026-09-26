@@ -16,6 +16,7 @@ from container.invoke import (
     loaded_skills_from_export,
     invoke_copilot,
     invoke_opencode,
+    opencode_model_ref,
     verify_expected_plugin,
 )
 
@@ -166,11 +167,11 @@ class OpenCodeTransportTests(unittest.TestCase):
         self.assertIn("--model", calls[0])
         self.assertNotIn("--refresh", calls[0])
         self.assertNotIn("models", calls[0][1:])
-        self.assertNotIn("--variant", calls[0])
+        self.assertEqual(calls[0][calls[0].index("--model") + 1], "openai/gpt-5.3-codex-spark")
         self.assertEqual(result["reasoning"], "provider-default")
         self.assertEqual(result["reasoning_source"], "provider-default")
 
-    def test_opencode_maps_reasoning_to_variant(self):
+    def test_opencode_maps_reasoning_to_model_variant(self):
         class Result:
             returncode = 0
             stdout = ""
@@ -193,10 +194,18 @@ class OpenCodeTransportTests(unittest.TestCase):
                 reasoning="high",
             )
 
-        self.assertIn("--variant", calls[0])
-        self.assertEqual(calls[0][calls[0].index("--variant") + 1], "high")
+        self.assertNotIn("--variant", calls[0])
+        self.assertEqual(calls[0][calls[0].index("--model") + 1], "openai/gpt-5.6-luna#high")
         self.assertEqual(result["reasoning"], "high")
         self.assertEqual(result["reasoning_source"], "explicit")
+
+    def test_opencode_rejects_double_variant_authority(self):
+        self.assertEqual(
+            opencode_model_ref("openai/gpt-5.6-luna", "medium"),
+            "openai/gpt-5.6-luna#medium",
+        )
+        with self.assertRaisesRegex(RuntimeError, "already contains a #variant"):
+            opencode_model_ref("openai/gpt-5.6-luna#high", "medium")
 
     def test_copilot_maps_reasoning_to_effort(self):
         class Result:

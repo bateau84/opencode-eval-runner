@@ -415,7 +415,7 @@ def parser() -> argparse.ArgumentParser:
     run.add_argument(
         "--reasoning",
         metavar="LEVEL",
-        help="Optional reasoning level. OpenCode maps this to --variant; Copilot maps it to --effort. Omit to use the transport/provider default.",
+        help="Optional reasoning level. OpenCode maps this to the model #variant; Copilot maps it to --effort. Omit to use the transport/provider default.",
     )
     run.add_argument("--agent")
     run.add_argument(

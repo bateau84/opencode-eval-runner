@@ -72,7 +72,7 @@ Known API-key environment variables are passed when present:
 
 Additional variables require explicit `--env NAME`.
 
-Reasoning can be pinned explicitly with `--reasoning LEVEL`. For OpenCode this maps to `opencode run --variant LEVEL`; when omitted the runner leaves OpenCode's provider/model default untouched and records `"reasoning": "provider-default"` in the result.
+Reasoning can be pinned explicitly with `--reasoning LEVEL`. The pinned OpenCode 2.0.15 CLI represents a model variant in the model reference, so the runner maps `--model provider/model --reasoning LEVEL` to `opencode run --model provider/model#LEVEL`. Supplying both a `#variant` in `--model` and `--reasoning` is rejected as ambiguous. When reasoning is omitted the runner leaves OpenCode's provider/model default untouched and records `"reasoning": "provider-default"` in the result.
 
 ### `github-copilot-cli`
 

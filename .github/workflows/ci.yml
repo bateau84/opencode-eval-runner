@@ -179,7 +179,8 @@ jobs:
 
       - name: Verify pinned reasoning controls
         run: |
-          docker run --rm --entrypoint opencode opencode-eval-runner:opencode-test run --help             | grep -F -- '--variant'
+          docker run --rm --entrypoint opencode opencode-eval-runner:opencode-test run --help \
+            | grep -F -- 'provider/model#variant'
           docker run --rm --entrypoint copilot opencode-eval-runner:copilot-test --help             | grep -F -- '--effort'
 
       - name: Report image sizes
