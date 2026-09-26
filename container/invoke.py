@@ -657,14 +657,21 @@ def plugin_diagnostic(env: dict[str, str]) -> dict[str, Any]:
     }
 
 
-def opencode_model_ref(model: str, reasoning: str) -> str:
-    if not reasoning:
-        return model
+def resolve_opencode_reasoning(model: str, reasoning: str) -> tuple[str, str, str]:
+    if reasoning:
+        if "#" in model:
+            raise RuntimeError(
+                "OpenCode reasoning is ambiguous: --model already contains a #variant while --reasoning was also supplied"
+            )
+        return model + "#" + reasoning, reasoning, "explicit"
+
     if "#" in model:
-        raise RuntimeError(
-            "OpenCode reasoning is ambiguous: --model already contains a #variant while --reasoning was also supplied"
-        )
-    return model + "#" + reasoning
+        _, variant = model.rsplit("#", 1)
+        if not variant:
+            raise RuntimeError("OpenCode model reference has an empty #variant")
+        return model, variant, "model-variant"
+
+    return model, "provider-default", "provider-default"
 
 
 def invoke_opencode(
@@ -679,6 +686,7 @@ def invoke_opencode(
     plugins = plugin_diagnostic(env)
     expected_plugin = os.environ.get("EVAL_EXPECT_PLUGIN", "").strip()
     plugin_preflight = verify_expected_plugin(env, agent, model, expected_plugin, timeout)
+    invoked_model, reasoning_label, reasoning_source = resolve_opencode_reasoning(model, reasoning)
 
     # OpenCode V2 has no documented force-refresh command for the model
     # catalog. A fresh isolated process owns a fresh cache and resolves the
@@ -701,7 +709,7 @@ def invoke_opencode(
     ]
     if agent:
         command += ["--agent", agent]
-    command += ["--model", opencode_model_ref(model, reasoning), prompt]
+    command += ["--model", invoked_model, prompt]
     run_started = time.perf_counter()
     try:
         proc = run(command, Path("/workspace"), env, timeout)
@@ -723,8 +731,8 @@ def invoke_opencode(
             "schema": RESULT_SCHEMA,
             "transport": "opencode",
             "model": model,
-            "reasoning": reasoning or "provider-default",
-            "reasoning_source": "explicit" if reasoning else "provider-default",
+            "reasoning": reasoning_label,
+            "reasoning_source": reasoning_source,
             "agent": agent or None,
             "skill": skill or None,
             "exit_code": 124,
@@ -771,8 +779,8 @@ def invoke_opencode(
         "schema": RESULT_SCHEMA,
         "transport": "opencode",
         "model": model,
-        "reasoning": reasoning or "provider-default",
-        "reasoning_source": "explicit" if reasoning else "provider-default",
+        "reasoning": reasoning_label,
+        "reasoning_source": reasoning_source,
         "agent": agent or None,
         "skill": skill or None,
         "exit_code": proc.returncode,
@@ -832,8 +840,8 @@ def invoke_copilot(
             "schema": RESULT_SCHEMA,
             "transport": "github-copilot-cli",
             "model": model,
-            "reasoning": reasoning or "provider-default",
-            "reasoning_source": "explicit" if reasoning else "provider-default",
+            "reasoning": reasoning_label,
+            "reasoning_source": reasoning_source,
             "agent": COPILOT_AGENT_NAME,
             "skill": None,
             "exit_code": 2,
@@ -881,8 +889,8 @@ def invoke_copilot(
         "schema": RESULT_SCHEMA,
         "transport": "github-copilot-cli",
         "model": model,
-        "reasoning": reasoning or "provider-default",
-        "reasoning_source": "explicit" if reasoning else "provider-default",
+        "reasoning": reasoning_label,
+        "reasoning_source": reasoning_source,
         "agent": COPILOT_AGENT_NAME,
         "skill": None,
         "credential_source": auth_source,

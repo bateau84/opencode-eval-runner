@@ -16,7 +16,7 @@ from container.invoke import (
     loaded_skills_from_export,
     invoke_copilot,
     invoke_opencode,
-    opencode_model_ref,
+    resolve_opencode_reasoning,
     verify_expected_plugin,
 )
 
@@ -199,13 +199,49 @@ class OpenCodeTransportTests(unittest.TestCase):
         self.assertEqual(result["reasoning"], "high")
         self.assertEqual(result["reasoning_source"], "explicit")
 
-    def test_opencode_rejects_double_variant_authority(self):
+    def test_opencode_reports_model_embedded_variant(self):
+        class Result:
+            returncode = 0
+            stdout = ""
+            stderr = ""
+
+        calls: list[list[str]] = []
+
+        def fake_run(command, cwd, env, timeout):
+            calls.append(command)
+            return Result()
+
+        with patch("container.invoke.prepare_opencode_env", return_value={}), patch(
+            "container.invoke.run", side_effect=fake_run
+        ):
+            result = invoke_opencode(
+                "openai/gpt-5.6-luna#high",
+                "reviewer",
+                "test prompt",
+                30,
+            )
+
+        self.assertEqual(calls[0][calls[0].index("--model") + 1], "openai/gpt-5.6-luna#high")
+        self.assertEqual(result["reasoning"], "high")
+        self.assertEqual(result["reasoning_source"], "model-variant")
+
+    def test_opencode_reasoning_provenance_and_double_authority(self):
         self.assertEqual(
-            opencode_model_ref("openai/gpt-5.6-luna", "medium"),
-            "openai/gpt-5.6-luna#medium",
+            resolve_opencode_reasoning("openai/gpt-5.6-luna", "medium"),
+            ("openai/gpt-5.6-luna#medium", "medium", "explicit"),
+        )
+        self.assertEqual(
+            resolve_opencode_reasoning("openai/gpt-5.6-luna#high", ""),
+            ("openai/gpt-5.6-luna#high", "high", "model-variant"),
+        )
+        self.assertEqual(
+            resolve_opencode_reasoning("openai/gpt-5.6-luna", ""),
+            ("openai/gpt-5.6-luna", "provider-default", "provider-default"),
         )
         with self.assertRaisesRegex(RuntimeError, "already contains a #variant"):
-            opencode_model_ref("openai/gpt-5.6-luna#high", "medium")
+            resolve_opencode_reasoning("openai/gpt-5.6-luna#high", "medium")
+        with self.assertRaisesRegex(RuntimeError, "empty #variant"):
+            resolve_opencode_reasoning("openai/gpt-5.6-luna#", "")
 
     def test_copilot_maps_reasoning_to_effort(self):
         class Result:
