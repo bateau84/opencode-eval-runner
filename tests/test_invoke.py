@@ -14,6 +14,7 @@ from container.invoke import (
     extract_loaded_skills,
     extract_tool_result_evidence,
     loaded_skills_from_export,
+    invoke_copilot,
     invoke_opencode,
     verify_expected_plugin,
 )
@@ -165,6 +166,62 @@ class OpenCodeTransportTests(unittest.TestCase):
         self.assertIn("--model", calls[0])
         self.assertNotIn("--refresh", calls[0])
         self.assertNotIn("models", calls[0][1:])
+        self.assertNotIn("--variant", calls[0])
+        self.assertEqual(result["reasoning"], "provider-default")
+
+    def test_opencode_maps_reasoning_to_variant(self):
+        class Result:
+            returncode = 0
+            stdout = ""
+            stderr = ""
+
+        calls: list[list[str]] = []
+
+        def fake_run(command, cwd, env, timeout):
+            calls.append(command)
+            return Result()
+
+        with patch("container.invoke.prepare_opencode_env", return_value={}), patch(
+            "container.invoke.run", side_effect=fake_run
+        ):
+            result = invoke_opencode(
+                "openai/gpt-5.6-luna",
+                "reviewer",
+                "test prompt",
+                30,
+                reasoning="high",
+            )
+
+        self.assertIn("--variant", calls[0])
+        self.assertEqual(calls[0][calls[0].index("--variant") + 1], "high")
+        self.assertEqual(result["reasoning"], "high")
+
+    def test_copilot_maps_reasoning_to_effort(self):
+        class Result:
+            returncode = 0
+            stdout = "done"
+            stderr = ""
+
+        calls: list[list[str]] = []
+
+        def fake_run(command, cwd, env, timeout):
+            calls.append(command)
+            return Result()
+
+        with patch.dict(os.environ, {"GITHUB_TOKEN": "test-token"}, clear=True), patch(
+            "container.invoke.run", side_effect=fake_run
+        ):
+            result = invoke_copilot(
+                "gpt-5.6-luna",
+                "test prompt",
+                "system",
+                30,
+                reasoning="xhigh",
+            )
+
+        self.assertIn("--effort", calls[0])
+        self.assertEqual(calls[0][calls[0].index("--effort") + 1], "xhigh")
+        self.assertEqual(result["reasoning"], "xhigh")
 
     def test_opencode_uses_event_stream_without_session_export(self):
         class Result:

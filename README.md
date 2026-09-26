@@ -72,6 +72,8 @@ Known API-key environment variables are passed when present:
 
 Additional variables require explicit `--env NAME`.
 
+Reasoning can be pinned explicitly with `--reasoning LEVEL`. For OpenCode this maps to `opencode run --variant LEVEL`; when omitted the runner leaves OpenCode's provider/model default untouched and records `"reasoning": "provider-default"` in the result.
+
 ### `github-copilot-cli`
 
 Use this for pure model/role/judge execution when OpenCode runtime tools are not required.
@@ -86,6 +88,8 @@ Authentication precedence for container execution is:
 When no token environment variable is set, the host wrapper uses an authenticated GitHub CLI session if `gh` is available. The token is injected into the container as `COPILOT_GITHUB_TOKEN` via the child-process environment; its value is not written to disk or placed on the command line.
 
 The container uses fresh `COPILOT_HOME` and `COPILOT_CACHE_HOME`, disables auto-update, prompt-mode extensions, repo hooks, MCPs, remote operations, and model tools.
+
+Reasoning can be pinned with the same `--reasoning LEVEL` runner option. Copilot maps this to its native `--effort LEVEL`. If the selected model does not support that effort, the invocation fails as transport/non-evidence rather than silently falling back. When omitted, the result records `"reasoning": "provider-default"`.
 
 This transport reuses the trust-boundary pattern already proven in `nrkno/mats-opencode-setup`.
 
@@ -115,6 +119,7 @@ PYTHONPATH=. python3 bin/opencode-eval-runner invoke \
   --transport opencode \
   --workspace /path/to/evaluated/project \
   --model openai/gpt-5.3-codex-spark \
+  --reasoning medium \
   --agent reviewer \
   --prompt-file /tmp/prompt.txt \
   --output /tmp/target.json
@@ -287,6 +292,7 @@ Each invocation writes one JSON document:
   "schema": "opencode-eval-runner/v1",
   "transport": "opencode",
   "model": "openai/gpt-5.3-codex-spark",
+  "reasoning": "medium",
   "agent": "reviewer",
   "skill": "architectural-design",
   "exit_code": 0,

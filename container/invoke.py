@@ -663,6 +663,7 @@ def invoke_opencode(
     prompt: str,
     timeout: int,
     skill: str = "",
+    reasoning: str = "",
 ) -> dict[str, Any]:
     env = prepare_opencode_env()
     plugins = plugin_diagnostic(env)
@@ -690,6 +691,8 @@ def invoke_opencode(
     ]
     if agent:
         command += ["--agent", agent]
+    if reasoning:
+        command += ["--variant", reasoning]
     command += ["--model", model, prompt]
     run_started = time.perf_counter()
     try:
@@ -712,6 +715,7 @@ def invoke_opencode(
             "schema": RESULT_SCHEMA,
             "transport": "opencode",
             "model": model,
+            "reasoning": reasoning or "provider-default",
             "agent": agent or None,
             "skill": skill or None,
             "exit_code": 124,
@@ -758,6 +762,7 @@ def invoke_opencode(
         "schema": RESULT_SCHEMA,
         "transport": "opencode",
         "model": model,
+        "reasoning": reasoning or "provider-default",
         "agent": agent or None,
         "skill": skill or None,
         "exit_code": proc.returncode,
@@ -803,7 +808,13 @@ def copilot_profile(system: str) -> str:
     )
 
 
-def invoke_copilot(model: str, prompt: str, system: str, timeout: int) -> dict[str, Any]:
+def invoke_copilot(
+    model: str,
+    prompt: str,
+    system: str,
+    timeout: int,
+    reasoning: str = "",
+) -> dict[str, Any]:
     env = dict(os.environ)
     auth_source = copilot_auth_source(env)
     if not auth_source:
@@ -811,6 +822,7 @@ def invoke_copilot(model: str, prompt: str, system: str, timeout: int) -> dict[s
             "schema": RESULT_SCHEMA,
             "transport": "github-copilot-cli",
             "model": model,
+            "reasoning": reasoning or "provider-default",
             "agent": COPILOT_AGENT_NAME,
             "skill": None,
             "exit_code": 2,
@@ -845,6 +857,7 @@ def invoke_copilot(model: str, prompt: str, system: str, timeout: int) -> dict[s
         "-p", prompt,
         "-s",
         "--model", model,
+        *(["--effort", reasoning] if reasoning else []),
         "--disable-builtin-mcps",
         "--no-experimental",
         "--no-remote",
@@ -857,6 +870,7 @@ def invoke_copilot(model: str, prompt: str, system: str, timeout: int) -> dict[s
         "schema": RESULT_SCHEMA,
         "transport": "github-copilot-cli",
         "model": model,
+        "reasoning": reasoning or "provider-default",
         "agent": COPILOT_AGENT_NAME,
         "skill": None,
         "credential_source": auth_source,
@@ -884,6 +898,7 @@ def main() -> int:
     try:
         transport = os.environ.get("EVAL_TRANSPORT", "opencode")
         model = os.environ["EVAL_MODEL"]
+        reasoning = os.environ.get("EVAL_REASONING", "").strip()
         agent = os.environ.get("EVAL_AGENT", "")
         skill = os.environ.get("EVAL_SKILL", "")
         timeout = int(os.environ.get("EVAL_TIMEOUT_SECONDS", "240"))
@@ -892,9 +907,9 @@ def main() -> int:
         system = system_path.read_text(encoding="utf-8") if system_path.is_file() else ""
 
         if transport == "opencode":
-            result = invoke_opencode(model, agent, prompt, timeout, skill)
+            result = invoke_opencode(model, agent, prompt, timeout, skill, reasoning)
         elif transport == "github-copilot-cli":
-            result = invoke_copilot(model, prompt, system, timeout)
+            result = invoke_copilot(model, prompt, system, timeout, reasoning)
         else:
             raise RuntimeError(f"unsupported transport: {transport}")
 
@@ -905,6 +920,7 @@ def main() -> int:
             "schema": RESULT_SCHEMA,
             "transport": os.environ.get("EVAL_TRANSPORT"),
             "model": os.environ.get("EVAL_MODEL"),
+            "reasoning": os.environ.get("EVAL_REASONING") or "provider-default",
             "skill": os.environ.get("EVAL_SKILL") or None,
             "exit_code": 2,
             "session_id": None,
