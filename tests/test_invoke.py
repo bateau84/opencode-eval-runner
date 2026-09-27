@@ -710,8 +710,8 @@ class OpenCodeTransportTests(unittest.TestCase):
         containerfile = (Path(__file__).resolve().parents[1] / "Containerfile").read_text(
             encoding="utf-8"
         )
-        self.assertIn("ARG OPENCODE_VERSION=2.0.15", containerfile)
-        self.assertNotIn("ARG OPENCODE_VERSION=2.0.12", containerfile)
+        self.assertIn("ARG OPENCODE_VERSION=2.0.18", containerfile)
+        self.assertNotIn("ARG OPENCODE_VERSION=2.0.15", containerfile)
 
     def test_container_pins_base_images_and_copilot_release_asset(self):
         containerfile = (Path(__file__).resolve().parents[1] / "Containerfile").read_text(
