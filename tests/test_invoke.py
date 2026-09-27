@@ -706,7 +706,7 @@ class OpenCodeTransportTests(unittest.TestCase):
         ):
             self.assertNotIn(mutable, ci + publish)
 
-    def test_container_pins_opencode_2_0_15(self):
+    def test_container_pins_opencode_2_0_18(self):
         containerfile = (Path(__file__).resolve().parents[1] / "Containerfile").read_text(
             encoding="utf-8"
         )
