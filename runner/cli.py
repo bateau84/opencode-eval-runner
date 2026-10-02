@@ -11,6 +11,8 @@ import sys
 import tempfile
 from pathlib import Path
 
+from runner.observer import ObserverCapture, unavailable
+
 DEFAULT_IMAGES = {
     "opencode": "ghcr.io/bateau84/opencode-eval-runner:opencode-edge",
     "github-copilot-cli": "ghcr.io/bateau84/opencode-eval-runner:copilot-edge",
@@ -323,6 +325,9 @@ def build_container_command(
 
 
 def invoke(args: argparse.Namespace) -> int:
+    observer_key = getattr(args, "observer_key_file", None)
+    if observer_key and args.transport != "opencode":
+        raise RunnerError("--observer-key-file is only supported by the opencode transport")
     prompt_path = Path(args.prompt_file).resolve()
     if not prompt_path.is_file():
         raise RunnerError(f"prompt file not found: {prompt_path}")
@@ -364,30 +369,52 @@ def invoke(args: argparse.Namespace) -> int:
             host_env=host_env,
             database_seed=database_seed,
         )
-        proc = subprocess.run(
-            command,
-            env=host_env,
-            text=True,
-            capture_output=True,
-            timeout=args.container_timeout,
-            check=False,
-        )
+        capture = None
+        if observer_key:
+            try:
+                capture = ObserverCapture(Path(observer_key).expanduser(), root, command, host_env)
+            except (OSError, ValueError) as exc:
+                raise RunnerError("cannot configure isolated observer capture") from exc
         try:
-            result = json.loads(proc.stdout)
-        except json.JSONDecodeError as exc:
-            detail = " | ".join(part.strip() for part in (proc.stderr, proc.stdout) if part.strip())
-            raise RunnerError(
-                f"container produced invalid result JSON (exit {proc.returncode}): {exc}"
-                + (f": {detail[:2000]}" if detail else "")
-            ) from exc
+            proc = subprocess.run(
+                command,
+                env=host_env,
+                text=True,
+                capture_output=True,
+                timeout=args.container_timeout,
+                check=False,
+            )
+            try:
+                result = json.loads(proc.stdout)
+            except json.JSONDecodeError as exc:
+                detail = " | ".join(part.strip() for part in (proc.stderr, proc.stdout) if part.strip())
+                raise RunnerError(
+                    f"container produced invalid result JSON (exit {proc.returncode}): {exc}"
+                    + (f": {detail[:2000]}" if detail else "")
+                ) from exc
 
-        if not isinstance(result, dict):
-            raise RunnerError("container result must be a JSON object")
+            if not isinstance(result, dict):
+                raise RunnerError("container result must be a JSON object")
+            returncode = proc.returncode
+        except (RunnerError, subprocess.TimeoutExpired, OSError):
+            if capture is None:
+                raise
+            # Preserve an explicit non-evidence artifact even on interruption.
+            # Never echo untrusted stdout/stderr into observer diagnostics.
+            result = {"error": "observer_transport_failed", "exit_code": 2}
+            returncode = 2
 
+        # ALWAYS replace this field: container/script JSON cannot attest itself.
+        result["observed_execution"] = (
+            capture.finish(transport_ok=returncode == 0) if capture
+            else unavailable("capture_not_requested")
+        )
+        if capture and not result["observed_execution"]["evidence_eligible"] and returncode == 0:
+            returncode = 4
         result_host.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
         if args.print_result:
             sys.stdout.write(result_host.read_text(encoding="utf-8"))
-        return 0 if proc.returncode == 0 else proc.returncode
+        return returncode
 
 
 def parser() -> argparse.ArgumentParser:
@@ -429,6 +456,11 @@ def parser() -> argparse.ArgumentParser:
     run.add_argument("--prompt-file", required=True)
     run.add_argument("--system-file")
     run.add_argument("--output", required=True)
+    run.add_argument(
+        "--observer-key-file",
+        metavar="PATH",
+        help="Require authenticated execution-observer evidence (OpenCode only). The trusted producer's verification key must remain outside every container mount. Missing or indeterminate capture exits 4; see docs/execution-observer.md.",
+    )
     run.add_argument("--auth")
     run.add_argument("--config")
     run.add_argument("--models-catalog")
