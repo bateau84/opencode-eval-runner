@@ -1,0 +1,43 @@
+name: Observer boundary integration
+
+on:
+  pull_request:
+    paths:
+      - 'tests/integration/**'
+      - 'runner/observer.py'
+      - '.github/workflows/observer-integration.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  capture-boundary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+
+      - name: Verify probe syntax and record checkout
+        run: |
+          python3 -m py_compile tests/integration/run_capture_probe.py
+          git rev-parse HEAD
+
+      - name: Pull unchanged immutable OpenCode 2.0.18 image
+        run: docker pull ghcr.io/bateau84/opencode-eval-runner@sha256:68ef7322c75aede0e8cc76d0e3531e8b82dd417bbb5e5100264a89eab7fe8627
+
+      - name: Run isolated deterministic boundary probe
+        run: python3 tests/integration/run_capture_probe.py --output capture-probe-results
+        # Exit 4 means the runtime diagnostics succeeded but capture acceptance
+        # remains blocked. Do not continue-on-error or convert this into PASS.
+
+      - name: Preserve diagnostic evidence even on blocked capture
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: capture-boundary-${{ github.event.pull_request.head.sha }}
+          path: capture-probe-results/
+          if-no-files-found: error
+          retention-days: 14
