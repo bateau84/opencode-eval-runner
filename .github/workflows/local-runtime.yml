@@ -1,0 +1,102 @@
+name: Local runtime observation patch
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - runtime-patches/**
+      - .github/workflows/local-runtime.yml
+
+permissions:
+  contents: read
+  packages: write
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  downstream-runtime:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: anomalyco/opencode
+          ref: cd9a14a6b688d4021bee381dfd39d2cef9c0f862
+          path: .runtime-source
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version: 1.4.2
+      - name: Apply exact downstream source patch
+        run: |
+          mkdir -p local-runtime-results
+          python3 -m py_compile runtime-patches/*.py
+          python3 runtime-patches/apply.py .runtime-source
+          git -C .runtime-source add -N packages/core/src/codemode/local-observation.ts packages/core/test/local-observation.test.ts
+          git -C .runtime-source diff --binary > local-runtime-results/runtime.patch
+          git rev-parse HEAD > local-runtime-results/runner-revision.txt
+          sha256sum runtime-patches/*.py runtime-patches/*.ts runtime-patches/Containerfile > local-runtime-results/patch-inputs.sha256
+      - name: Install pinned runtime dependencies
+        working-directory: .runtime-source
+        run: bun install --frozen-lockfile
+      - name: Test real Code Mode source with disposable state
+        run: |
+          root="$(mktemp -d "$RUNNER_TEMP/local-runtime-test.XXXXXX")"
+          mkdir -p "$root"/{home,config,data,state,cache,run}
+          HOME="$root/home" XDG_CONFIG_HOME="$root/config" XDG_DATA_HOME="$root/data" \
+          XDG_STATE_HOME="$root/state" XDG_CACHE_HOME="$root/cache" XDG_RUNTIME_DIR="$root/run" \
+          OPENCODE_DISABLE_AUTOUPDATE=1 bun test --cwd .runtime-source/packages/core --timeout 20000 test/local-observation.test.ts \
+            2>&1 | tee local-runtime-results/source-tests.txt
+          rm -rf "$root"
+      - name: Build the existing CLI with the local patch
+        working-directory: .runtime-source
+        env:
+          OPENCODE_VERSION: 2.0.18-eval.1
+          OPENCODE_CHANNEL: latest
+        run: |
+          bun run packages/cli/script/build.ts --skip-install --target=opencode-linux-x64 \
+            2>&1 | tee "$GITHUB_WORKSPACE/local-runtime-results/build.txt"
+          cp packages/cli/dist/cli-linux-x64/bin/opencode "$GITHUB_WORKSPACE/local-runtime-results/opencode"
+          sha256sum "$GITHUB_WORKSPACE/local-runtime-results/opencode" > "$GITHUB_WORKSPACE/local-runtime-results/binary.sha256"
+      - name: Build experimental image without replacing defaults
+        run: |
+          docker build -f runtime-patches/Containerfile \
+            --build-arg RUNNER_REVISION="$(git rev-parse HEAD)" \
+            -t local-observation:test local-runtime-results
+      - name: Publish commit-and-run-scoped image and record immutable digest
+        id: image
+        env:
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          printf '%s' "$REGISTRY_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          tag="ghcr.io/bateau84/opencode-eval-runner:observer-pr41-$(git rev-parse --short=12 HEAD)-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          docker tag local-observation:test "$tag"
+          docker push "$tag" | tee local-runtime-results/publish.txt
+          image="$(docker image inspect "$tag" --format '{{index .RepoDigests 0}}')"
+          test "${image#*@sha256:}" != "$image"
+          printf '%s\n' "$image" > local-runtime-results/image.txt
+          printf 'reference=%s\n' "$image" >> "$GITHUB_OUTPUT"
+          docker logout ghcr.io
+          docker pull "$image"
+          docker image inspect "$image" > local-runtime-results/image-inspect.json
+      - name: Probe the actual published runtime with deterministic local provider
+        env:
+          LOCAL_IMAGE: ${{ steps.image.outputs.reference }}
+        run: python3 runtime-patches/run_image_probe.py --image "$LOCAL_IMAGE" --output local-runtime-results/probe
+      - name: Preserve evidence without claiming Loom acceptance
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: local-runtime-${{ github.event.pull_request.head.sha }}
+          path: |
+            local-runtime-results/**
+            !local-runtime-results/opencode
+          if-no-files-found: error
+          retention-days: 14
