@@ -35,7 +35,9 @@ function log(path: string, record: unknown) {
 }
 function isProbe(event: any) { return String(event.tool).includes("captureprobe") }
 function hook(phase: string, event: any) {
-  if (enabled && isProbe(event)) log(hookPath, {
+  // Record every hook event, including the outer execute, so a name filter
+  // cannot hide an error terminal or invent an apparent callback gap.
+  if (enabled) log(hookPath, {
     phase, event, eventRef: ref(event), inputRef: ref(event.input), contextRef: ref(event.context),
   })
 }
