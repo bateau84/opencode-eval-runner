@@ -149,6 +149,39 @@ def overlap(value):
             and echo[2]["n"] == echo[1]["n"] and echo[3]["n"] == echo[0]["n"])
 
 
+def hook_observations(value):
+    hooks = [item["record"] for item in value.get("hooks", [])]
+
+    def selected(name, phase):
+        return [item for item in hooks if item.get("phase") == phase
+                and item.get("event", {}).get("tool") == "captureprobe_" + name]
+
+    def content(item):
+        raw = item.get("event", {}).get("result", {}).get("content")
+        if isinstance(raw, str):
+            return raw
+        if isinstance(raw, list) and len(raw) == 1 and raw[0].get("type") == "text":
+            return raw[0].get("text")
+        return None
+
+    starts = selected("echo", "before")
+    terminals = selected("echo", "early-after")
+    early = selected("mutate", "early-after")
+    late = selected("mutate", "late-after")
+    return {
+        "echo_start_ids": [item["event"].get("id") for item in starts],
+        "echo_terminal_ids": [item["event"].get("id") for item in terminals],
+        "echo_terminal_values_in_observed_order": [content(item) for item in terminals],
+        "echo_start_input_object_refs": [item.get("inputRef") for item in starts],
+        "echo_terminal_input_object_refs": [item.get("inputRef") for item in terminals],
+        "object_reference_note": "Runtime observation only; object identity is not an agreed supported correlation contract.",
+        "throw_before_count": len(selected("throws", "before")),
+        "throw_after_count": len(selected("throws", "early-after")),
+        "early_mutate_result": content(early[0]) if len(early) == 1 else None,
+        "late_mutate_result": content(late[0]) if len(late) == 1 else None,
+    }
+
+
 def host(output):
     repo = Path(__file__).resolve().parents[2]
     sys.path.insert(0, str(repo))
@@ -184,23 +217,31 @@ def host(output):
             reports[name] = report
             (output / f"{name}.json").write_text(json.dumps(report, indent=2) + "\n")
             print(f"{name}: scenario_completed={scenario_completed(report)}, observer={report['observed_execution']['status']}", flush=True)
+    observations = {name: hook_observations(reports[name]) for name in ("on", "on-forged")}
     checks = {
         "pinned_image": IMAGE in image.get("RepoDigests", []),
-        "runtime_2_0_18": all(r.get("opencode_version") == "2.0.18" for r in reports.values()),
+        "runtime_2_0_18": all(r.get("opencode_version") in {"2.0.18", "opencode v2.0.18"} for r in reports.values()),
         "scenarios_completed": all(scenario_completed(r) for r in reports.values()),
         "identical_calls_overlap_and_finish_reversed": all(overlap(r) for r in reports.values()),
         "tool_behavior_unchanged": bool(reports["off"].get("oracle")) and all(oracle_signature(r) == oracle_signature(reports["off"]) for r in reports.values()),
         "missing_producer_not_evidence": all(reports[n]["observed_execution"]["issues"] == ["missing_capture"] for n in ("off", "on")),
         "forged_sidecar_rejected": all(reports[n]["observed_execution"]["issues"] == ["authentication_failed"] for n in ("off-forged", "on-forged")),
+        "diagnostic_hooks_toggle": all(not reports[n].get("hooks") for n in ("off", "off-forged")) and all(reports[n].get("hooks") for n in ("on", "on-forged")),
+        "shared_id_counterexample": all(o["echo_start_ids"] == ["fixture-call-2", "fixture-call-2"] and o["echo_terminal_values_in_observed_order"] == ["CALL-2", "CALL-1"] for o in observations.values()),
+        "caught_throw_has_no_after_hook": all(o["throw_before_count"] == 1 and o["throw_after_count"] == 0 for o in observations.values()),
+        "early_after_is_not_final_return": all(o["early_mutate_result"] == "BEFORE-MUTATION" and o["late_mutate_result"] == "FINAL-RETURN" for o in observations.values()),
         "no_capture_eligible": all(r["observed_execution"]["evidence_eligible"] is False for r in reports.values()),
     }
     summary = {"kind": "capture-boundary-probe", "version": 1,
                "image": IMAGE, "image_id": image["Id"], "image_labels": image.get("Config", {}).get("Labels"),
-               "checks": checks, "diagnostics_passed": all(checks.values()),
+               "checks": checks, "observations": observations, "diagnostics_passed": all(checks.values()),
+               "checkout": subprocess.run(["git", "rev-parse", "HEAD"], cwd=repo, text=True, capture_output=True, check=True).stdout.strip(),
                "handoff_acceptance": "BLOCKED", "independent_code_approval": False,
                "blockers": ["No demonstrated Loom producer/export boundary is supplied. Diagnostic hooks are not a production observer.",
                             "No authenticated inner results are admitted; signing remains a proposal.",
-                            "Final-hook and invocation correlation observations require producer review, not inferred pairing."],
+                            "The caught nested throw produced no execute.after terminal in the pinned-runtime probe.",
+                            "Nested calls share the parent id; observed input object identity is not a supported correlation contract.",
+                            "An early execute.after observer sees a value that a later hook can change."],
                "scope": "Real pinned OpenCode + original container invoke_opencode + PR host ObserverCapture. Not the complete host CLI or Loom assertion consumer."}
     (output / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
     print(json.dumps(summary, indent=2), flush=True)
