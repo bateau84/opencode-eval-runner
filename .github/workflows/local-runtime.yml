@@ -164,6 +164,13 @@ jobs:
           python3 runtime-patches/run_eval_live_compat_probe.py \
             --image "$LOCAL_IMAGE" \
             --output local-runtime-results/eval-live-compat
+      - name: Exercise real delegated Session identity and permission enforcement
+        env:
+          LOCAL_IMAGE: ${{ needs.publish.outputs.reference }}
+        run: |
+          python3 runtime-patches/run_delegated_session_probe.py \
+            --image "$LOCAL_IMAGE" \
+            --output local-runtime-results/delegated-session
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
