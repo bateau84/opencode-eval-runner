@@ -1,0 +1,126 @@
+name: Evidence safety boundaries
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - container/**
+      - runner/**
+      - bin/opencode-eval-runner
+      - evidence-safety/**
+      - tests/test_evidence_safety*.py
+      - tests/integration/run_evidence_safety_probe.py
+      - .github/workflows/evidence-safety.yml
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - name: Test source and build a separate opt-in image
+        run: |
+          mkdir evidence-safety-results
+          python3 -m unittest discover -s tests -p 'test_*.py' 2>&1 | tee evidence-safety-results/tests.txt
+          python3 -m py_compile container/*.py runner/*.py tests/integration/run_evidence_safety_probe.py
+          git rev-parse HEAD > evidence-safety-results/source-commit.txt
+          sha256sum container/evidence_safety.py container/invoke.py runner/safe_invoke.py runner/cli.py bin/opencode-eval-runner > evidence-safety-results/code.sha256
+          docker build -f evidence-safety/Containerfile \
+            --build-arg RUNNER_REVISION="$(git rev-parse HEAD)" \
+            --build-arg SAFETY_MODULE_SHA256="$(sha256sum container/evidence_safety.py | cut -d' ' -f1)" \
+            --build-arg INVOKE_SHA256="$(sha256sum container/invoke.py | cut -d' ' -f1)" \
+            -t evidence-safety:test .
+          docker save -o image.tar evidence-safety:test
+          git archive --format=tar HEAD > evidence-safety-results/source.tar
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: safety-image-${{ github.run_id }}-${{ github.run_attempt }}
+          path: image.tar
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 1
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: safety-source-${{ github.run_id }}-${{ github.run_attempt }}
+          path: evidence-safety-results/
+          if-no-files-found: error
+          retention-days: 14
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      reference: ${{ steps.image.outputs.reference }}
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: safety-image-${{ github.run_id }}-${{ github.run_attempt }}
+          path: image-data
+      - name: Publish image bytes without executing the workload
+        id: image
+        env:
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          [[ "$HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]
+          mkdir publication
+          docker load --input image-data/image.tar
+          printf '%s' "$REGISTRY_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          trap 'docker logout ghcr.io' EXIT
+          tag="ghcr.io/bateau84/opencode-eval-runner:evidence-safety-${HEAD_SHA:0:12}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          docker tag evidence-safety:test "$tag"
+          docker push "$tag"
+          image="$(docker image inspect "$tag" --format '{{index .RepoDigests 0}}')"
+          [[ "$image" =~ ^ghcr\.io/bateau84/opencode-eval-runner@sha256:[0-9a-f]{64}$ ]]
+          printf '%s\n' "$image" > publication/image.txt
+          printf 'reference=%s\n' "$image" >> "$GITHUB_OUTPUT"
+          docker image inspect "$image" > publication/image-inspect.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: safety-publication-${{ github.run_id }}-${{ github.run_attempt }}
+          path: publication/
+          if-no-files-found: error
+          retention-days: 14
+
+  verify:
+    needs: [build, publish]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - name: Exercise actual pre-output boundaries without real inference
+        env:
+          IMAGE: ${{ needs.publish.outputs.reference }}
+        run: |
+          docker pull "$IMAGE"
+          python3 tests/integration/run_evidence_safety_probe.py --image "$IMAGE" --output evidence-safety-results
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: safety-connection-${{ github.event.pull_request.head.sha }}-${{ github.run_attempt }}
+          path: evidence-safety-results/
+          if-no-files-found: error
+          retention-days: 14

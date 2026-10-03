@@ -1,0 +1,17 @@
+# Reuse the already-tested eval.4 OpenCode binary. Only runner adapters change.
+FROM ghcr.io/bateau84/opencode-eval-runner@sha256:590d5dd61faa6bbdad5d0cd8af3282b783c901ec7aaec84e79fc0057d8731be8
+ARG RUNNER_REVISION
+ARG SAFETY_MODULE_SHA256
+ARG INVOKE_SHA256
+LABEL org.opencontainers.image.revision=$RUNNER_REVISION \
+      io.opencode-eval.evidence-safety="runner-evidence-safety/v1" \
+      io.opencode-eval.evidence-safety-module=$SAFETY_MODULE_SHA256 \
+      io.opencode-eval.evidence-safety-invoke=$INVOKE_SHA256
+COPY container /opt/opencode-eval-runner/container
+USER root
+RUN echo "$SAFETY_MODULE_SHA256  /opt/opencode-eval-runner/container/evidence_safety.py" | sha256sum -c - \
+ && echo "$INVOKE_SHA256  /opt/opencode-eval-runner/container/invoke.py" | sha256sum -c - \
+ && printf '%s\n' "$RUNNER_REVISION" > /opt/opencode-eval-runner/container/evidence-safety-revision.txt
+USER 1000:1000
+# Direct image invocation without a policy emits omissions, never legacy raw evidence.
+ENV EVAL_EVIDENCE_SAFETY=1

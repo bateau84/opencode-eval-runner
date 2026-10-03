@@ -16,6 +16,30 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
+# Only the opt-in safety image/host mode enables this adapter.
+RSP_ACTIVE = False
+RSP_POLICY = None
+RSP_RUN_ID = None
+RSP_STREAM_INVALID = False
+RSP_BINDING_KEY = b''
+
+
+def evidence_slice(text: str, limit: int) -> str:
+    # Omit opaque streams before any runner clipping. Typed values are projected
+    # separately from the complete in-memory event stream. Legacy behavior stays unchanged.
+    return "" if RSP_ACTIVE else text[:limit]
+
+
+def rsp_module():
+    import importlib.util
+    name = "runner_evidence_safety"
+    if name not in sys.modules:
+        spec = importlib.util.spec_from_file_location(name, Path(__file__).with_name("evidence_safety.py"))
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return sys.modules[name]
+
 RESULT_SCHEMA = "opencode-eval-runner/v1"
 OPENCODE_EVAL_TITLE = "opencode-eval-runner"
 COPILOT_AGENT_NAME = "eval-runner"
@@ -36,6 +60,7 @@ def run(command: list[str], cwd: Path, env: dict[str, str], timeout: int) -> sub
         cwd=cwd,
         env=env,
         capture_output=True,
+        stdin=subprocess.DEVNULL if RSP_ACTIVE else None,
         text=True,
         timeout=max(timeout, 1),
         check=False,
@@ -43,9 +68,16 @@ def run(command: list[str], cwd: Path, env: dict[str, str], timeout: int) -> sub
 
 
 def timeout_output(value: str | bytes | None) -> str:
+    global RSP_STREAM_INVALID
     if value is None:
         return ""
     if isinstance(value, bytes):
+        if RSP_ACTIVE:
+            try:
+                return value.decode("utf-8", errors="strict")
+            except UnicodeError:
+                RSP_STREAM_INVALID = True
+                return ""
         return value.decode("utf-8", errors="replace")
     return value
 
@@ -72,14 +104,19 @@ def last_event_summary(events: list[dict[str, Any]]) -> dict[str, Any] | None:
 
 
 def parse_events(text: str) -> list[dict[str, Any]]:
+    global RSP_STREAM_INVALID
     events: list[dict[str, Any]] = []
     for line in text.splitlines():
         try:
-            value = json.loads(line)
-        except json.JSONDecodeError:
+            value = rsp_module().strict_loads(line) if RSP_ACTIVE else json.loads(line)
+        except (ValueError, TypeError, RecursionError):
+            if RSP_ACTIVE and line.strip():
+                RSP_STREAM_INVALID = True
             continue
         if isinstance(value, dict):
             events.append(value)
+        elif RSP_ACTIVE:
+            RSP_STREAM_INVALID = True
     return events
 
 
@@ -127,7 +164,7 @@ def tool_action(part: dict[str, Any]) -> dict[str, Any] | None:
     if part.get("type") != "tool" or not isinstance(tool, str):
         return None
     state = part.get("state")
-    args = state.get("input") if isinstance(state, dict) and isinstance(state.get("input"), dict) else {}
+    args = state.get("input") if isinstance(state, dict) and isinstance(state.get("input"), dict) else (None if RSP_ACTIVE else {})
     return {"tool": tool, "args": args}
 
 
@@ -152,7 +189,7 @@ STDERR_CAPTURE_LIMIT = 20000
 
 def _tool_result_text(value: Any, limit: int) -> tuple[str, bool]:
     text = value if isinstance(value, str) else json.dumps(value, ensure_ascii=False, sort_keys=True)
-    if len(text) <= limit:
+    if RSP_ACTIVE or len(text) <= limit:
         return text, False
     marker = "\n[... tool-result field truncated ...]\n"
     retained = limit - len(marker)
@@ -162,6 +199,10 @@ def _tool_result_text(value: Any, limit: int) -> tuple[str, bool]:
 
 def extract_tool_result_evidence(events: list[dict[str, Any]]) -> dict[str, Any]:
     """Bound tool results from the full structured event stream before stdout clipping."""
+    if RSP_ACTIVE:
+        # Never serialize/clip an unprotected field. This marker is private to
+        # this function and emit_result; it is never sent to the host.
+        return {"schema": "runner-unclipped-events/internal-v1", "events": events}
     evidence: dict[str, Any] = {
         "schema": "opencode-eval-runner/tool-results/v1",
         "source": "opencode.event-stream.full",
@@ -404,7 +445,7 @@ def _standalone_json_request(
     except urllib.error.HTTPError as exc:
         body = exc.read().decode("utf-8", errors="replace")
         raise RuntimeError(
-            f"OpenCode preflight request {method} {path} failed: HTTP {exc.code}: {body[:2000]}"
+            f"OpenCode preflight request {method} {path} failed: HTTP {exc.code}: {evidence_slice(body, 2000)}"
         ) from exc
     except urllib.error.URLError as exc:
         raise RuntimeError(
@@ -416,7 +457,7 @@ def _standalone_json_request(
         return json.loads(body)
     except json.JSONDecodeError as exc:
         raise RuntimeError(
-            f"OpenCode preflight request {method} {path} returned non-JSON: {body[:2000]}"
+            f"OpenCode preflight request {method} {path} returned non-JSON: {evidence_slice(body, 2000)}"
         ) from exc
 
 
@@ -453,7 +494,7 @@ def _start_preflight_server(
         stderr = proc.stderr.read() if proc.stderr is not None else ""
         raise RuntimeError(
             "OpenCode preflight server did not report readiness"
-            + (f": {stderr[:3000]}" if stderr.strip() else "")
+            + (f": {evidence_slice(stderr, 3000)}" if stderr.strip() else "")
         )
     line = proc.stdout.readline()
     try:
@@ -463,7 +504,7 @@ def _start_preflight_server(
         stderr = proc.stderr.read() if proc.stderr is not None else ""
         raise RuntimeError(
             f"OpenCode preflight server returned invalid readiness JSON: {line!r}"
-            + (f"; logs: {stderr[:3000]}" if stderr.strip() else "")
+            + (f"; logs: {evidence_slice(stderr, 3000)}" if stderr.strip() else "")
         ) from exc
     url = ready.get("url") if isinstance(ready, dict) else None
     if not isinstance(url, str) or not url:
@@ -526,7 +567,7 @@ def verify_expected_plugin(
         )
         raise RuntimeError(
             f"expected plugin {expected_plugin!r} is not materialized in {plugins_root}; "
-            f"available entries: {available[:80]}"
+            f"available entries: {([] if RSP_ACTIVE else available[:80])}"
         )
 
     # Agent resolution is intentionally left to the real `opencode run --agent`
@@ -602,7 +643,7 @@ def verify_expected_plugin(
             )
             raise RuntimeError(
                 f"expected plugin {expected_plugin!r} is not present in OpenCode plugin inventory "
-                f"after activation; available plugins: {available[:120]}"
+                f"after activation; available plugins: {([] if RSP_ACTIVE else available[:120])}"
             )
         state = plugin.get("state")
         status = state.get("status") if isinstance(state, dict) else None
@@ -618,7 +659,7 @@ def verify_expected_plugin(
         logs = _stop_preflight_server(server)
         raise RuntimeError(
             str(exc)
-            + (f"; server logs: {logs.strip()[:4000]}" if logs.strip() else "")
+            + (f"; server logs: {evidence_slice(logs.strip(), 4000)}" if logs.strip() else "")
         ) from exc
     else:
         logs = _stop_preflight_server(server)
@@ -748,11 +789,11 @@ def invoke_opencode(
                 "export_exit_code": None,
                 "total_seconds": round(run_seconds, 3),
             },
-            "stderr": detail[:STDERR_CAPTURE_LIMIT],
-            "stderr_truncated": len(detail) > STDERR_CAPTURE_LIMIT,
+            "stderr": evidence_slice(detail, STDERR_CAPTURE_LIMIT),
+            "stderr_truncated": False if RSP_ACTIVE else len(detail) > STDERR_CAPTURE_LIMIT,
             "stderr_total_chars": len(detail),
-            "stdout": stdout[:STDOUT_CAPTURE_LIMIT],
-            "stdout_truncated": len(stdout) > STDOUT_CAPTURE_LIMIT,
+            "stdout": evidence_slice(stdout, STDOUT_CAPTURE_LIMIT),
+            "stdout_truncated": False if RSP_ACTIVE else len(stdout) > STDOUT_CAPTURE_LIMIT,
             "stdout_total_chars": len(stdout),
             "tool_result_evidence": extract_tool_result_evidence(events),
             "plugin_diagnostic": plugins,
@@ -795,11 +836,11 @@ def invoke_opencode(
             "export_exit_code": export_exit_code,
             "total_seconds": round(run_seconds + export_seconds, 3),
         },
-        "stderr": proc.stderr[:STDERR_CAPTURE_LIMIT],
-        "stderr_truncated": len(proc.stderr) > STDERR_CAPTURE_LIMIT,
+        "stderr": evidence_slice(proc.stderr, STDERR_CAPTURE_LIMIT),
+        "stderr_truncated": False if RSP_ACTIVE else len(proc.stderr) > STDERR_CAPTURE_LIMIT,
         "stderr_total_chars": len(proc.stderr),
-        "stdout": proc.stdout[:STDOUT_CAPTURE_LIMIT],
-        "stdout_truncated": len(proc.stdout) > STDOUT_CAPTURE_LIMIT,
+        "stdout": evidence_slice(proc.stdout, STDOUT_CAPTURE_LIMIT),
+        "stdout_truncated": False if RSP_ACTIVE else len(proc.stdout) > STDOUT_CAPTURE_LIMIT,
         "stdout_total_chars": len(proc.stdout),
         "tool_result_evidence": extract_tool_result_evidence(events),
         "plugin_diagnostic": plugins,
@@ -900,21 +941,52 @@ def invoke_copilot(
         "tools": [],
         "actions": [],
         "skills_loaded": [],
-        "stderr": proc.stderr[:STDERR_CAPTURE_LIMIT],
-        "stderr_truncated": len(proc.stderr) > STDERR_CAPTURE_LIMIT,
+        "stderr": evidence_slice(proc.stderr, STDERR_CAPTURE_LIMIT),
+        "stderr_truncated": False if RSP_ACTIVE else len(proc.stderr) > STDERR_CAPTURE_LIMIT,
         "stderr_total_chars": len(proc.stderr),
-        "stdout": proc.stdout[:STDOUT_CAPTURE_LIMIT],
-        "stdout_truncated": len(proc.stdout) > STDOUT_CAPTURE_LIMIT,
+        "stdout": evidence_slice(proc.stdout, STDOUT_CAPTURE_LIMIT),
+        "stdout_truncated": False if RSP_ACTIVE else len(proc.stdout) > STDOUT_CAPTURE_LIMIT,
         "stdout_total_chars": len(proc.stdout),
     }
 
 
 def emit_result(result: dict[str, Any]) -> None:
-    sys.stdout.write(json.dumps(result, separators=(",", ":")) + "\n")
+    if RSP_ACTIVE:
+        safety = rsp_module()
+        try:
+            projected = safety.fallback('invalid', 'runner', RSP_POLICY) if RSP_STREAM_INVALID else safety.project_result(result, RSP_POLICY)
+            if RSP_STREAM_INVALID:
+                if type(result.get('exit_code')) is int:
+                    projected['exit_code'] = result['exit_code']
+                if type(result.get('timed_out')) is bool:
+                    projected['timed_out'] = result['timed_out']
+            revision_file = Path(__file__).with_name('evidence-safety-revision.txt')
+            revision = revision_file.read_text().strip() if revision_file.is_file() else 'unavailable'
+            projected['evidence_safety_ack'] = safety.receipt(RSP_POLICY, RSP_RUN_ID, revision, RSP_BINDING_KEY)
+            encoded = safety.encode(projected)
+            if len(encoded) > safety.RESULT_LIMIT:
+                projected = safety.fallback('size_limit', 'runner', RSP_POLICY)
+                if type(result.get('exit_code')) is int:
+                    projected['exit_code'] = result['exit_code']
+                if type(result.get('timed_out')) is bool:
+                    projected['timed_out'] = result['timed_out']
+                projected['evidence_safety_ack'] = safety.receipt(RSP_POLICY, RSP_RUN_ID, revision, RSP_BINDING_KEY)
+                encoded = safety.encode(projected)
+        except Exception:
+            # No exception text, policy value or partial serialization may escape.
+            encoded = safety.encode(safety.fallback('invalid', 'runner'))
+        sys.stdout.write(encoded.decode('utf-8') + "\n")
+    else:
+        sys.stdout.write(json.dumps(result, separators=(",", ":")) + "\n")
     sys.stdout.flush()
 
 
 def main() -> int:
+    global RSP_ACTIVE, RSP_POLICY, RSP_RUN_ID, RSP_STREAM_INVALID, RSP_BINDING_KEY
+    RSP_ACTIVE = os.environ.get('EVAL_EVIDENCE_SAFETY') == '1'
+    RSP_STREAM_INVALID = False
+    if RSP_ACTIVE:
+        RSP_POLICY, RSP_RUN_ID, RSP_BINDING_KEY = rsp_module().read_request(sys.stdin.buffer)
     try:
         transport = os.environ.get("EVAL_TRANSPORT", "opencode")
         model = os.environ["EVAL_MODEL"]
@@ -949,7 +1021,7 @@ def main() -> int:
             "tools": [],
             "actions": [],
             "skills_loaded": [],
-            "stderr": f"{type(exc).__name__}: {exc}",
+            "stderr": "runner_exception" if RSP_ACTIVE else f"{type(exc).__name__}: {exc}",
             "stdout": "",
             "infrastructure_error": True,
         }

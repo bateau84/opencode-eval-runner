@@ -325,6 +325,9 @@ def build_container_command(
 
 
 def invoke(args: argparse.Namespace) -> int:
+    if getattr(args, 'require_evidence_safety', False) or getattr(args, 'evidence_policy_file', None):
+        from runner.safe_invoke import invoke as safe_invoke
+        return safe_invoke(args)
     observer_key = getattr(args, "observer_key_file", None)
     if observer_key and args.transport != "opencode":
         raise RunnerError("--observer-key-file is only supported by the opencode transport")
@@ -456,6 +459,10 @@ def parser() -> argparse.ArgumentParser:
     run.add_argument("--prompt-file", required=True)
     run.add_argument("--system-file")
     run.add_argument("--output", required=True)
+    run.add_argument("--require-evidence-safety", action="store_true",
+                     help="Require pre-output projection and matching image acknowledgement; missing policy omits payloads.")
+    run.add_argument("--evidence-policy-file",
+                     help="Private Loom credential inventory JSON (128000-byte maximum); implies --require-evidence-safety.")
     run.add_argument(
         "--observer-key-file",
         metavar="PATH",
@@ -474,7 +481,22 @@ def parser() -> argparse.ArgumentParser:
 
 
 def main() -> int:
-    args = parser().parse_args()
+    requested_safety = any(arg == '--require-evidence-safety' or arg == '--evidence-policy-file'
+                           or arg.startswith('--require-evidence-safety=') or arg.startswith('--evidence-policy-file=') for arg in sys.argv[1:])
+    if requested_safety:
+        # argparse can echo invalid arguments (including accidental credential
+        # values) before invoke has loaded policy. Emit only a fixed diagnostic.
+        import contextlib
+        import io
+        try:
+            with contextlib.redirect_stderr(io.StringIO()):
+                args = parser().parse_args()
+        except SystemExit as exc:
+            if exc.code:
+                print('opencode-eval-runner: invalid safety invocation', file=sys.stderr)
+            return int(exc.code or 0)
+    else:
+        args = parser().parse_args()
     try:
         if args.command == "invoke":
             return invoke(args)
