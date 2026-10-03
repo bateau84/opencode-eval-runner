@@ -84,7 +84,7 @@ def apply(root: Path):
       id,
       error:
         tool.name === "subagent" && error.type === "aborted" && typeof tool.progress?.sessionID === "string"
-          ? { ...error, message: `\${error.message} (sessionID: \${tool.progress.sessionID})` }
+          ? { ...error, message: `${error.message} (sessionID: ${tool.progress.sessionID})` }
           : error,
       ...failureSnapshot(tool, metadata),
       executed: tool.providerExecuted,
@@ -96,7 +96,7 @@ def apply(root: Path):
       id,
       error:
         tool.name === "subagent" && error.type === "aborted" && typeof tool.progress?.sessionID === "string"
-          ? { ...error, message: `\${error.message} (sessionID: \${tool.progress.sessionID})` }
+          ? { ...error, message: `${error.message} (sessionID: ${tool.progress.sessionID})` }
           : error,
       ...failureSnapshot(tool, metadata),
       executed: tool.providerExecuted,
