@@ -225,7 +225,7 @@ def run(image: str, output: Path) -> int:
                     and (native_failure_end or {}).get("boundary") == "session-tool-terminal"
                     and (native_failure_end or {}).get("error_representation") == "session-tool-failed/v1"
                     and isinstance(native_failure_value, dict)
-                    and native_failure_value.get("error", {}).get("type") == "tool.execution"
+                    and native_failure_value.get("error", {}).get("type") == "unknown"
                     and "NATIVE-FAIL-RAW" in str(native_failure_value.get("error", {}).get("message", ""))
                 ),
                 "outer_execute_observation_present": len(outer) == 1 and outer[0].get("invocation_id") in native_ends,

@@ -43,7 +43,7 @@ A plugin may subscribe to:
 ctx.tool.hook("execute.native-observed", callback)
 ```
 
-The central Tool service emits `opencode-native-observation/v1` starts and final
+The central Tool service emits `opencode-native-observation/v2` starts and final
 returns/errors for normal native calls, including the outer `execute` call.
 
 The start is emitted after input decoding, using the real Tool.Context:
@@ -94,7 +94,7 @@ The `Normal-invoke runtime observation seam` workflow:
 
 1. applies only `apply.py` — **not** the restricted `apply-protected.py`;
 2. runs source tests against the real core/interpreter;
-3. builds `OpenCode 2.0.18-eval.3`;
+3. builds `OpenCode 2.0.18-eval.4`;
 4. publishes a commit/run-scoped immutable image in a separate credentialed job;
 5. probes the runtime with a deterministic local provider;
 6. runs `run_eval_live_compat_probe.py` through the public
@@ -119,3 +119,14 @@ boundary while retaining the APIs and lifecycle semantics Loom depends on. That 
 a broader runtime project and must not be implemented implicitly in PR #41.
 
 See [Loom host-semantics feasibility](../docs/loom-host-semantics-feasibility.md).
+
+
+## Loom-facing contract
+
+The exact event fields, enablement, ordering, value/error semantics, redaction
+boundary, completeness limits and unsupported coverage are defined in
+[docs/loom-normal-invoke-observation.md](../docs/loom-normal-invoke-observation.md).
+
+A bounded proposal for stronger plugin isolation, without replacing `invoke`, is
+documented in
+[docs/plugin-isolation-feasibility.md](../docs/plugin-isolation-feasibility.md).

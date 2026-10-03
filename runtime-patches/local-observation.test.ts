@@ -153,6 +153,28 @@ test("native decode failures do not fabricate terminal-only observations", async
   expect(events).toEqual([])
 })
 
+test("native terminal omission increments unavailable accounting", async () => {
+  const omittedContext = {
+    sessionID: "omit-session", messageID: "omit-message", id: "omit-call", agent: "build",
+    progress: () => Effect.void,
+  } as any
+  const events: any[] = []
+  const observation = LocalObservation.makeNative(omittedContext, "read", (event) => Effect.sync(() => events.push(event)))
+  await Effect.runPromise(observation.start({ path: "x" }))
+  await Effect.runPromise(LocalObservation.finishNative({
+    sessionID: omittedContext.sessionID,
+    messageID: omittedContext.messageID,
+    callID: omittedContext.id,
+    outcome: "returned",
+    value: undefined,
+  }))
+  expect(events.at(-1)).toMatchObject({
+    kind: "call_end",
+    unavailable_fields: 1,
+    result: { state: "omitted", reason: "unsupported_snapshot" },
+  })
+})
+
 test("runtime-carried invocation IDs reach actual executable and terminal", async () => {
   const executing: string[] = [], after: string[] = []
   const tools = { one: Tool.make({ description: "one", input: Schema.Struct({}), output: Schema.Null,

@@ -38,8 +38,10 @@ the script.
 The downstream runtime patch therefore keeps normal execution intact and exposes
 two diagnostic hook streams:
 
-- `tool.execute.native-observed` — direct/native Tool-service starts and final
-  Tool returns/errors, including the outer `execute` call.
+- `tool.execute.native-observed` — direct/native executable-input starts plus
+  final Session-owned success/failure terminals, including the outer `execute`
+  call. The terminal is emitted after `ToolOutput.truncate` and successful
+  Session event publication.
 - `tool.execute.observed` — Code Mode inner starts and the final value/error
   delivered to the Code Mode caller.
 
@@ -132,7 +134,7 @@ await ctx.tool.hook("execute.native-observed", event => { /* diagnostic only */ 
 await ctx.tool.hook("execute.observed", event => { /* diagnostic only */ })
 ```
 
-`execute.native-observed` uses schema `opencode-native-observation/v1`.
+`execute.native-observed` uses schema `opencode-native-observation/v2`.
 `execute.observed` retains `opencode-local-observation/v1`.
 
 The two streams share the runtime sequence counter. Native records carry
@@ -191,40 +193,24 @@ projection version **3**. Any text describing that implementation as wire v1 /
 projection v2 is stale documentation, not the tested contract. Historical
 artifacts keep their original bytes and meaning.
 
+## Current verification rule
 
-## Empirical normal-invoke checkpoint
+The reviewed source commit and its immutable image digest must come from the same
+completed **Normal-invoke runtime observation seam** workflow. Because the image
+records the runner revision in OCI metadata, a source commit after that build
+requires a newly published digest before the pair can be claimed as matching.
 
-Tested implementation: `3005bcdfb7fa81c86f9a6222a8b8a04d990e42a2`.
+The compatibility workflow must enter through the public
+`opencode-eval-runner invoke` CLI and prove, provider-free, that:
 
-Published experimental normal-invoke image:
+- ordinary result text and tool outcomes remain intact;
+- native success is observed after session truncation/publication;
+- native failure is the canonical Session failure representation;
+- inner Code Mode values/errors remain final caller values;
+- inner parent identity matches the actual outer `execute` observation;
+- native/inner ordering remains truthful.
 
-```text
-ghcr.io/bateau84/opencode-eval-runner@sha256:8268bdf9c0269d00585bdce434c8e7b763f5999d9a36990761c52c1ca019b517
-```
+Runner fixture evidence does not replace Loom checkpoint `f8439e4` composition.
 
-The **Normal-invoke runtime observation seam #12** workflow passed its source,
-build, publication and read-only verification jobs. Its provider-free
-`eval-live-invoke-compatibility` probe entered through the public
-`opencode-eval-runner invoke` command and observed all of the following without
-real-provider credentials:
-
-- the existing result text remained `EVAL-LIVE-FINAL`;
-- the normal native sentinel remained `NATIVE-RAW`;
-- the normal `execute` product result retained the Code Mode `INNER-RAW` value;
-- native and outer-`execute` observations were present;
-- the inner final Code Mode result was present;
-- the inner parent invocation ID matched the actually observed outer
-  `execute` invocation;
-- native/inner start and completion events shared truthful sequence ordering.
-
-The separate runtime seam probe also passed overlap/reverse-completion,
-dispatched-input, denial-string, caught-throw, final-output-mutation, observer
-failure and forged-sidecar rejection checks.
-
-This is **diagnostic semantic evidence only**. The workflow intentionally records
-`evidence_status: diagnostic_non_evidence`,
-`delegated_session_identity: not_exercised`, and
-`in_process_plugin_protection: unsupported`.
-
-All four PR workflows were green on the tested implementation. This does not
-authorize merge or full Loom acceptance.
+See [the exact normal-invoke interface](loom-normal-invoke-observation.md) and
+[the bounded plugin-isolation feasibility proposal](plugin-isolation-feasibility.md).
