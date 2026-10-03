@@ -1,0 +1,262 @@
+name: Sign approved normal-invoke evidence
+
+# Trusted release/provenance workflow. Invoke the default-branch definition for
+# an explicitly reviewed source commit. PR workflows receive no OIDC authority.
+on:
+  workflow_dispatch:
+    inputs:
+      source_commit:
+        description: Reviewed 40-hex source commit to rebuild and sign
+        required: true
+        type: string
+      pull_request:
+        description: Pull request number containing source_commit
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    permissions:
+      contents: read
+    outputs:
+      source_commit: ${{ steps.source.outputs.sha }}
+    steps:
+      - name: Validate reviewed source selection
+        id: source
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SOURCE_COMMIT: ${{ inputs.source_commit }}
+          PR_NUMBER: ${{ inputs.pull_request }}
+        run: |
+          set -euo pipefail
+          [[ "$SOURCE_COMMIT" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$PR_NUMBER" =~ ^[1-9][0-9]*$ ]]
+          test "$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" --jq .head.sha)" = "$SOURCE_COMMIT"
+          printf 'sha=%s\n' "$SOURCE_COMMIT" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ steps.source.outputs.sha }}
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: anomalyco/opencode
+          ref: cd9a14a6b688d4021bee381dfd39d2cef9c0f862
+          path: .runtime-source
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version: 1.4.2
+
+      - name: Rebuild reviewed runtime from source
+        run: |
+          set -euo pipefail
+          mkdir -p approved-results
+          python3 -m py_compile runtime-patches/*.py
+          python3 runtime-patches/apply.py .runtime-source
+          bun install --cwd .runtime-source --frozen-lockfile
+          root="$(mktemp -d "$RUNNER_TEMP/approved-runtime-test.XXXXXX")"
+          mkdir -p "$root"/{home,config,data,state,cache,run}
+          HOME="$root/home" XDG_CONFIG_HOME="$root/config" XDG_DATA_HOME="$root/data" \
+          XDG_STATE_HOME="$root/state" XDG_CACHE_HOME="$root/cache" XDG_RUNTIME_DIR="$root/run" \
+          OPENCODE_DISABLE_AUTOUPDATE=1 bun test --cwd .runtime-source/packages/core --timeout 20000 test/local-observation.test.ts \
+            2>&1 | tee approved-results/source-tests.txt
+          rm -rf "$root"
+          OPENCODE_VERSION=2.0.18-eval.4 OPENCODE_CHANNEL=latest \
+            bun run --cwd .runtime-source packages/cli/script/build.ts --skip-install --target=opencode-linux-x64 \
+            2>&1 | tee approved-results/build.txt
+          cp .runtime-source/packages/cli/dist/cli-linux-x64/bin/opencode approved-results/opencode
+          sha256sum approved-results/opencode > approved-results/binary.sha256
+          docker build -f runtime-patches/Containerfile \
+            --build-arg RUNNER_REVISION="${{ steps.source.outputs.sha }}" \
+            -t approved-normal-invoke:build approved-results
+          docker save -o approved-image.tar approved-normal-invoke:build
+          git rev-parse HEAD > approved-results/source-commit.txt
+          git archive --format=tar HEAD > approved-results/tested-source.tar
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: approved-build-${{ steps.source.outputs.sha }}-${{ github.run_id }}
+          path: |
+            approved-image.tar
+            approved-results/**
+            !approved-results/opencode
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.publish.outputs.image }}
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: approved-build-${{ needs.build.outputs.source_commit }}-${{ github.run_id }}
+          path: approved
+      - name: Publish reviewed image bytes without executing them
+        id: publish
+        env:
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SOURCE_COMMIT: ${{ needs.build.outputs.source_commit }}
+        run: |
+          set -euo pipefail
+          docker load --input approved/approved-image.tar
+          printf '%s' "$REGISTRY_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          trap 'docker logout ghcr.io' EXIT
+          tag="ghcr.io/bateau84/opencode-eval-runner:approved-${SOURCE_COMMIT:0:12}-${GITHUB_RUN_ID}"
+          docker tag approved-normal-invoke:build "$tag"
+          docker push "$tag"
+          image="$(docker image inspect "$tag" --format '{{index .RepoDigests 0}}')"
+          [[ "$image" =~ ^ghcr\.io/bateau84/opencode-eval-runner@sha256:[0-9a-f]{64}$ ]]
+          printf 'image=%s\n' "$image" >> "$GITHUB_OUTPUT"
+          mkdir publication
+          printf '%s\n' "$image" > publication/image.txt
+          docker image inspect "$image" > publication/image-inspect.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: approved-publication-${{ needs.build.outputs.source_commit }}-${{ github.run_id }}
+          path: publication/
+          if-no-files-found: error
+          retention-days: 30
+
+  verify:
+    needs: [build, publish]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ needs.build.outputs.source_commit }}
+          persist-credentials: false
+      - name: Verify rebuilt image through normal invoke
+        env:
+          IMAGE: ${{ needs.publish.outputs.image }}
+          SOURCE_COMMIT: ${{ needs.build.outputs.source_commit }}
+        run: |
+          set -euo pipefail
+          docker pull "$IMAGE"
+          test "$(docker image inspect "$IMAGE" --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}')" = "$SOURCE_COMMIT"
+          test "$(docker image inspect "$IMAGE" --format '{{ index .Config.Labels "io.opencode.runtime.version" }}')" = "2.0.18-eval.4"
+          mkdir -p approved-evidence
+          python3 runtime-patches/run_image_probe.py --image "$IMAGE" --output approved-evidence/probe
+          python3 runtime-patches/run_eval_live_compat_probe.py --image "$IMAGE" --output approved-evidence/eval-live-compat
+          python3 runtime-patches/run_delegated_session_probe.py --image "$IMAGE" --output approved-evidence/delegated-session
+          jq -e '.runtime_seam_passed == true and .handoff_acceptance == "BLOCKED"' approved-evidence/probe/summary.json >/dev/null
+          jq -e '.passed == true and .evidence_status == "diagnostic_non_evidence"' approved-evidence/eval-live-compat/summary.json >/dev/null
+          jq -e '.passed == true' approved-evidence/delegated-session/summary.json >/dev/null
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: approved-evidence-${{ needs.build.outputs.source_commit }}-${{ github.run_id }}
+          path: approved-evidence/
+          if-no-files-found: error
+          retention-days: 30
+
+  sign:
+    needs: [build, publish, verify]
+    # Repository configuration must protect this environment with required
+    # reviewers. Green PR CI alone cannot authorize a signature.
+    environment: release-signing
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    env:
+      COSIGN_OIDC_ISSUER: https://token.actions.githubusercontent.com
+    steps:
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: approved-evidence-${{ needs.build.outputs.source_commit }}-${{ github.run_id }}
+          path: evidence
+      - name: Finalize reviewed result without executing source code
+        env:
+          SOURCE_COMMIT: ${{ needs.build.outputs.source_commit }}
+          IMAGE: ${{ needs.publish.outputs.image }}
+          PR_NUMBER: ${{ inputs.pull_request }}
+        run: |
+          set -euo pipefail
+          test -z "$(find evidence -type l -print -quit)"
+          test "$(du -sb evidence | cut -f1)" -le 25000000
+          jq -e '.passed == true and .evidence_status == "diagnostic_non_evidence"' evidence/eval-live-compat/summary.json >/dev/null
+          jq -e '.passed == true' evidence/delegated-session/summary.json >/dev/null
+          jq -e '.runtime_seam_passed == true and .handoff_acceptance == "BLOCKED"' evidence/probe/summary.json >/dev/null
+          mkdir signed
+          export SOURCE_COMMIT IMAGE PR_NUMBER
+          python3 - <<'PY'
+          import hashlib, json, os
+          from pathlib import Path
+          files = {
+              "eval_live_compat": Path("evidence/eval-live-compat/summary.json"),
+              "delegated_session": Path("evidence/delegated-session/summary.json"),
+              "runtime_probe": Path("evidence/probe/summary.json"),
+          }
+          parsed = {name: json.loads(path.read_text()) for name, path in files.items()}
+          payload = {
+              "schema": "opencode-eval-runner/signed-result/v2",
+              "source_commit": os.environ["SOURCE_COMMIT"],
+              "pull_request": int(os.environ["PR_NUMBER"]),
+              "workflow_run_id": int(os.environ["GITHUB_RUN_ID"]),
+              "image_digest": os.environ["IMAGE"],
+              "results": {
+                  "eval_live_compat": bool(parsed["eval_live_compat"]["passed"]),
+                  "delegated_session": bool(parsed["delegated_session"]["passed"]),
+                  "runtime_seam": bool(parsed["runtime_probe"]["runtime_seam_passed"]),
+              },
+              "evidence_sha256": {
+                  name: hashlib.sha256(path.read_bytes()).hexdigest()
+                  for name, path in files.items()
+              },
+              "evidence_scope": "diagnostic normal-invoke observations",
+              "protected_capture_accepted": False,
+              "in_process_plugin_protection": "unsupported",
+          }
+          Path("signed/eval-result.json").write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+          PY
+          printf '%s\n' "$IMAGE" > signed/image.txt
+      - name: Sign and verify reviewed image and finalized result
+        env:
+          SOURCE_COMMIT: ${{ needs.build.outputs.source_commit }}
+          IMAGE: ${{ needs.publish.outputs.image }}
+        run: |
+          set -euo pipefail
+          identity="https://github.com/$GITHUB_WORKFLOW_REF"
+          cosign sign --yes -a "source_commit=$SOURCE_COMMIT" -a "workflow_run=$GITHUB_RUN_ID" "$IMAGE"
+          cosign verify "$IMAGE" \
+            --certificate-identity "$identity" \
+            --certificate-oidc-issuer "$COSIGN_OIDC_ISSUER" \
+            -a "source_commit=$SOURCE_COMMIT" \
+            -a "workflow_run=$GITHUB_RUN_ID" \
+            > signed/image-verification.json
+          cosign sign-blob --yes --bundle signed/eval-result.sigstore.json signed/eval-result.json
+          cosign verify-blob signed/eval-result.json \
+            --bundle signed/eval-result.sigstore.json \
+            --certificate-identity "$identity" \
+            --certificate-oidc-issuer "$COSIGN_OIDC_ISSUER" \
+            > signed/result-verification.txt
+          printf '%s\n' "$identity" > signed/expected-signer-identity.txt
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: signed-approved-${{ needs.build.outputs.source_commit }}-${{ github.run_id }}
+          path: signed/
+          if-no-files-found: error
+          retention-days: 90

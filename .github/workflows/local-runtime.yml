@@ -1,0 +1,183 @@
+name: Normal-invoke runtime observation seam
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - runtime-patches/**
+      - runner/cli.py
+      - container/**
+      - bin/opencode-eval-runner
+      - tests/test_workflow_boundaries.py
+      - .github/workflows/local-runtime.yml
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: anomalyco/opencode
+          ref: cd9a14a6b688d4021bee381dfd39d2cef9c0f862
+          path: .runtime-source
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version: 1.4.2
+      - name: Apply exact downstream source patch
+        run: |
+          mkdir -p local-runtime-results
+          python3 -m py_compile runtime-patches/*.py
+          python3 runtime-patches/apply.py .runtime-source
+          git -C .runtime-source add -N packages/core/src/codemode/local-observation.ts packages/core/test/local-observation.test.ts
+          git -C .runtime-source diff --binary > local-runtime-results/runtime.patch
+          git rev-parse HEAD > local-runtime-results/runner-revision.txt
+          sha256sum runtime-patches/*.py runtime-patches/*.ts runtime-patches/Containerfile > local-runtime-results/patch-inputs.sha256
+      - name: Install pinned runtime dependencies
+        working-directory: .runtime-source
+        run: bun install --frozen-lockfile
+      - name: Test normal host-semantics observation source
+        run: |
+          root="$(mktemp -d "$RUNNER_TEMP/local-runtime-test.XXXXXX")"
+          mkdir -p "$root"/{home,config,data,state,cache,run}
+          HOME="$root/home" XDG_CONFIG_HOME="$root/config" XDG_DATA_HOME="$root/data" \
+          XDG_STATE_HOME="$root/state" XDG_CACHE_HOME="$root/cache" XDG_RUNTIME_DIR="$root/run" \
+          OPENCODE_DISABLE_AUTOUPDATE=1 bun test --cwd .runtime-source/packages/core --timeout 20000 test/local-observation.test.ts \
+            2>&1 | tee local-runtime-results/source-tests.txt
+          rm -rf "$root"
+      - name: Build the existing CLI with the local patch
+        working-directory: .runtime-source
+        env:
+          OPENCODE_VERSION: 2.0.18-eval.4
+          OPENCODE_CHANNEL: latest
+        run: |
+          bun run packages/cli/script/build.ts --skip-install --target=opencode-linux-x64 \
+            2>&1 | tee "$GITHUB_WORKSPACE/local-runtime-results/build.txt"
+          cp packages/cli/dist/cli-linux-x64/bin/opencode "$GITHUB_WORKSPACE/local-runtime-results/opencode"
+          sha256sum "$GITHUB_WORKSPACE/local-runtime-results/opencode" > "$GITHUB_WORKSPACE/local-runtime-results/binary.sha256"
+      - name: Build experimental image without replacing defaults
+        run: |
+          docker build -f runtime-patches/Containerfile \
+            --build-arg RUNNER_REVISION="$(git rev-parse HEAD)" \
+            -t local-observation:test local-runtime-results
+      - name: Save image data without publication credentials
+        run: docker save -o images.tar local-observation:test
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: runtime-build-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            local-runtime-results/**
+            !local-runtime-results/opencode
+          if-no-files-found: error
+          retention-days: 14
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: runtime-image-data-${{ github.run_id }}-${{ github.run_attempt }}
+          path: images.tar
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      reference: ${{ steps.image.outputs.reference }}
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: runtime-image-data-${{ github.run_id }}-${{ github.run_attempt }}
+          path: image-data
+      # No repository checkout or executable workload in the publication job.
+      - name: Publish fixed destination from image archive data
+        id: image
+        env:
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          [[ "$HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]
+          mkdir publication
+          docker load --input image-data/images.tar
+          printf '%s' "$REGISTRY_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          trap 'docker logout ghcr.io' EXIT
+          tag="ghcr.io/bateau84/opencode-eval-runner:observer-pr41-${HEAD_SHA:0:12}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          docker tag local-observation:test "$tag"
+          docker push "$tag" | tee publication/publish.txt
+          image="$(docker image inspect "$tag" --format '{{index .RepoDigests 0}}')"
+          [[ "$image" =~ ^ghcr\.io/bateau84/opencode-eval-runner@sha256:[0-9a-f]{64}$ ]]
+          printf '%s\n' "$image" > publication/image.txt
+          printf 'reference=%s\n' "$image" >> "$GITHUB_OUTPUT"
+          docker image inspect "$image" > publication/image-inspect.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: runtime-publication-${{ github.run_id }}-${{ github.run_attempt }}
+          path: publication/
+          retention-days: 14
+          if-no-files-found: error
+
+  verify:
+    needs: [build, publish]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: runtime-build-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: local-runtime-results
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: runtime-publication-${{ github.run_id }}-${{ github.run_attempt }}
+          path: local-runtime-results
+      - name: Probe published runtime without publication credentials
+        env:
+          LOCAL_IMAGE: ${{ needs.publish.outputs.reference }}
+        run: |
+          docker pull "$LOCAL_IMAGE"
+          python3 runtime-patches/run_image_probe.py --image "$LOCAL_IMAGE" --output local-runtime-results/probe
+      - name: Preserve Loom eval:live invoke contract
+        env:
+          LOCAL_IMAGE: ${{ needs.publish.outputs.reference }}
+        run: |
+          python3 runtime-patches/run_eval_live_compat_probe.py \
+            --image "$LOCAL_IMAGE" \
+            --output local-runtime-results/eval-live-compat
+      - name: Exercise real delegated Session identity and permission enforcement
+        env:
+          LOCAL_IMAGE: ${{ needs.publish.outputs.reference }}
+        run: |
+          python3 runtime-patches/run_delegated_session_probe.py \
+            --image "$LOCAL_IMAGE" \
+            --output local-runtime-results/delegated-session
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: local-runtime-${{ github.event.pull_request.head.sha }}-${{ github.run_attempt }}
+          path: local-runtime-results/
+          if-no-files-found: error
+          retention-days: 14
