@@ -190,3 +190,41 @@ The historical `c1629415...` restricted-profile proof used runtime events
 projection version **3**. Any text describing that implementation as wire v1 /
 projection v2 is stale documentation, not the tested contract. Historical
 artifacts keep their original bytes and meaning.
+
+
+## Empirical normal-invoke checkpoint
+
+Tested implementation: `3005bcdfb7fa81c86f9a6222a8b8a04d990e42a2`.
+
+Published experimental normal-invoke image:
+
+```text
+ghcr.io/bateau84/opencode-eval-runner@sha256:8268bdf9c0269d00585bdce434c8e7b763f5999d9a36990761c52c1ca019b517
+```
+
+The **Normal-invoke runtime observation seam #12** workflow passed its source,
+build, publication and read-only verification jobs. Its provider-free
+`eval-live-invoke-compatibility` probe entered through the public
+`opencode-eval-runner invoke` command and observed all of the following without
+real-provider credentials:
+
+- the existing result text remained `EVAL-LIVE-FINAL`;
+- the normal native sentinel remained `NATIVE-RAW`;
+- the normal `execute` product result retained the Code Mode `INNER-RAW` value;
+- native and outer-`execute` observations were present;
+- the inner final Code Mode result was present;
+- the inner parent invocation ID matched the actually observed outer
+  `execute` invocation;
+- native/inner start and completion events shared truthful sequence ordering.
+
+The separate runtime seam probe also passed overlap/reverse-completion,
+dispatched-input, denial-string, caught-throw, final-output-mutation, observer
+failure and forged-sidecar rejection checks.
+
+This is **diagnostic semantic evidence only**. The workflow intentionally records
+`evidence_status: diagnostic_non_evidence`,
+`delegated_session_identity: not_exercised`, and
+`in_process_plugin_protection: unsupported`.
+
+All four PR workflows were green on the tested implementation. This does not
+authorize merge or full Loom acceptance.
