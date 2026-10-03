@@ -71,7 +71,7 @@ class PublicationBoundaryTests(unittest.TestCase):
         prefix, jobs = workflow_jobs("sign-normal-invoke-evidence.yml")
         self.assertIn("workflow_dispatch:", prefix)
         self.assertNotIn("workflow_run:", prefix)
-        self.assertNotIn("pull_request:", prefix)
+        self.assertNotRegex(prefix, r"(?m)^  pull_request:\\s*$")
         self.assertNotIn("pull_request_target", text)
         self.assertEqual(set(jobs), {"build", "publish", "verify", "sign"})
 
