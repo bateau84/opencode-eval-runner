@@ -91,7 +91,8 @@ def empty_projection(run_id: str) -> dict:
         "coverage": {"scope": PROFILE, "native": "unsupported", "delegated_sessions": "unsupported",
                      "in_process_untrusted_plugins": "unsupported", "capture_started": False,
                      "capture_ended": False, "starts": 0, "terminals": 0,
-                     "missing_terminals": 0, "omitted_records": None, "truncated": False},
+                     "missing_terminals": None, "omitted_records": None, "truncated": False,
+                     "accounting_complete": False},
     }
 
 
@@ -106,6 +107,7 @@ def import_capture(raw: bytes, *, run_id: str, policy_id: str, launch_id: str, r
     result["launch_id"] = launch_id
     result["collection_profile"] = "private-supervisor-receipt/v1"
     parents, calls = {}, {}
+    accounting_started = False
     try:
         _require(len(raw) <= MAX_BYTES, "capture_limit")
         _shape(receipt, ("sha256", "bytes"))
@@ -132,6 +134,7 @@ def import_capture(raw: bytes, *, run_id: str, policy_id: str, launch_id: str, r
         _require(footer["sha256"] == hashlib.sha256(b"".join(lines[:-1])).hexdigest(), "stream_modified")
         result["coverage"]["capture_ended"] = True
         session = None
+        accounting_started = True
         for expected_source_seq, frame in enumerate(frames[1:-1], 1):
             _shape(frame, ("kind", "run_id", "seq", "observation"))
             _require(frame["kind"] == "observation", "unknown_record")
@@ -151,7 +154,7 @@ def import_capture(raw: bytes, *, run_id: str, policy_id: str, launch_id: str, r
             if kind == "parent_start":
                 _shape(event, common | {"boundary", "mode"})
                 _require(event["boundary"] == "codemode-engine" and event["mode"] == "code_mode", "wrong_boundary")
-                _require(pid not in parents, "duplicate_parent")
+                _require(pid not in parents and pid not in calls, "duplicate_parent")
                 parents[pid] = {"identity": parent, "actor": actor, "start_sequence": frame["seq"],
                                 "terminal_sequence": None, "starts": 0, "terminals": 0}
                 continue
@@ -161,7 +164,7 @@ def import_capture(raw: bytes, *, run_id: str, policy_id: str, launch_id: str, r
             if kind == "call_start":
                 _shape(event, common | {"invocation_id", "tool", "catalog_path", "input", "boundary"})
                 iid = event["invocation_id"]
-                _require(_token(iid) and iid not in calls, "duplicate_or_invalid_invocation")
+                _require(_token(iid) and iid not in calls and iid not in parents, "duplicate_or_invalid_invocation")
                 _require(event["tool"] in tools and event["catalog_path"] == "isolated." + event["tool"][len("isolated_"):], "unapproved_registration")
                 _require(event["boundary"] == "executable-input", "wrong_boundary")
                 calls[iid] = {"invocation_id": iid, "tool": event["tool"], "catalog_path": event["catalog_path"],
@@ -180,7 +183,6 @@ def import_capture(raw: bytes, *, run_id: str, policy_id: str, launch_id: str, r
                 _require(call["parent"] == parent and call["actor"] == actor, "conflicting_identity")
                 _require(event["dispatched"] is True and event["boundary"] == "codemode-json-return", "wrong_boundary")
                 _require(outcome in ("returned", "threw", "interrupted"), "invalid_outcome")
-                call.update(outcome=outcome, terminal_sequence=frame["seq"])
                 if outcome == "returned":
                     call["result"] = _field(event["result"])
                 elif outcome == "threw":
@@ -189,6 +191,8 @@ def import_capture(raw: bytes, *, run_id: str, policy_id: str, launch_id: str, r
                     call["error_representation"] = event["error_representation"]
                 else:
                     result["issues"].append("interrupted_call")
+                # A malformed result must not make its call look settled.
+                call.update(outcome=outcome, terminal_sequence=frame["seq"])
                 bound["terminals"] += 1
             elif kind == "parent_end":
                 _shape(event, common | {"admitted", "dispatched", "terminals", "missing_terminals", "unsupported_dispatches",
@@ -219,7 +223,7 @@ def import_capture(raw: bytes, *, run_id: str, policy_id: str, launch_id: str, r
         result["status"] = "incomplete" if result["issues"] else "complete"
         result["evidence_eligible"] = not result["issues"]
         result["coverage"].update(starts=len(calls), terminals=sum(c["terminal_sequence"] is not None for c in calls.values()),
-                                  missing_terminals=0, omitted_records=0)
+                                  missing_terminals=0, omitted_records=0, accounting_complete=True)
         for call in calls.values():
             call["evidence_eligible"] = result["evidence_eligible"]
         result["records"], result["parents"] = list(calls.values()), list(parents.values())
@@ -228,6 +232,14 @@ def import_capture(raw: bytes, *, run_id: str, policy_id: str, launch_id: str, r
         result["issues"] = [str(exc) if isinstance(exc, CaptureError) else "malformed_capture"]
         result["records"], result["parents"] = [], []
         result["evidence_eligible"] = False
+        if isinstance(exc, CaptureError) and str(exc) in {"capture_limit", "frame_count", "frame_limit", "field_limit"}:
+            result["coverage"]["truncated"] = True
+    if accounting_started:
+        # Verified-prefix counts are diagnostic only. An invalid suffix can hide
+        # more calls, so completeness and omitted_records remain separately unknown.
+        terminals = sum(call["terminal_sequence"] is not None for call in calls.values())
+        result["coverage"].update(starts=len(calls), terminals=terminals,
+                                  missing_terminals=len(calls) - terminals)
     return result
 
 
