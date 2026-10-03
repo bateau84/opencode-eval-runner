@@ -1,5 +1,5 @@
 # Existing locally patched runtime: no second interpreter or tool-call observer.
-FROM ghcr.io/bateau84/opencode-eval-runner@sha256:6daa5372db601ee6fdcc75e8fafd7c4cc626122610eaff5b56ebb6912156dccb AS protected
+FROM ghcr.io/bateau84/opencode-eval-runner@sha256:800480450524bb9dd4f99a55d2c3cd40617b04b06625f74ae2d7e912bf4b0151 AS protected
 ARG RUNNER_REVISION
 LABEL io.opencode-eval.capture-profile="codemode-inner/direct-session/v1" \
       io.opencode-eval.runner-revision=$RUNNER_REVISION
@@ -8,6 +8,6 @@ ENTRYPOINT ["python3", "/opt/protected/invoke.py"]
 
 # Adversarial fixture is a DIFFERENT runtime process/container, never an imported
 # plugin. Sharing a read-only base image does not share capture mounts or PIDs.
-FROM ghcr.io/bateau84/opencode-eval-runner@sha256:6daa5372db601ee6fdcc75e8fafd7c4cc626122610eaff5b56ebb6912156dccb AS fixture-tools
+FROM ghcr.io/bateau84/opencode-eval-runner@sha256:800480450524bb9dd4f99a55d2c3cd40617b04b06625f74ae2d7e912bf4b0151 AS fixture-tools
 COPY tests/integration/protected_tools.py /opt/tools/server.py
 ENTRYPOINT ["python3", "/opt/tools/server.py"]

@@ -96,8 +96,8 @@ function observed(event: any) {
 export default {
   id: "protectedbridge",
   async setup(ctx: any) {
-    if (request.observe) write({ kind: "capture_start", schema: "opencode-protected-observation/v1",
-      profile: "codemode-inner/direct-session/v1", run_id: request.run_id, seq: 0, policy_id: request.policy_id })
+    if (request.observe) write({ kind: "capture_start", schema: "opencode-protected-observation/v2",
+      profile: "codemode-inner/direct-session/v1", run_id: request.run_id, seq: 0, policy_id: request.policy_id, launch_id: request.launch_id })
     await ctx.tool.hook("execute.observed", observed)
     await ctx.tool.hook("execute.before", (event: any) => {
       if (event.tool !== "execute" && !request.tools.some((t: any) => event.tool === "isolated_" + t.name))
@@ -112,13 +112,30 @@ export default {
         name: definition.name, description: definition.description ?? definition.name,
         input: definition.input, output: {}, options: { namespace: "isolated", codemode: true },
         execute: async (input: unknown, tool: any) => {
+          if (!token.test(tool.evaluationInvocationID) || !Number.isSafeInteger(tool.evaluationDispatchOrdinal))
+            throw new Error("protected_runtime_context_missing")
           const response = await fetch(request.tool_url + "/call", {
             method: "POST", headers: { "content-type": "application/json" },
-            body: JSON.stringify({ name: definition.name, input }), signal: AbortSignal.timeout(10000),
+            body: JSON.stringify({ name: definition.name, input, context: {
+              invocation_id: tool.evaluationInvocationID, ordinal: tool.evaluationDispatchOrdinal,
+              agent: tool.agent, session_id: tool.sessionID, message_id: tool.messageID, call_id: tool.id,
+            }}), signal: AbortSignal.timeout(10000), redirect: "error",
           })
           if (!response.ok) throw new Error("isolated_tool_transport_failed")
-          const text = await response.text()
-          if (Buffer.byteLength(text) > 1024 * 1024) throw new Error("isolated_tool_response_limit")
+          if (!response.body) throw new Error("isolated_tool_invalid_response")
+          const reader = response.body.getReader()
+          const chunks: Uint8Array[] = []
+          let size = 0
+          try {
+            for (;;) {
+              const next = await reader.read()
+              if (next.done) break
+              size += next.value.byteLength
+              if (size > 1024 * 1024) throw new Error("isolated_tool_response_limit")
+              chunks.push(next.value)
+            }
+          } finally { await reader.cancel().catch(() => {}) }
+          const text = Buffer.concat(chunks).toString("utf8")
           const value = JSON.parse(text)
           if (value.outcome === "threw" && typeof value.error === "string") throw new Error(value.error)
           if (value.outcome !== "returned" || !Object.hasOwn(value, "result")) throw new Error("isolated_tool_invalid_response")

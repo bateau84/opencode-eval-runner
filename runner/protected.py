@@ -21,7 +21,7 @@ import tempfile
 from typing import Any
 
 PROFILE = "codemode-inner/direct-session/v1"
-SCHEMA = "opencode-protected-observation/v1"
+SCHEMA = "opencode-protected-observation/v2"
 RUNTIME_SCHEMA = "opencode-local-observation/v1"
 MAX_BYTES = 8 * 1024 * 1024
 MAX_EVENTS = 10000
@@ -84,7 +84,7 @@ def _field(value):
 
 def empty_projection(run_id: str) -> dict:
     return {
-        "kind": "execution-observer-projection", "version": 2,
+        "kind": "execution-observer-projection", "version": 3,
         "profile": PROFILE, "run_id": run_id, "status": "unavailable",
         "evidence_eligible": False, "full_handoff_eligible": False,
         "records": [], "parents": [], "issues": [],
@@ -95,7 +95,7 @@ def empty_projection(run_id: str) -> dict:
     }
 
 
-def import_capture(raw: bytes, *, run_id: str, policy_id: str, tools: set[str], transport_ok: bool) -> dict:
+def import_capture(raw: bytes, *, run_id: str, policy_id: str, launch_id: str, tools: set[str], transport_ok: bool) -> dict:
     """Validate bytes read by the protected launcher, NOT arbitrary target bytes.
 
     A checksum detects stream damage; it is not an origin proof. Origin comes from
@@ -109,14 +109,16 @@ def import_capture(raw: bytes, *, run_id: str, policy_id: str, tools: set[str], 
         _require(bool(raw) and raw.endswith(b"\n"), "missing_or_partial_capture")
         lines = raw.splitlines(keepends=True)
         _require(2 <= len(lines) <= MAX_EVENTS + 2, "frame_count")
+        _require(all(len(line) <= 256 * 1024 for line in lines), "frame_limit")
         frames = [strict_json(line) for line in lines]
         for seq, frame in enumerate(frames):
             _require(isinstance(frame, dict) and frame.get("run_id") == run_id, "wrong_run")
             _require(type(frame.get("seq")) is int and frame["seq"] == seq, "sequence_gap")
         header, footer = frames[0], frames[-1]
-        _shape(header, ("kind", "schema", "profile", "run_id", "seq", "policy_id"))
+        _shape(header, ("kind", "schema", "profile", "run_id", "seq", "policy_id", "launch_id"))
         _require(header["kind"] == "capture_start" and header["schema"] == SCHEMA
                  and header["profile"] == PROFILE and header["policy_id"] == policy_id, "wrong_profile")
+        _require(header["launch_id"] == launch_id, "wrong_launch")
         result["coverage"]["capture_started"] = True
         _shape(footer, ("kind", "run_id", "seq", "event_count", "sha256", "writer_exited", "runtime_exit"))
         _require(footer["kind"] == "capture_end" and footer["writer_exited"] is True, "missing_capture_end")
@@ -241,91 +243,9 @@ def read_private(path: Path) -> bytes:
         os.close(fd)
 
 
-def invoke(args, *, _test_receive=None, _test_prepare=None) -> int:
-    # _test_receive is a host-only fault-injection seam, never a CLI/target option.
-    for value in (args.image, args.tool_image):
-        _require(bool(IMAGE.fullmatch(value)), "immutable_image_required")
-    policy_raw = Path(args.policy_file).read_bytes()
-    policy = strict_json(policy_raw)
-    _require(isinstance(policy, dict) and policy.get("version") == 1, "invalid_policy")
-    _require(len(policy_raw) <= 1024 * 1024, "policy_limit")
-    _require(isinstance(policy.get("allowed_values"), list) and isinstance(policy.get("secrets"), list)
-             and all(isinstance(s, str) and s for s in policy["secrets"]), "invalid_policy")
-    policy_id = hashlib.sha256(policy_raw).hexdigest()
-    tools = strict_json(Path(args.tools_file).read_bytes())
-    _require(isinstance(tools, list) and 0 < len(tools) <= 64, "invalid_tools")
-    _require(all(isinstance(t, dict) and re.fullmatch(r"[a-z][a-z0-9_]{0,63}", t.get("name", "")) for t in tools), "invalid_tools")
-    _require(len({t["name"] for t in tools}) == len(tools), "duplicate_tool")
-    program = Path(args.program_file).read_text()
-    _require(len(program.encode()) <= 128 * 1024, "program_limit")
-    run_id = secrets.token_hex(32)
-    prefix = "capture-" + run_id[:16]
-    network, target, runtime = prefix + "-net", prefix + "-tools", prefix + "-runtime"
-    output = Path(args.output).resolve()
-    output.parent.mkdir(parents=True, exist_ok=True)
-    result = {"schema": "opencode-eval-runner/v1", "profile": PROFILE, "run_id": run_id,
-              "runtime_image": args.image, "tool_image": args.tool_image, "policy_id": policy_id,
-              "observed_execution": empty_projection(run_id)}
-    code = 4
-    with tempfile.TemporaryDirectory(prefix="protected-capture-") as tmp:
-        root = Path(tmp)
-        inputs, capture = root / "input", root / "capture"
-        inputs.mkdir(mode=0o755)
-        capture.mkdir(mode=0o777)
-        capture.chmod(0o777)  # the mode-0700 parent is never mounted in either container
-        (inputs / "request.json").write_text(json.dumps({"run_id": run_id, "program": program, "tools": tools,
-            "tool_url": "http://" + target + ":8080", "policy_id": policy_id, "observe": not args.no_observe}))
-        (inputs / "policy.json").write_bytes(policy_raw)
-        for file in inputs.iterdir():
-            file.chmod(0o644)  # private host directory; only trusted runtime receives this mount
-        if _test_prepare is not None:
-            _test_prepare(capture)
-        hardening = ["--read-only", "--cap-drop", "ALL", "--security-opt", "no-new-privileges",
-                     "--pids-limit", "128", "--memory", "1g", "--cpus", "2", "--user", "1000:1000"]
-        try:
-            for image in {args.image, args.tool_image}:
-                _run(["docker", "pull", image])
-            _run(["docker", "network", "create", "--internal", network])
-            _run(["docker", "run", "-d", "--name", target, "--network", network, *hardening,
-                  "--tmpfs", "/tmp:rw,nosuid,nodev,size=64m", args.tool_image])
-            command = ["docker", "run", "--name", runtime, "--network", network, *hardening,
-                       "--tmpfs", "/tmp:rw,exec,nosuid,nodev,size=1g",
-                       "--tmpfs", "/workspace:rw,nosuid,nodev,size=32m,mode=1777",
-                       "--volume", str(inputs) + ":/input:ro", "--volume", str(capture) + ":/capture:rw",
-                       "--entrypoint", "python3", args.image, "/opt/protected/invoke.py"]
-            completed = subprocess.run(command, capture_output=True, text=True, timeout=args.timeout, check=False)
-            # Do not preserve raw CLI/target stdout or stderr. Only trusted supervisor
-            # status data is retained, and it cannot inject the observation projection.
-            envelope = strict_json(completed.stdout)
-            _shape(envelope, ("profile", "run_id", "runtime_exit", "script_output", "writer_exited"))
-            _require(envelope["profile"] == PROFILE and envelope["run_id"] == run_id, "invalid_supervisor")
-            result["runtime_exit"] = envelope["runtime_exit"]
-            result["script_output"] = envelope["script_output"]
-            if args.no_observe:
-                result["observed_execution"]["issues"] = ["capture_not_requested"]
-                code = 0 if completed.returncode == 0 else 2
-            else:
-                try:
-                    raw = read_private(capture / "events.jsonl")
-                except FileNotFoundError:
-                    raw = b""
-                if _test_receive is not None:
-                    raw = _test_receive(raw, run_id, policy_id)
-                result["observed_execution"] = import_capture(raw, run_id=run_id, policy_id=policy_id,
-                    tools={"isolated_" + t["name"] for t in tools},
-                    transport_ok=completed.returncode == 0 and envelope["runtime_exit"] == 0 and envelope["writer_exited"] is True)
-                code = 0 if result["observed_execution"]["evidence_eligible"] else 4
-        except (OSError, subprocess.SubprocessError, ValueError, TypeError, KeyError):
-            result["observed_execution"] = empty_projection(run_id)
-            result["observed_execution"]["issues"] = ["protected_transport_failed"]
-            code = 2
-        finally:
-            for name in (runtime, target):
-                subprocess.run(["docker", "rm", "-f", name], capture_output=True, timeout=20, check=False)
-            subprocess.run(["docker", "network", "rm", network], capture_output=True, timeout=20, check=False)
-        output.write_text(json.dumps(result, indent=2) + "\n")
-        output.chmod(0o600)
-    return code
+def invoke(args, *, _test_receive=None, _test_prepare=None, _test_target_probe=None) -> int:
+    from .protected_launch import invoke as launch
+    return launch(args, _test_receive=_test_receive, _test_prepare=_test_prepare, _test_target_probe=_test_target_probe)
 
 
 def parser():

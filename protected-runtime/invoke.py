@@ -4,6 +4,7 @@ Only this container sees /capture. Tool code runs in another container, never as
 an in-process plugin. Raw OpenCode stdout/stderr are held in memory and discarded.
 """
 from __future__ import annotations
+import base64
 import hashlib
 import json
 import os
@@ -14,6 +15,7 @@ import subprocess
 import threading
 import time
 import urllib.request
+import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 PROFILE = "codemode-inner/direct-session/v1"
@@ -24,6 +26,11 @@ def main():
     policy_raw = Path("/input/policy.json").read_bytes()
     if hashlib.sha256(policy_raw).hexdigest() != request["policy_id"]:
         raise ValueError("policy_mismatch")
+    if hashlib.sha256(Path("/input/launch.json").read_bytes()).hexdigest() != request["launch_id"]:
+        raise ValueError("launch_mismatch")
+    version = subprocess.run(["opencode", "--version"], capture_output=True, text=True, check=True).stdout.strip()
+    if version != "opencode v2.0.18-eval.2":
+        raise ValueError("protected_runtime_version_required")
     for attempt in range(100):
         try:
             with urllib.request.urlopen(request["tool_url"] + "/health", timeout=1) as response:
@@ -36,6 +43,8 @@ def main():
     stage, script_output = 0, {"state": "omitted", "reason": "not_observed"}
     policy = json.loads(policy_raw)
     allowed = policy.get("allowed_values", [])
+    literals = [v for s in policy["secrets"] for v in
+                (s, base64.b64encode(s.encode()).decode(), s.encode().hex(), urllib.parse.quote(s, safe=""))]
 
     class Provider(BaseHTTPRequestHandler):
         def log_message(self, *args):
@@ -57,7 +66,7 @@ def main():
                 messages = [m for m in body.get("messages", []) if m.get("role") == "tool"]
                 if messages:
                     value = messages[-1].get("content")
-                    if isinstance(value, str) and value in allowed and not any(s in value for s in policy.get("secrets", [])):
+                    if isinstance(value, str) and value in allowed and not any(s in value for s in literals):
                         script_output = {"state": "available", "value": value}
                 delta, finish = {"role": "assistant", "content": "capture-complete"}, "stop"
             stage += 1
@@ -100,7 +109,7 @@ def main():
            "XDG_CONFIG_HOME": str(home / "config"), "XDG_DATA_HOME": str(home / "data"),
            "XDG_STATE_HOME": str(home / "state"), "XDG_CACHE_HOME": str(home / "cache"),
            "XDG_RUNTIME_DIR": str(home / "run"), "OPENCODE_DISABLE_AUTOUPDATE": "1",
-           "OPENCODE_EVAL_OBSERVATIONS": "1" if request["observe"] else "0", "OPENCODE_DB": "opencode.db"}
+           "OPENCODE_EVAL_OBSERVATIONS": "1" if request["observe"] else "0", "OPENCODE_EVAL_PROTECTED_CHANNEL": "1", "OPENCODE_DB": "opencode.db"}
     runtime_exit, exited = 124, False
     proc = subprocess.Popen(["opencode", "run", "--standalone", "--format", "json", "--auto",
                              "--title", "protected capture", "--model", "capture/mock", "Run the prescribed capture program."],

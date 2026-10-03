@@ -6,6 +6,7 @@ on:
     paths:
       - protected-runtime/**
       - runner/protected.py
+      - runner/protected_launch.py
       - bin/opencode-eval-runner
       - tests/integration/protected_tools.py
       - tests/integration/test_protected_connection.py
@@ -15,6 +16,10 @@ on:
 permissions:
   contents: read
   packages: write
+
+defaults:
+  run:
+    shell: bash
 
 jobs:
   connection:
@@ -32,7 +37,7 @@ jobs:
           python3 -m unittest discover -s tests -p 'test_*.py' 2>&1 | tee protected-results/unit-tests.txt
           python3 -m py_compile protected-runtime/invoke.py tests/integration/test_protected_connection.py
           git rev-parse HEAD > protected-results/checkout.txt
-          sha256sum runner/protected.py protected-runtime/*.py protected-runtime/*.ts protected-runtime/Containerfile tests/integration/protected_tools.py tests/integration/test_protected_connection.py > protected-results/sources.sha256
+          sha256sum runner/protected.py runner/protected_launch.py protected-runtime/*.py protected-runtime/*.ts protected-runtime/Containerfile tests/integration/protected_tools.py tests/integration/test_protected_connection.py > protected-results/sources.sha256
       - name: Build and publish separate runtime and untrusted-tool images
         id: images
         env:

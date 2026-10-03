@@ -8,6 +8,7 @@ from runner.protected import import_capture, PROFILE, SCHEMA, RUNTIME_SCHEMA
 
 RUN = "a" * 64
 POLICY = "b" * 64
+LAUNCH = "d" * 64
 ACTOR = {"agent": "build", "session_id": "s", "message_id": "m"}
 PARENT = {"invocation_id": "p", "session_id": "s", "message_id": "m", "call_id": "c"}
 
@@ -22,7 +23,7 @@ def stream(events=None):
         {"kind": "parent_end", "admitted": 1, "dispatched": 1, "terminals": 1, "missing_terminals": 0,
          "unsupported_dispatches": 0, "unavailable_fields": 0, "scope": "one-codemode-engine-invocation", "evidence_eligible": False},
     ]
-    frames = [{"kind": "capture_start", "schema": SCHEMA, "profile": PROFILE, "run_id": RUN, "seq": 0, "policy_id": POLICY}]
+    frames = [{"kind": "capture_start", "schema": SCHEMA, "profile": PROFILE, "run_id": RUN, "seq": 0, "policy_id": POLICY, "launch_id": LAUNCH}]
     for n, event in enumerate(events, 1):
         frames.append({"kind": "observation", "run_id": RUN, "seq": n, "observation": {
             "schema": RUNTIME_SCHEMA, "sequence": n, "parent": PARENT, "actor": ACTOR, "observer_failures": 0, **event}})
@@ -33,7 +34,7 @@ def stream(events=None):
 
 
 def load(raw, **kwargs):
-    return import_capture(raw, run_id=RUN, policy_id=POLICY, tools={"isolated_echo"}, transport_ok=kwargs.get("transport_ok", True))
+    return import_capture(raw, run_id=RUN, policy_id=POLICY, launch_id=LAUNCH, tools={"isolated_echo"}, transport_ok=kwargs.get("transport_ok", True))
 
 
 class ProtectedParserTests(unittest.TestCase):
@@ -46,6 +47,12 @@ class ProtectedParserTests(unittest.TestCase):
         self.assertEqual(call["parent"], PARENT)
         self.assertEqual(call["runtime_call_id"], "c")
         self.assertEqual(call["result"]["value"], "actual")
+
+    def test_wrong_launch_binding_rejected(self):
+        value = import_capture(stream(), run_id=RUN, policy_id=POLICY, launch_id="e" * 64,
+                               tools={"isolated_echo"}, transport_ok=True)
+        self.assertFalse(value["evidence_eligible"])
+        self.assertEqual(value["issues"], ["wrong_launch"])
 
     def test_changes_and_replay_cannot_pass(self):
         for raw in (stream().replace(b"actual", b"FORGED"), stream().replace(RUN.encode(), ("c" * 64).encode()),
@@ -96,3 +103,23 @@ class ProtectedParserTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+class ProtectedLaunchTests(unittest.TestCase):
+    def test_bounded_snapshot_is_independent_of_later_input_change(self):
+        import tempfile
+        from pathlib import Path
+        from runner.protected_launch import bounded_file
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "program"
+            path.write_bytes(b"original")
+            snapshot = bounded_file(path, 8)
+            path.write_bytes(b"changed source")
+            self.assertEqual(snapshot, b"original")
+            with self.assertRaisesRegex(ValueError, "input_limit"):
+                bounded_file(path, 8)
+
+    def test_new_wire_and_projection_are_explicit_not_v1_aliases(self):
+        result = load(stream())
+        self.assertEqual(SCHEMA, "opencode-protected-observation/v2")
+        self.assertEqual(result["version"], 3)
+        self.assertEqual(result["profile"], PROFILE)
