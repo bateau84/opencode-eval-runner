@@ -38,8 +38,8 @@ jobs:
         run: |
           mkdir -p local-runtime-results
           python3 -m py_compile runtime-patches/*.py
-          python3 runtime-patches/apply.py .runtime-source
-          git -C .runtime-source add -N packages/core/src/codemode/local-observation.ts packages/core/test/local-observation.test.ts
+          python3 runtime-patches/apply-protected.py .runtime-source
+          git -C .runtime-source add -N packages/core/src/codemode/local-observation.ts packages/core/test/local-observation.test.ts packages/core/test/protected-profile.test.ts
           git -C .runtime-source diff --binary > local-runtime-results/runtime.patch
           git rev-parse HEAD > local-runtime-results/runner-revision.txt
           sha256sum runtime-patches/*.py runtime-patches/*.ts runtime-patches/Containerfile > local-runtime-results/patch-inputs.sha256
@@ -52,13 +52,13 @@ jobs:
           mkdir -p "$root"/{home,config,data,state,cache,run}
           HOME="$root/home" XDG_CONFIG_HOME="$root/config" XDG_DATA_HOME="$root/data" \
           XDG_STATE_HOME="$root/state" XDG_CACHE_HOME="$root/cache" XDG_RUNTIME_DIR="$root/run" \
-          OPENCODE_DISABLE_AUTOUPDATE=1 bun test --cwd .runtime-source/packages/core --timeout 20000 test/local-observation.test.ts \
+          OPENCODE_DISABLE_AUTOUPDATE=1 bun test --cwd .runtime-source/packages/core --timeout 20000 test/local-observation.test.ts test/protected-profile.test.ts \
             2>&1 | tee local-runtime-results/source-tests.txt
           rm -rf "$root"
       - name: Build the existing CLI with the local patch
         working-directory: .runtime-source
         env:
-          OPENCODE_VERSION: 2.0.18-eval.1
+          OPENCODE_VERSION: 2.0.18-eval.2
           OPENCODE_CHANNEL: latest
         run: |
           bun run packages/cli/script/build.ts --skip-install --target=opencode-linux-x64 \
