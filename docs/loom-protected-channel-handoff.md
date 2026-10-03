@@ -10,7 +10,7 @@ or synthetic inner-result extractor is introduced.
 The working profile is **`codemode-inner/direct-session/v1`**, exposed by the
 runner's **`observe`** command. It is a provider-free, direct-session profile for
 Code Mode programs calling isolated remote tools. The current result projection
-is **`observed_execution.version = 4`**, with
+is **`observed_execution.version = 5`**, with
 `collection_profile = "private-supervisor-receipt/v1"`.
 
 This is not a drop-in protected replacement for Loom's normal `invoke` path.
@@ -137,7 +137,7 @@ bin/opencode-eval-runner observe \
   --output results.json
 ```
 
-The consumer must explicitly support projection version 4 and this profile. Require
+The consumer must explicitly support projection version 5 and this profile. Require
 matching expected run ID, launch ID, image/input/policy hashes, complete coverage,
 no issues and eligible matching records before checking an outcome. Distinguish
 `returned` from domain success. Interpret JSON-looking result strings only through
@@ -174,3 +174,19 @@ policy must name those identities; target JSON does not choose trusted signers.
 Keep signing/OIDC authority outside both evaluated code and arbitrary artifact
 submission. Signed eval input files must be verified before executing the same
 snapshot. These steps complement, not replace, the protected collection path.
+
+
+### Importer review clarifications
+
+Consumers must not treat diagnostic prefix counts as evidence: require complete,
+eligible capture and validated accounting. `coverage.accounting_complete` is false
+on invalid/unfinished accounting; `missing_terminals` may be null when unknown.
+The host now rejects inherited image volumes before launch and enforces its 16 KiB
+sanitized-value limit. These fixes do not add native or delegated-session support,
+turn the restricted receipt profile into full Loom proof, or supply signing.
+
+
+Projection version 5 makes the accounting change explicit; consumers written for
+version 4 must not silently accept it. The runtime-event and wire schema versions
+and the receipt collection profile are unchanged. Historical v4 artifacts retain
+their original version and meaning; a new host checkout does not rewrite them.

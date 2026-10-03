@@ -4,7 +4,7 @@
 
 `observe` connects the existing patched OpenCode final inner-call observations to
 the host importer. Profile: **`codemode-inner/direct-session/v1`**. The projection
-is **`observed_execution.version = 4`**, with collection profile
+is **`observed_execution.version = 5`**, with collection profile
 **`private-supervisor-receipt/v1`**. Runtime events remain
 `opencode-local-observation/v1`; wire frames use
 `opencode-protected-observation/v2`.
@@ -87,7 +87,7 @@ No raw CLI stdout/stderr or tool logs become evidence artifacts. The separate
 
 ## Admission and verification
 
-Consumers must explicitly accept version 4 and this profile, match the trusted
+Consumers must explicitly accept version 5 and this profile, match the trusted
 launch record, require complete eligible capture/records, and inspect actual tool
 outcomes. A returned denial is not domain success; a JSON-looking string remains
 a string. Any unsupported scope, missing terminal, failed receipt, omitted field,
@@ -103,3 +103,35 @@ stored separately. Source/runtime tests, fixture integration, independent review
 and actual Loom composition remain distinct requirements.
 
 [Complete Loom integration instructions and remaining scope](loom-protected-channel-handoff.md).
+
+
+## Review hardening
+
+Capture accounting is separate from evidence eligibility. `coverage.starts` and
+`coverage.terminals` retain counts from the validated prefix on a later semantic
+failure; `missing_terminals` is unknown (`null`) until that accounting starts.
+`accounting_complete` stays false unless all source accounting is validated.
+Unknown omissions remain null, and invalid captures still admit no records.
+These counters are diagnostic, never a way to promote a valid-looking prefix.
+Parent and child invocation IDs share one capture-wide uniqueness requirement.
+The host enforces the 16 KiB sanitized-value bound using compact UTF-8 JSON.
+
+Image-declared volumes are rejected before any container is launched. Tools that
+need temporary state must use the profile's existing disposable writable space,
+not an inherited image `VOLUME`. Cleanup removes anonymous volumes associated
+with this launch's containers; it does not prune unrelated host volumes. Fixed
+launcher-policy failures retain their non-sensitive reason codes.
+
+The experimental image workflows separate read-only build/test jobs from fresh
+publication jobs that have no checkout and never execute their image artifacts.
+A further read-only job tests the published digests. Publication is not code
+approval, a Cosign signature, or a change to default image pins. Repository owners
+and authorized workflow editors remain trusted; this boundary prevents tested
+code/process residue from sharing publication credentials, not malicious edits to
+the publisher workflow itself.
+
+
+Projection version 5 makes the accounting change explicit; consumers written for
+version 4 must not silently accept it. The runtime-event and wire schema versions
+and the receipt collection profile are unchanged. Historical v4 artifacts retain
+their original version and meaning; a new host checkout does not rewrite them.

@@ -30,6 +30,11 @@ class CaptureIdentityTests(unittest.TestCase):
 
 
 class CaptureAccountingTests(unittest.TestCase):
+    def test_changed_accounting_contract_has_a_new_projection_version(self):
+        result = load(stream())
+        self.assertEqual(result["version"], 5)
+        self.assertTrue(result["coverage"]["accounting_complete"])
+
     def test_missing_terminal_retains_diagnostic_prefix_counts(self):
         records = events()
         del records[2]

@@ -100,7 +100,7 @@ def main():
         checks["legitimate_connection_eligible"] = code == 0 and projection["evidence_eligible"] is True
         checks["separate_receipt_binds_capture"] = good.get("collection_receipt") == {
             "sha256": hashlib.sha256(originals["good"]).hexdigest(), "bytes": len(originals["good"])}
-        checks["receipt_profile_explicit"] = projection.get("version") == 4 and projection.get("launch_id") == good["launch_id"]
+        checks["receipt_profile_explicit"] = projection.get("version") == 5 and projection.get("launch_id") == good["launch_id"] and projection["coverage"].get("accounting_complete") is True
         echo = [r for r in records if r["tool"] == "isolated_echo"]
         checks["distinct_correlated_reverse_completion"] = (len(echo) == 2 and echo[0]["invocation_id"] != echo[1]["invocation_id"]
             and echo[0]["input"]["value"] == echo[1]["input"]["value"] == {"tag": "identical"}

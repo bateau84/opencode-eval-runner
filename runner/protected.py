@@ -25,6 +25,7 @@ SCHEMA = "opencode-protected-observation/v2"
 RUNTIME_SCHEMA = "opencode-local-observation/v1"
 MAX_BYTES = 8 * 1024 * 1024
 MAX_EVENTS = 10000
+MAX_FIELD_BYTES = 16 * 1024
 TOKEN = re.compile(r"[A-Za-z0-9_.:/@-]{1,256}\Z")
 IMAGE = re.compile(r"[A-Za-z0-9._:/-]+@sha256:[0-9a-f]{64}\Z")
 
@@ -75,7 +76,7 @@ def _field(value):
     if state in ("available", "redacted"):
         _shape(value, ("state", "value", "redaction"))
         _require(value["redaction"] == "safe", "unsafe_field")
-        _require(len(json.dumps(value["value"], ensure_ascii=False).encode()) <= 32768, "field_limit")
+        _require(len(json.dumps(value["value"], ensure_ascii=False, separators=(",", ":")).encode("utf-8")) <= MAX_FIELD_BYTES, "field_limit")
         return {"state": state, "value": value["value"]}
     _shape(value, ("state", "reason"))
     _require(value["reason"] in ("policy_omission", "field_limit", "unsupported_snapshot"), "invalid_reason")
@@ -84,7 +85,7 @@ def _field(value):
 
 def empty_projection(run_id: str) -> dict:
     return {
-        "kind": "execution-observer-projection", "version": 4,
+        "kind": "execution-observer-projection", "version": 5,
         "profile": PROFILE, "run_id": run_id, "status": "unavailable",
         "evidence_eligible": False, "full_handoff_eligible": False,
         "records": [], "parents": [], "issues": [],
@@ -115,7 +116,8 @@ def import_capture(raw: bytes, *, run_id: str, policy_id: str, launch_id: str, r
                  and receipt["sha256"] == hashlib.sha256(raw).hexdigest(), "receipt_mismatch")
         _require(bool(raw) and raw.endswith(b"\n"), "missing_or_partial_capture")
         lines = raw.splitlines(keepends=True)
-        _require(2 <= len(lines) <= MAX_EVENTS + 2, "frame_count")
+        _require(len(lines) <= MAX_EVENTS + 2, "frame_limit")
+        _require(len(lines) >= 2, "frame_count")
         _require(all(len(line) <= 256 * 1024 for line in lines), "frame_limit")
         frames = [strict_json(line) for line in lines]
         for seq, frame in enumerate(frames):
@@ -232,7 +234,7 @@ def import_capture(raw: bytes, *, run_id: str, policy_id: str, launch_id: str, r
         result["issues"] = [str(exc) if isinstance(exc, CaptureError) else "malformed_capture"]
         result["records"], result["parents"] = [], []
         result["evidence_eligible"] = False
-        if isinstance(exc, CaptureError) and str(exc) in {"capture_limit", "frame_count", "frame_limit", "field_limit"}:
+        if isinstance(exc, CaptureError) and str(exc) in {"capture_limit", "frame_limit", "field_limit"}:
             result["coverage"]["truncated"] = True
     if accounting_started:
         # Verified-prefix counts are diagnostic only. An invalid suffix can hide

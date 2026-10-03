@@ -138,7 +138,7 @@ class ProtectedLaunchTests(unittest.TestCase):
     def test_new_wire_and_projection_are_explicit_not_v1_aliases(self):
         result = load(stream())
         self.assertEqual(SCHEMA, "opencode-protected-observation/v2")
-        self.assertEqual(result["version"], 4)
+        self.assertEqual(result["version"], 5)
         self.assertEqual(result["profile"], PROFILE)
 
 
