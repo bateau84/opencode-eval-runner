@@ -149,9 +149,13 @@ def run(image: str, output: Path) -> int:
             for name in ("home", "config", "data", "state", "cache"):
                 (empty / name).mkdir(parents=True, exist_ok=True)
             env = dict(os.environ)
-            for secret_name in ("OPENAI_API_KEY", "ANTHROPIC_API_KEY", "OPENROUTER_API_KEY",
-                                "COPILOT_GITHUB_TOKEN", "GH_TOKEN", "GITHUB_TOKEN"):
-                env.pop(secret_name, None)
+            direct_auth = {
+                "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "OPENROUTER_API_KEY",
+                "OPENCODE_API_KEY", "COPILOT_GITHUB_TOKEN", "GH_TOKEN", "GITHUB_TOKEN",
+            }
+            for name in list(env):
+                if name in direct_auth or name.startswith("OPENCODE_EVAL_RUNNER_"):
+                    env.pop(name, None)
             env.update({
                 "HOME": str(empty / "home"),
                 "XDG_CONFIG_HOME": str(empty / "config"),
@@ -237,10 +241,10 @@ def run(image: str, output: Path) -> int:
                 "shared_sequence_orders_boundaries": len(outer) == 1 and len(inner_starts) == len(inner_ends) == 1
                     and outer[0].get("sequence", 0) < inner_starts[0].get("sequence", 0)
                     < inner_ends[0].get("sequence", 0) < native_ends[outer[0].get("invocation_id")].get("sequence", 0),
-                "no_real_provider_credentials": not any(env.get(key) for key in (
-                    "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "OPENROUTER_API_KEY",
-                    "COPILOT_GITHUB_TOKEN", "GH_TOKEN", "GITHUB_TOKEN",
-                )),
+                "no_real_provider_credentials": not any(env.get(key) for key in direct_auth),
+                "no_runner_seed_overrides": not any(
+                    key.startswith("OPENCODE_EVAL_RUNNER_") for key in env
+                ),
             }
             summary = {
                 "kind": "eval-live-invoke-compatibility",

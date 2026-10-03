@@ -10,16 +10,32 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def workflow_jobs(name):
-    text = (ROOT / ".github/workflows" / name).read_text()
+JOB_ID = r"[A-Za-z_][A-Za-z0-9_-]*"
+
+
+def parse_workflow_jobs(text):
     prefix, body = text.split("\njobs:\n", 1)
-    matches = list(re.finditer(r"^  ([a-z-]+):\n", body, re.MULTILINE))
+    matches = list(re.finditer(rf"^  ({JOB_ID}):\n", body, re.MULTILINE))
     jobs = {m[1]: body[m.end(): matches[i + 1].start() if i + 1 < len(matches) else len(body)]
             for i, m in enumerate(matches)}
     return prefix, jobs
 
 
+def workflow_jobs(name):
+    return parse_workflow_jobs((ROOT / ".github/workflows" / name).read_text())
+
+
 class PublicationBoundaryTests(unittest.TestCase):
+    def test_job_parser_covers_digits_and_underscores(self):
+        prefix, jobs = parse_workflow_jobs(
+            "name: fixture\non:\n  pull_request:\njobs:\n"
+            "  build:\n    runs-on: ubuntu-latest\n"
+            "  publish_2:\n    runs-on: ubuntu-latest\n"
+            "  _verify9:\n    runs-on: ubuntu-latest\n"
+        )
+        self.assertIn("pull_request", prefix)
+        self.assertEqual(set(jobs), {"build", "publish_2", "_verify9"})
+
     def test_only_fresh_publisher_has_package_write_authority(self):
         for name in ("protected-channel.yml", "local-runtime.yml"):
             with self.subTest(workflow=name):

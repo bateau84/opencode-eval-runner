@@ -214,8 +214,13 @@ def run_once(image: str, output: Path, *, denied: bool):
             for name in ("home", "config", "data", "state", "cache"):
                 (xdg / name).mkdir(parents=True, exist_ok=True)
             env = dict(os.environ)
-            for key in ("OPENAI_API_KEY","ANTHROPIC_API_KEY","OPENROUTER_API_KEY","COPILOT_GITHUB_TOKEN","GH_TOKEN","GITHUB_TOKEN"):
-                env.pop(key, None)
+            direct_auth = {
+                "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "OPENROUTER_API_KEY",
+                "OPENCODE_API_KEY", "COPILOT_GITHUB_TOKEN", "GH_TOKEN", "GITHUB_TOKEN",
+            }
+            for name in list(env):
+                if name in direct_auth or name.startswith("OPENCODE_EVAL_RUNNER_"):
+                    env.pop(name, None)
             env.update({
                 "HOME": str(xdg/"home"), "XDG_CONFIG_HOME": str(xdg/"config"),
                 "XDG_DATA_HOME": str(xdg/"data"), "XDG_STATE_HOME": str(xdg/"state"),
@@ -243,8 +248,13 @@ def run_once(image: str, output: Path, *, denied: bool):
             child_session = None
             if sub_end and sub_end.get("outcome")=="returned":
                 child_session = sub_end.get("result",{}).get("value",{}).get("metadata",{}).get("sessionID")
+            environment_clean = (
+                not any(env.get(key) for key in direct_auth)
+                and not any(key.startswith("OPENCODE_EVAL_RUNNER_") for key in env)
+            )
             if denied:
                 checks = {
+                    "no_ambient_credentials_or_runner_seeds": environment_clean,
                     "invoke_completed": proc.returncode == 0 and result.get("exit_code") == 0,
                     "subagent_attempt_observed": sub_start is not None,
                     "canonical_denial_terminal": sub_end is not None and sub_end.get("outcome")=="threw"
@@ -254,6 +264,7 @@ def run_once(image: str, output: Path, *, denied: bool):
                 }
             else:
                 checks = {
+                    "no_ambient_credentials_or_runner_seeds": environment_clean,
                     "invoke_completed": proc.returncode == 0 and result.get("exit_code") == 0 and result.get("text")=="PARENT-DONE",
                     "parent_subagent_observed": sub_start is not None and sub_end is not None,
                     "child_session_returned_by_real_subagent": isinstance(child_session,str) and bool(child_session),
