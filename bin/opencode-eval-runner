@@ -4,7 +4,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from runner.cli import main
+if len(sys.argv) > 1 and sys.argv[1] == "observe":
+    sys.argv.pop(1)
+    from runner.protected import main
+else:
+    from runner.cli import main
 
 if __name__ == "__main__":
     raise SystemExit(main())

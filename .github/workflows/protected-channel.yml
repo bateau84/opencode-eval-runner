@@ -1,0 +1,71 @@
+name: Protected runtime channel
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - protected-runtime/**
+      - runner/protected.py
+      - bin/opencode-eval-runner
+      - tests/integration/protected_tools.py
+      - tests/integration/test_protected_connection.py
+      - tests/test_protected.py
+      - .github/workflows/protected-channel.yml
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  connection:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - name: Python tests and provenance
+        run: |
+          mkdir -p protected-results
+          python3 -m unittest discover -s tests -p 'test_*.py' 2>&1 | tee protected-results/unit-tests.txt
+          python3 -m py_compile protected-runtime/invoke.py tests/integration/test_protected_connection.py
+          git rev-parse HEAD > protected-results/checkout.txt
+          sha256sum runner/protected.py protected-runtime/*.py protected-runtime/*.ts protected-runtime/Containerfile tests/integration/protected_tools.py tests/integration/test_protected_connection.py > protected-results/sources.sha256
+      - name: Build and publish separate runtime and untrusted-tool images
+        id: images
+        env:
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          printf '%s' "$REGISTRY_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          suffix="$(git rev-parse --short=12 HEAD)-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          for target in protected fixture-tools; do
+            tag="ghcr.io/bateau84/opencode-eval-runner:pr41-${target}-${suffix}"
+            docker build -f protected-runtime/Containerfile --target "$target" --build-arg RUNNER_REVISION="$(git rev-parse HEAD)" -t "$tag" .
+            docker push "$tag" | tee "protected-results/${target}-publish.txt"
+            image="$(docker image inspect "$tag" --format '{{index .RepoDigests 0}}')"
+            test "${image#*@sha256:}" != "$image"
+            printf '%s\n' "$image" > "protected-results/${target}-image.txt"
+            printf '%s=%s\n' "$target" "$image" >> "$GITHUB_OUTPUT"
+            docker pull "$image"
+            docker image inspect "$image" > "protected-results/${target}-inspect.json"
+          done
+          docker logout ghcr.io
+      - name: Real runtime to host importer, target attacks and transport faults
+        env:
+          RUNTIME_IMAGE: ${{ steps.images.outputs.protected }}
+          TOOL_IMAGE: ${{ steps.images.outputs['fixture-tools'] }}
+        run: |
+          python3 tests/integration/test_protected_connection.py --image "$RUNTIME_IMAGE" --tool-image "$TOOL_IMAGE" --output protected-results/connection
+      - name: Preserve new evidence and the tested source
+        if: always()
+        run: |
+          git archive --format=tar HEAD > protected-results/tested-source.tar
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: protected-channel-${{ github.event.pull_request.head.sha }}
+          path: protected-results/
+          retention-days: 14
+          if-no-files-found: error
