@@ -11,11 +11,29 @@ docker pull ghcr.io/bateau84/opencode-eval-runner@sha256:68ef7322c75aede0e8cc76d
 python3 tests/integration/run_capture_probe.py --output capture-probe-results
 ```
 
-Exit 1 means a diagnostic expectation failed. Exit 4 means the diagnostics ran as
-expected but usable capture remains BLOCKED. There is intentionally no success
-exit for end-to-end capture while a demonstrated producer is absent. The separate
-`Observer boundary integration` workflow preserves all results and remains red;
-the existing exporter/unit CI is a different check.
+By default, exit 1 means a diagnostic expectation failed. Exit 4 means the
+diagnostics ran as expected but this old image's capture remains BLOCKED.
+There is still no success exit for end-to-end capture from this diagnostic.
+
+CI runs the same experiment as an explicit **negative control**:
+
+```sh
+python3 tests/integration/run_capture_probe.py --expect-unsupported-baseline --output capture-probe-results
+```
+
+In this mode, exit 0 means all 12 required checks passed on the exact pinned old
+image, including missing-producer rejection, forged-record rejection and no
+eligible capture. Any missing/failed check, unexpected capture eligibility,
+wrong image, or changed acceptance claim exits 1. This does not use
+`continue-on-error` or ignore arbitrary exit codes.
+
+The summary keeps `handoff_acceptance: "BLOCKED"` and
+`independent_code_approval: false`. Its separate `ci_check` identifies the
+old-image rejection regression; it is not an evidence-admission field.
+`Observer boundary integration` preserves the raw results as before. The
+`Protected runtime channel` workflow tests positive capture through the new
+isolated profile. Full Loom handoff acceptance and independent review remain
+separate requirements. Earlier non-passing runs and artifacts are not rewritten.
 
 ## Isolation
 

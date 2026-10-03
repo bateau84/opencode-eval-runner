@@ -2,8 +2,9 @@
 """Real pinned-runtime diagnostic + PR host importer; NOT a substitute producer.
 
 Run on a disposable Docker host. No real provider, seeds, or user's state. The
-capture acceptance deliberately remains BLOCKED until Loom supplies a demonstrated
-producer. The unsigned hook/oracle logs are never fed into load_capture as proof.
+capture acceptance deliberately remains BLOCKED for this old-image baseline.
+An explicit negative-control mode can pass CI only when all baseline checks pass
+and no capture is eligible. Unsigned hook/oracle logs are never imported as proof.
 """
 from __future__ import annotations
 
@@ -182,7 +183,37 @@ def hook_observations(value):
     }
 
 
-def host(output):
+BASELINE_CHECKS = frozenset({
+    "pinned_image", "runtime_2_0_18", "scenarios_completed",
+    "identical_calls_overlap_and_finish_reversed", "tool_behavior_unchanged",
+    "missing_producer_not_evidence", "forged_sidecar_rejected",
+    "diagnostic_hooks_toggle", "shared_id_counterexample",
+    "caught_throw_has_no_after_hook", "early_after_is_not_final_return",
+    "no_capture_eligible",
+})
+
+
+def probe_exit_code(summary: dict, *, expect_unsupported_baseline: bool = False) -> int:
+    """Separate a passing rejection regression from successful evidence capture.
+
+    Only the exact old-image counterexample suite may use the zero-exit mode.
+    Missing checks, execution failures and unexpected eligible capture still fail.
+    The default remains exit 4 for correctly reproduced, blocked capture.
+    """
+    checks = summary.get("checks")
+    if (summary.get("kind") != "capture-boundary-probe"
+            or type(summary.get("version")) is not int or summary["version"] != 1
+            or summary.get("image") != IMAGE
+            or not isinstance(checks, dict) or set(checks) != BASELINE_CHECKS
+            or any(value is not True for value in checks.values())
+            or summary.get("diagnostics_passed") is not True
+            or summary.get("handoff_acceptance") != "BLOCKED"
+            or summary.get("independent_code_approval") is not False):
+        return 1
+    return 0 if expect_unsupported_baseline else 4
+
+
+def host(output: Path, *, expect_unsupported_baseline: bool = False) -> int:
     repo = Path(__file__).resolve().parents[2]
     sys.path.insert(0, str(repo))
     from runner.observer import ObserverCapture
@@ -243,18 +274,27 @@ def host(output):
                             "Nested calls share the parent id; observed input object identity is not a supported correlation contract.",
                             "An early execute.after observer sees a value that a later hook can change."],
                "scope": "Real pinned OpenCode + original container invoke_opencode + PR host ObserverCapture. Not the complete host CLI or Loom assertion consumer."}
+    code = probe_exit_code(summary, expect_unsupported_baseline=expect_unsupported_baseline)
+    summary["ci_check"] = {
+        "mode": "old-image-rejection-regression" if expect_unsupported_baseline else "capture-acceptance",
+        "passed": code == 0,
+    }
     (output / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
     print(json.dumps(summary, indent=2), flush=True)
-    # Diagnostic success must never be represented as successful handoff capture.
-    return 4 if all(checks.values()) else 1
+    # A negative-control PASS never changes BLOCKED or any record's eligibility.
+    return code
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--inside", action="store_true")
     parser.add_argument("--output", type=Path, default=Path("capture-probe-results"))
+    parser.add_argument(
+        "--expect-unsupported-baseline", action="store_true",
+        help="Test the pinned old image as a rejection regression; capture stays BLOCKED.",
+    )
     args = parser.parse_args()
     if args.inside:
         inside()
     else:
-        raise SystemExit(host(args.output))
+        raise SystemExit(host(args.output, expect_unsupported_baseline=args.expect_unsupported_baseline))
