@@ -40,6 +40,26 @@ def image_info(reference):
     return info
 
 
+def cleanup_resources(created, runtime, target, network):
+    """Remove only resources this invocation successfully created."""
+    failures = []
+    resources = (
+        ("runtime", ["docker", "rm", "--volumes", "-f", runtime]),
+        ("target", ["docker", "rm", "--volumes", "-f", target]),
+        ("network", ["docker", "network", "rm", network]),
+    )
+    for resource, command in resources:
+        if not created.get(resource, False):
+            continue
+        try:
+            cleanup = subprocess.run(command, capture_output=True, timeout=20, check=False)
+            if cleanup.returncode:
+                failures.append(resource)
+        except (OSError, subprocess.SubprocessError):
+            failures.append(resource)
+    return failures
+
+
 def invoke(args: argparse.Namespace, *, _test_receive=None, _test_prepare=None, _test_target_probe=None) -> int:
     for reference in (args.image, args.tool_image):
         _require(bool(IMAGE.fullmatch(reference)), "immutable_image_required")
@@ -88,6 +108,7 @@ def invoke(args: argparse.Namespace, *, _test_receive=None, _test_prepare=None, 
         hardening = ["--read-only", "--cap-drop", "ALL", "--security-opt", "no-new-privileges",
                      "--pids-limit", "128", "--memory", "1g", "--cpus", "2", "--user", "1000:1000",
                      "--log-driver", "none"]
+        created = {"network": False, "target": False, "runtime": False}
         try:
             runtime_info, target_info = image_info(args.image), image_info(args.tool_image)
             launch.update(runtime_config_digest=runtime_info["Id"], tool_config_digest=target_info["Id"])
@@ -105,8 +126,10 @@ def invoke(args: argparse.Namespace, *, _test_receive=None, _test_prepare=None, 
             if _test_prepare is not None:
                 _test_prepare(capture)
             run(["docker", "network", "create", "--internal", network])
+            created["network"] = True
             run(["docker", "run", "-d", "--name", target, "--network", network, *hardening,
                  "--tmpfs", "/tmp:rw,nosuid,nodev,size=64m", args.tool_image])
+            created["target"] = True
             # No arbitrary mounts, plugin roots, host credentials or command override.
             command = ["docker", "run", "--name", runtime, "--network", network, *hardening,
                        "--tmpfs", "/tmp:rw,exec,nosuid,nodev,size=1g",
@@ -114,8 +137,11 @@ def invoke(args: argparse.Namespace, *, _test_receive=None, _test_prepare=None, 
                        "--volume", str(inputs) + ":/input:ro", "--volume", str(capture) + ":/capture:rw",
                        "--entrypoint", "python3", args.image, "/opt/protected/invoke.py"]
             completed = subprocess.run(command, capture_output=True, text=True, timeout=args.timeout, check=False)
-            # Verify the engine's actual container identities, not claims in JSON.
+            # A named runtime container exists only if inspect succeeds. Track it
+            # before any later validation so failed/ineligible runs still clean it.
             runtime_state = strict_json(run(["docker", "inspect", runtime]).stdout)[0]
+            created["runtime"] = True
+            # Verify the engine's actual container identities, not claims in JSON.
             target_state = strict_json(run(["docker", "inspect", target]).stdout)[0]
             _require(runtime_state["Image"] == launch["runtime_config_digest"]
                      and target_state["Image"] == launch["tool_config_digest"], "launched_image_mismatch")
@@ -154,18 +180,16 @@ def invoke(args: argparse.Namespace, *, _test_receive=None, _test_prepare=None, 
             result["observed_execution"]["issues"] = ["protected_transport_failed"]
             code = 2
         finally:
-            for command in (["docker", "rm", "--volumes", "-f", runtime], ["docker", "rm", "--volumes", "-f", target], ["docker", "network", "rm", network]):
-                try:
-                    cleanup = subprocess.run(command, capture_output=True, timeout=20, check=False)
-                    if cleanup.returncode and code == 0:
-                        raise OSError("cleanup_failed")
-                except (OSError, subprocess.SubprocessError):
-                    result["observed_execution"]["evidence_eligible"] = False
-                    result["observed_execution"]["status"] = "incomplete"
+            cleanup_failures = cleanup_resources(created, runtime, target, network)
+            if cleanup_failures:
+                result["observed_execution"]["evidence_eligible"] = False
+                result["observed_execution"]["status"] = "incomplete"
+                if "cleanup_failed" not in result["observed_execution"]["issues"]:
                     result["observed_execution"]["issues"].append("cleanup_failed")
-                    for record in result["observed_execution"]["records"]:
-                        record["evidence_eligible"] = False
-                    code = 2
+                result["cleanup_failures"] = cleanup_failures
+                for record in result["observed_execution"]["records"]:
+                    record["evidence_eligible"] = False
+                code = 2
         # Atomically replace a host artifact without following an existing symlink.
         fd, staged = tempfile.mkstemp(prefix=".capture-", dir=output.parent)
         try:

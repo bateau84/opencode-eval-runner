@@ -36,6 +36,11 @@ class PublicationBoundaryTests(unittest.TestCase):
         self.assertIn("pull_request", prefix)
         self.assertEqual(set(jobs), {"build", "publish_2", "_verify9"})
 
+    def test_normal_invoke_workflow_tracks_public_runner_implementation(self):
+        text = (ROOT / ".github/workflows/local-runtime.yml").read_text()
+        for path in ("runtime-patches/**", "runner/cli.py", "container/**", "bin/opencode-eval-runner"):
+            self.assertIn("- " + path, text)
+
     def test_only_fresh_publisher_has_package_write_authority(self):
         for name in ("protected-channel.yml", "local-runtime.yml"):
             with self.subTest(workflow=name):

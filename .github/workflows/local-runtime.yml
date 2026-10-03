@@ -5,6 +5,9 @@ on:
     types: [opened, synchronize, reopened]
     paths:
       - runtime-patches/**
+      - runner/cli.py
+      - container/**
+      - bin/opencode-eval-runner
       - tests/test_workflow_boundaries.py
       - .github/workflows/local-runtime.yml
 
