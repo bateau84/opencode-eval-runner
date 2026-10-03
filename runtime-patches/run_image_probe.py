@@ -96,7 +96,8 @@ def run(image: str, output: Path):
         "all_scripts_completed": all(probe.scenario_completed(r) for r in reports.values()),
         "product_outcomes_unchanged": bool(reports["off"].get("oracle")) and all(
             probe.oracle_signature(r) == probe.oracle_signature(reports["off"]) for r in reports.values()),
-        "normal_image_observation_enabled": bool(observations("off")) and bool(native_observations("off")),
+        "native_observation_image_owned": bool(native_observations("off")) and bool(native_observations("on")),
+        "inner_observation_test_toggle": not observations("off") and bool(observations("on")),
         "observer_failure_does_not_change_results": probe.scenario_completed(reports["observer-fails"]),
         "normal_invoke_runtime_version": all(
             "2.0.18-eval.3" in str(r.get("opencode_version") or "") for r in reports.values()
