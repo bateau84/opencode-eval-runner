@@ -29,14 +29,14 @@ jobs:
     permissions:
       contents: read
     outputs:
-      source_commit: \${{ steps.source.outputs.sha }}
+      source_commit: ${{ steps.source.outputs.sha }}
     steps:
       - name: Validate reviewed source selection
         id: source
         env:
-          GH_TOKEN: \${{ secrets.GITHUB_TOKEN }}
-          SOURCE_COMMIT: \${{ inputs.source_commit }}
-          PR_NUMBER: \${{ inputs.pull_request }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SOURCE_COMMIT: ${{ inputs.source_commit }}
+          PR_NUMBER: ${{ inputs.pull_request }}
         run: |
           set -euo pipefail
           [[ "$SOURCE_COMMIT" =~ ^[0-9a-f]{40}$ ]]
@@ -46,7 +46,7 @@ jobs:
 
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          ref: \${{ steps.source.outputs.sha }}
+          ref: ${{ steps.source.outputs.sha }}
           persist-credentials: false
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -78,7 +78,7 @@ jobs:
           cp .runtime-source/packages/cli/dist/cli-linux-x64/bin/opencode approved-results/opencode
           sha256sum approved-results/opencode > approved-results/binary.sha256
           docker build -f runtime-patches/Containerfile \
-            --build-arg RUNNER_REVISION="\${{ steps.source.outputs.sha }}" \
+            --build-arg RUNNER_REVISION="${{ steps.source.outputs.sha }}" \
             -t approved-normal-invoke:build approved-results
           docker save -o approved-image.tar approved-normal-invoke:build
           git rev-parse HEAD > approved-results/source-commit.txt
@@ -86,7 +86,7 @@ jobs:
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: approved-build-\${{ steps.source.outputs.sha }}-\${{ github.run_id }}
+          name: approved-build-${{ steps.source.outputs.sha }}-${{ github.run_id }}
           path: |
             approved-image.tar
             approved-results/**
@@ -103,23 +103,23 @@ jobs:
       contents: read
       packages: write
     outputs:
-      image: \${{ steps.publish.outputs.image }}
+      image: ${{ steps.publish.outputs.image }}
     steps:
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
-          name: approved-build-\${{ needs.build.outputs.source_commit }}-\${{ github.run_id }}
+          name: approved-build-${{ needs.build.outputs.source_commit }}-${{ github.run_id }}
           path: approved
       - name: Publish reviewed image bytes without executing them
         id: publish
         env:
-          REGISTRY_TOKEN: \${{ secrets.GITHUB_TOKEN }}
-          SOURCE_COMMIT: \${{ needs.build.outputs.source_commit }}
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SOURCE_COMMIT: ${{ needs.build.outputs.source_commit }}
         run: |
           set -euo pipefail
           docker load --input approved/approved-image.tar
           printf '%s' "$REGISTRY_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
           trap 'docker logout ghcr.io' EXIT
-          tag="ghcr.io/bateau84/opencode-eval-runner:approved-\${SOURCE_COMMIT:0:12}-\${GITHUB_RUN_ID}"
+          tag="ghcr.io/bateau84/opencode-eval-runner:approved-${SOURCE_COMMIT:0:12}-${GITHUB_RUN_ID}"
           docker tag approved-normal-invoke:build "$tag"
           docker push "$tag"
           image="$(docker image inspect "$tag" --format '{{index .RepoDigests 0}}')"
@@ -130,7 +130,7 @@ jobs:
           docker image inspect "$image" > publication/image-inspect.json
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: approved-publication-\${{ needs.build.outputs.source_commit }}-\${{ github.run_id }}
+          name: approved-publication-${{ needs.build.outputs.source_commit }}-${{ github.run_id }}
           path: publication/
           if-no-files-found: error
           retention-days: 30
@@ -144,12 +144,12 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          ref: \${{ needs.build.outputs.source_commit }}
+          ref: ${{ needs.build.outputs.source_commit }}
           persist-credentials: false
       - name: Verify rebuilt image through normal invoke
         env:
-          IMAGE: \${{ needs.publish.outputs.image }}
-          SOURCE_COMMIT: \${{ needs.build.outputs.source_commit }}
+          IMAGE: ${{ needs.publish.outputs.image }}
+          SOURCE_COMMIT: ${{ needs.build.outputs.source_commit }}
         run: |
           set -euo pipefail
           docker pull "$IMAGE"
@@ -164,7 +164,7 @@ jobs:
           jq -e '.passed == true' approved-evidence/delegated-session/summary.json >/dev/null
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: approved-evidence-\${{ needs.build.outputs.source_commit }}-\${{ github.run_id }}
+          name: approved-evidence-${{ needs.build.outputs.source_commit }}-${{ github.run_id }}
           path: approved-evidence/
           if-no-files-found: error
           retention-days: 30
@@ -186,13 +186,13 @@ jobs:
       - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
-          name: approved-evidence-\${{ needs.build.outputs.source_commit }}-\${{ github.run_id }}
+          name: approved-evidence-${{ needs.build.outputs.source_commit }}-${{ github.run_id }}
           path: evidence
       - name: Finalize reviewed result without executing source code
         env:
-          SOURCE_COMMIT: \${{ needs.build.outputs.source_commit }}
-          IMAGE: \${{ needs.publish.outputs.image }}
-          PR_NUMBER: \${{ inputs.pull_request }}
+          SOURCE_COMMIT: ${{ needs.build.outputs.source_commit }}
+          IMAGE: ${{ needs.publish.outputs.image }}
+          PR_NUMBER: ${{ inputs.pull_request }}
         run: |
           set -euo pipefail
           test -z "$(find evidence -type l -print -quit)"
@@ -235,8 +235,8 @@ jobs:
           printf '%s\n' "$IMAGE" > signed/image.txt
       - name: Sign and verify reviewed image and finalized result
         env:
-          SOURCE_COMMIT: \${{ needs.build.outputs.source_commit }}
-          IMAGE: \${{ needs.publish.outputs.image }}
+          SOURCE_COMMIT: ${{ needs.build.outputs.source_commit }}
+          IMAGE: ${{ needs.publish.outputs.image }}
         run: |
           set -euo pipefail
           identity="https://github.com/$GITHUB_WORKFLOW_REF"
@@ -256,7 +256,7 @@ jobs:
           printf '%s\n' "$identity" > signed/expected-signer-identity.txt
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: signed-approved-\${{ needs.build.outputs.source_commit }}-\${{ github.run_id }}
+          name: signed-approved-${{ needs.build.outputs.source_commit }}-${{ github.run_id }}
           path: signed/
           if-no-files-found: error
           retention-days: 90

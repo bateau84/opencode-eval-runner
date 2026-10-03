@@ -127,20 +127,25 @@ def invoke(args: argparse.Namespace, *, _test_receive=None, _test_prepare=None, 
                 _test_prepare(capture)
             run(["docker", "network", "create", "--internal", network])
             created["network"] = True
-            run(["docker", "run", "-d", "--name", target, "--network", network, *hardening,
+            # Create and start are separate so cleanup ownership is established
+            # before an image entrypoint/start failure can occur.
+            run(["docker", "create", "--name", target, "--network", network, *hardening,
                  "--tmpfs", "/tmp:rw,nosuid,nodev,size=64m", args.tool_image])
             created["target"] = True
+            run(["docker", "start", target])
             # No arbitrary mounts, plugin roots, host credentials or command override.
-            command = ["docker", "run", "--name", runtime, "--network", network, *hardening,
-                       "--tmpfs", "/tmp:rw,exec,nosuid,nodev,size=1g",
-                       "--tmpfs", "/workspace:rw,nosuid,nodev,size=32m,mode=1777",
-                       "--volume", str(inputs) + ":/input:ro", "--volume", str(capture) + ":/capture:rw",
-                       "--entrypoint", "python3", args.image, "/opt/protected/invoke.py"]
-            completed = subprocess.run(command, capture_output=True, text=True, timeout=args.timeout, check=False)
-            # A named runtime container exists only if inspect succeeds. Track it
-            # before any later validation so failed/ineligible runs still clean it.
-            runtime_state = strict_json(run(["docker", "inspect", runtime]).stdout)[0]
+            create_runtime = ["docker", "create", "--name", runtime, "--network", network, *hardening,
+                              "--tmpfs", "/tmp:rw,exec,nosuid,nodev,size=1g",
+                              "--tmpfs", "/workspace:rw,nosuid,nodev,size=32m,mode=1777",
+                              "--volume", str(inputs) + ":/input:ro", "--volume", str(capture) + ":/capture:rw",
+                              "--entrypoint", "python3", args.image, "/opt/protected/invoke.py"]
+            run(create_runtime)
             created["runtime"] = True
+            completed = subprocess.run(
+                ["docker", "start", "--attach", runtime],
+                capture_output=True, text=True, timeout=args.timeout, check=False,
+            )
+            runtime_state = strict_json(run(["docker", "inspect", runtime]).stdout)[0]
             # Verify the engine's actual container identities, not claims in JSON.
             target_state = strict_json(run(["docker", "inspect", target]).stdout)[0]
             _require(runtime_state["Image"] == launch["runtime_config_digest"]

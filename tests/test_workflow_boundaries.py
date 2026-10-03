@@ -76,7 +76,7 @@ class PublicationBoundaryTests(unittest.TestCase):
         prefix, jobs = workflow_jobs("sign-normal-invoke-evidence.yml")
         self.assertIn("workflow_dispatch:", prefix)
         self.assertNotIn("workflow_run:", prefix)
-        self.assertNotRegex(prefix, r"(?m)^  pull_request:\\s*$")
+        self.assertNotRegex(prefix, r"(?m)^  pull_request:\s*$")
         self.assertNotIn("pull_request_target", text)
         self.assertEqual(set(jobs), {"build", "publish", "verify", "sign"})
 
@@ -115,6 +115,11 @@ class PublicationBoundaryTests(unittest.TestCase):
         self.assertIn("--certificate-identity", signer)
         self.assertIn("protected_capture_accepted", signer)
         self.assertIn('"unsupported"', signer)
+
+    def test_signer_expressions_are_not_escaped_literals(self):
+        text = (ROOT / ".github/workflows/sign-normal-invoke-evidence.yml").read_text()
+        self.assertNotRegex(text, r"\\\\\$\{\{")
+        self.assertNotRegex(text, r"\\\\\$\{[A-Z_]")
 
     def test_signer_never_auto_signs_pr_artifacts(self):
         text = (ROOT / ".github/workflows/sign-normal-invoke-evidence.yml").read_text()
