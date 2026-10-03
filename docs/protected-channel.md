@@ -2,6 +2,11 @@
 
 ## Supported scope
 
+**This profile is supplemental. It is not the implementation path underneath
+Loom's normal `bun run eval:live` entrypoint.** Normal-host feasibility and the
+fixed `opencode-eval-runner invoke` compatibility boundary are documented in
+[loom-host-semantics-feasibility.md](loom-host-semantics-feasibility.md).
+
 `observe` connects the existing patched OpenCode final inner-call observations to
 the host importer. Profile: **`codemode-inner/direct-session/v1`**. The projection
 is **`observed_execution.version = 5`**, with collection profile

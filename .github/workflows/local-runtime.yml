@@ -1,4 +1,4 @@
-name: Local runtime observation patch
+name: Normal-invoke runtime observation seam
 
 on:
   pull_request:
@@ -40,27 +40,27 @@ jobs:
         run: |
           mkdir -p local-runtime-results
           python3 -m py_compile runtime-patches/*.py
-          python3 runtime-patches/apply-protected.py .runtime-source
-          git -C .runtime-source add -N packages/core/src/codemode/local-observation.ts packages/core/test/local-observation.test.ts packages/core/test/protected-profile.test.ts
+          python3 runtime-patches/apply.py .runtime-source
+          git -C .runtime-source add -N packages/core/src/codemode/local-observation.ts packages/core/test/local-observation.test.ts
           git -C .runtime-source diff --binary > local-runtime-results/runtime.patch
           git rev-parse HEAD > local-runtime-results/runner-revision.txt
           sha256sum runtime-patches/*.py runtime-patches/*.ts runtime-patches/Containerfile > local-runtime-results/patch-inputs.sha256
       - name: Install pinned runtime dependencies
         working-directory: .runtime-source
         run: bun install --frozen-lockfile
-      - name: Test real Code Mode source with disposable state
+      - name: Test normal host-semantics observation source
         run: |
           root="$(mktemp -d "$RUNNER_TEMP/local-runtime-test.XXXXXX")"
           mkdir -p "$root"/{home,config,data,state,cache,run}
           HOME="$root/home" XDG_CONFIG_HOME="$root/config" XDG_DATA_HOME="$root/data" \
           XDG_STATE_HOME="$root/state" XDG_CACHE_HOME="$root/cache" XDG_RUNTIME_DIR="$root/run" \
-          OPENCODE_DISABLE_AUTOUPDATE=1 bun test --cwd .runtime-source/packages/core --timeout 20000 test/local-observation.test.ts test/protected-profile.test.ts \
+          OPENCODE_DISABLE_AUTOUPDATE=1 bun test --cwd .runtime-source/packages/core --timeout 20000 test/local-observation.test.ts \
             2>&1 | tee local-runtime-results/source-tests.txt
           rm -rf "$root"
       - name: Build the existing CLI with the local patch
         working-directory: .runtime-source
         env:
-          OPENCODE_VERSION: 2.0.18-eval.2
+          OPENCODE_VERSION: 2.0.18-eval.3
           OPENCODE_CHANNEL: latest
         run: |
           bun run packages/cli/script/build.ts --skip-install --target=opencode-linux-x64 \
@@ -157,6 +157,13 @@ jobs:
         run: |
           docker pull "$LOCAL_IMAGE"
           python3 runtime-patches/run_image_probe.py --image "$LOCAL_IMAGE" --output local-runtime-results/probe
+      - name: Preserve Loom eval:live invoke contract
+        env:
+          LOCAL_IMAGE: ${{ needs.publish.outputs.reference }}
+        run: |
+          python3 runtime-patches/run_eval_live_compat_probe.py \
+            --image "$LOCAL_IMAGE" \
+            --output local-runtime-results/eval-live-compat
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:

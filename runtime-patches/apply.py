@@ -65,16 +65,24 @@ def apply(root: Path):
          '    const decoded = yield* decodeInput(tool, input)\n    if (observedInput) yield* observedInput(decoded)')
 
     p = "packages/core/src/tool.ts"
+    edit(p, 'import { CodeModeTool } from "./codemode/tool.js"',
+         'import { CodeModeTool } from "./codemode/tool.js"\nimport { LocalObservation } from "./codemode/local-observation.js"')
     edit(p, '      context: Tool.Context,\n    ) {',
          '      context: Tool.Context,\n      observedInput?: (input: unknown) => Effect.Effect<void>,\n    ) {')
     edit(p, 'execute(tool, input, context).pipe(', 'execute(tool, input, context, observedInput).pipe(')
+    edit(p, '    ) {\n      const execution = yield* execute(tool, input, context, observedInput).pipe(',
+         '    ) {\n      const nativeObservation =\n        observedInput === undefined && process.env.OPENCODE_EVAL_HOST_OBSERVATIONS === "1"\n          ? LocalObservation.makeNative(context, name, (event) =>\n              hooks.trigger("tool", "execute.native-observed", event).pipe(Effect.asVoid),\n            )\n          : undefined\n      const execution = yield* execute(tool, input, context, observedInput ?? nativeObservation?.start).pipe(')
+    edit(p, '        yield* hooks.trigger("tool", "execute.after", afterEvent)\n        return yield* afterEvent.error',
+         '        yield* hooks.trigger("tool", "execute.after", afterEvent)\n        if (nativeObservation) {\n          yield* nativeObservation.threw({ message: afterEvent.error.message, metadata: afterEvent.error.metadata ?? null })\n          nativeObservation.close()\n        }\n        return yield* afterEvent.error')
+    edit(p, '      const afterContent = yield* normalizeImages(normalizeContent(afterEvent.result.content, afterEvent.result.output))\n      return {\n        ...(afterEvent.result.output === undefined ? {} : { output: afterEvent.result.output }),\n        content: afterContent,\n        ...(afterEvent.result.metadata === undefined ? {} : { metadata: afterEvent.result.metadata }),\n      }',
+         '      const afterContent = yield* normalizeImages(normalizeContent(afterEvent.result.content, afterEvent.result.output))\n      const result = {\n        ...(afterEvent.result.output === undefined ? {} : { output: afterEvent.result.output }),\n        content: afterContent,\n        ...(afterEvent.result.metadata === undefined ? {} : { metadata: afterEvent.result.metadata }),\n      }\n      if (nativeObservation) {\n        yield* nativeObservation.returned(result)\n        nativeObservation.close()\n      }\n      return result')
     edit(p, 'CodeModeTool.create(codeModeInventory, (name, tool, input, context) =>\n                beforeExecute(name, input, context).pipe(\n                  Effect.flatMap((event) => executeTool(tool, name, event.input, context)),\n                ),\n              )',
          'CodeModeTool.create(codeModeInventory, (name, tool, input, context, observedInput) =>\n                beforeExecute(name, input, context).pipe(\n                  Effect.flatMap((event) => executeTool(tool, name, event.input, context, observedInput)),\n                ),\n                process.env.OPENCODE_EVAL_OBSERVATIONS === "1"\n                  ? (event) => hooks.trigger("tool", "execute.observed", event).pipe(Effect.asVoid)\n                  : undefined,\n              )')
     p = "packages/plugin/src/effect/tool.ts"
     edit(p, 'export interface ToolHooks {',
-         'export interface ToolHooks {\n  /** Downstream eval-only observations; not an authenticated evidence channel. */\n  readonly "execute.observed": Readonly<Record<string, unknown>>')
+         'export interface ToolHooks {\n  /** Downstream eval-only observations; not an authenticated evidence channel. */\n  readonly "execute.observed": Readonly<Record<string, unknown>>\n  /** Native/tool-service observations for normal invoke feasibility; also unauthenticated. */\n  readonly "execute.native-observed": Readonly<Record<string, unknown>>')
     edit(p, 'export interface ToolFailures extends Record<keyof ToolHooks, unknown> {',
-         'export interface ToolFailures extends Record<keyof ToolHooks, unknown> {\n  readonly "execute.observed": never')
+         'export interface ToolFailures extends Record<keyof ToolHooks, unknown> {\n  readonly "execute.observed": never\n  readonly "execute.native-observed": never')
 
     p = "packages/core/src/codemode/tool.ts"
     edit(p, 'import { CodeModeWeb } from "./web.js"',

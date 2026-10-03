@@ -1,5 +1,13 @@
 # Loom handoff: isolated capture profile
 
+> **Superseding compatibility boundary:** Loom's external entrypoint remains
+> `bun run eval:live ...`, with existing case behavior and
+> `scripts/run-evals.py -> opencode-eval-runner invoke` unchanged. Runner/runtime
+> work belongs underneath that contract. The `observe` command and remote-tool
+> profile below are supplemental restricted-smoke machinery, **not** the migration
+> path for normal Loom agent/session evals. See
+> [host-semantics feasibility](loom-host-semantics-feasibility.md).
+
 ## Scope of this change
 
 The runner owns the isolated launch, private transport, collector adapter, import
@@ -51,6 +59,11 @@ launcher. The final JSON is a host artifact, not a portable signed attestation.
 
 ## Required Loom work
 
+The next normal-host step is **not** to move Loom behind the remote tool service.
+First preserve the existing eval entrypoint and wait for a runner/runtime path
+whose protection does not replace the in-process host semantics. Loom may use the
+restricted profile below only as a supplemental smoke.
+
 ### 1. Preserve and pin the actual producer and smoke
 
 Commit or otherwise supply the exact bytes of Loom's existing
@@ -64,9 +77,10 @@ Keep that original smoke and its past artifacts intact. Add a separate integrati
 variant for this profile; do not relabel a runner fixture run as the original
 Loom smoke, backfill old results, or reconstruct missing records from script output.
 
-### 2. Move evaluated code out of collector authority
+### 2. Supplemental restricted-profile pilot only: move evaluated code out of collector authority
 
-For a fixture/tool-level pilot, package the actual evaluated tool implementations
+This section does **not** define the normal `eval:live` migration. For a
+fixture/tool-level supplemental pilot only, package the actual evaluated tool implementations
 as an isolated tool-server image. It must serve `GET /health` and `POST /call` on
 port 8080. The request is:
 

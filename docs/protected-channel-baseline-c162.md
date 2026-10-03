@@ -35,3 +35,18 @@ trusted host. Pin actual adapter/producer/consumer bytes and preserve
 `scripts/test_eval_observer_image.py` and its original fixtures. See the current
 [handoff](loom-protected-channel-handoff.md) for version-4 admission and actual
 Loom execution-isolation work.
+
+
+## Contract erratum and current compatibility direction
+
+The tested `c1629415...` implementation used runtime events
+`opencode-local-observation/v1`, wire `opencode-protected-observation/v2`, and
+projection version **3**. Earlier prose describing that implementation as wire
+v1 / projection v2 was stale. This erratum does not rewrite its historical
+artifact.
+
+The normal Loom migration target is now explicitly the existing
+`bun run eval:live -> scripts/run-evals.py -> opencode-eval-runner invoke` path.
+The restricted `observe` profile remains supplemental and must not replace
+normal Loom host/session semantics. See
+[host-semantics feasibility](loom-host-semantics-feasibility.md).

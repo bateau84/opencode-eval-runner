@@ -67,6 +67,66 @@ test("real core and interpreter: identical overlap, final conversion, caught err
   expect(events.at(-1)).toMatchObject({ kind: "parent_end", missing_terminals: 0, unsupported_dispatches: 0, evidence_eligible: false })
 })
 
+test("native outer observation binds the actual Code Mode parent without changing context", async () => {
+  const nativeEvents: any[] = []
+  const innerEvents: any[] = []
+  const native = LocalObservation.makeNative(context, "execute", (event) => Effect.sync(() => nativeEvents.push(event)))
+  await Effect.runPromise(native.start({ code: "return await tools.fixture.echo({})" }))
+
+  const inventory = { tools: new Map([["fixture_echo", registration("echo")]]) }
+  const execute = (_name: unknown, _tool: unknown, input: unknown, actual: unknown, observed?: (value: unknown) => Effect.Effect<void>) =>
+    Effect.gen(function* () {
+      expect(actual).toBe(context)
+      if (observed) yield* observed(input)
+      return { content: "INNER-FINAL" }
+    })
+  const tool = CodeModeTool.create(inventory as any, execute as any, (event) => Effect.sync(() => innerEvents.push(event)))
+  const result = await Effect.runPromise(tool.execute({ code: "return await tools.fixture.echo({});" }, context))
+  await Effect.runPromise(native.returned(result))
+  native.close()
+
+  const nativeStart = nativeEvents.find((event) => event.kind === "call_start")
+  const nativeEnd = nativeEvents.find((event) => event.kind === "call_end")
+  const innerStart = innerEvents.find((event) => event.kind === "call_start")
+  expect(nativeStart).toMatchObject({
+    schema: "opencode-native-observation/v1",
+    invocation_id: native.invocationID,
+    call_id: "shared-parent",
+    tool: "execute",
+    mode: "native",
+    parent: null,
+    actor: { agent: "actual-agent", session_id: "actual-session", message_id: "actual-message" },
+  })
+  expect(nativeEnd.invocation_id).toBe(native.invocationID)
+  expect(innerStart.parent.invocation_id).toBe(native.invocationID)
+  expect(innerStart.parent.call_id).toBe("shared-parent")
+  expect(nativeStart.sequence).toBeLessThan(innerStart.sequence)
+  expect(context).not.toHaveProperty("evaluationInvocationID")
+})
+
+test("native observation keeps delegated actor identity as supplied by the real tool context", async () => {
+  const child = {
+    sessionID: "child-session", messageID: "child-message", id: "child-call", agent: "reviewer",
+    progress: () => Effect.void,
+  } as any
+  const events: any[] = []
+  const observation = LocalObservation.makeNative(child, "read", (event) => Effect.sync(() => events.push(event)))
+  await Effect.runPromise(observation.start({ file: "README.md" }))
+  await Effect.runPromise(observation.returned({ output: "ok", content: [] }))
+  observation.close()
+  expect(events[0].actor).toEqual({ agent: "reviewer", session_id: "child-session", message_id: "child-message" })
+  expect(events[0]).toMatchObject({ call_id: "child-call", mode: "native", parent: null })
+  expect(events[1].invocation_id).toBe(events[0].invocation_id)
+})
+
+test("native decode failures do not fabricate terminal-only observations", async () => {
+  const events: any[] = []
+  const observation = LocalObservation.makeNative(context, "read", (event) => Effect.sync(() => events.push(event)))
+  await Effect.runPromise(observation.threw({ message: "decode failed" }))
+  observation.close()
+  expect(events).toEqual([])
+})
+
 test("runtime-carried invocation IDs reach actual executable and terminal", async () => {
   const executing: string[] = [], after: string[] = []
   const tools = { one: Tool.make({ description: "one", input: Schema.Struct({}), output: Schema.Null,
@@ -86,6 +146,11 @@ test("observer failure does not replace actual return", async () => {
     const result = await Effect.runPromise(tool.execute({ code: 'return await tools.fixture.echo({});' }, context))
     expect(result.output.output).toBe("UNCHANGED")
   }
+
+  const native = LocalObservation.makeNative(context, "read", () => Effect.die("native-observer-failure"))
+  await Effect.runPromise(native.start({ path: "x" }))
+  await Effect.runPromise(native.returned({ output: "UNCHANGED", content: [] }))
+  native.close()
 })
 
 test("snapshots are owned, immutable, and do not call getters/toJSON", () => {

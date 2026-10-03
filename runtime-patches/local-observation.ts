@@ -4,12 +4,16 @@ import { CodeMode } from "@opencode/codemode"
 import type { Context } from "@opencode/schema/tool"
 import { Effect } from "effect"
 
-// This is a runtime event seam, not a collector, signer, or evidence verifier.
-// Nothing is persisted here. Loom must redact before recording these snapshots.
+// Runtime observation seam only. Nothing here authenticates a collector.
+// Sequence is process-wide so native and Code Mode records can be merged
+// without inferring ordering from timestamps or array position.
 let sequence = 0
+const nativeExecuteParents = new WeakMap<object, string>()
 
 type Event = Readonly<Record<string, unknown>>
 type Field = { readonly state: "available"; readonly value: unknown } | { readonly state: "omitted"; readonly reason: string }
+
+const nextSequence = () => ++sequence
 
 export function snapshot(value: unknown): Field {
   const seen = new Set<object>()
@@ -43,9 +47,78 @@ export function snapshot(value: unknown): Field {
   }
 }
 
+export function makeNative(context: Context, tool: string, emit: (event: Event) => Effect.Effect<void>) {
+  const invocationID = crypto.randomUUID()
+  const actor = Object.freeze({ agent: context.agent, session_id: context.sessionID, message_id: context.messageID })
+  let lost = 0
+  let unavailable = 0
+  let started = false
+  const send = (body: Event) => Effect.suspend(() => {
+    const event = Object.freeze({
+      schema: "opencode-native-observation/v1",
+      sequence: nextSequence(),
+      actor,
+      observer_failures: lost,
+      ...body,
+    })
+    return Effect.suspend(() => emit(event)).pipe(
+      Effect.catchCause(() => Effect.sync(() => { lost++ })),
+    )
+  })
+  const field = (value: unknown) => {
+    const result = snapshot(value)
+    if (result.state !== "available") unavailable++
+    return result
+  }
+  // The same Tool.Context object is passed into the internal Code Mode tool.
+  // Keep the native execute invocation only as an internal parent binding; do
+  // not add observation metadata to the public tool input or plugin context.
+  if (tool === "execute") nativeExecuteParents.set(context as object, invocationID)
+  return {
+    invocationID,
+    start: (input: unknown) => Effect.suspend(() => {
+      started = true
+      return send({
+        kind: "call_start",
+        invocation_id: invocationID,
+        call_id: context.id,
+        tool,
+        mode: "native",
+        parent: null,
+        input: field(input),
+        boundary: "executable-input",
+      })
+    }),
+    returned: (result: unknown) => started ? send({
+      kind: "call_end",
+      invocation_id: invocationID,
+      call_id: context.id,
+      outcome: "returned",
+      result: field(result),
+      boundary: "native-tool-return",
+      unavailable_fields: unavailable,
+    }) : Effect.void,
+    threw: (error: unknown) => started ? send({
+      kind: "call_end",
+      invocation_id: invocationID,
+      call_id: context.id,
+      outcome: "threw",
+      error: field(error),
+      error_representation: "tool-error-message-metadata/v1",
+      boundary: "native-tool-error",
+      unavailable_fields: unavailable,
+    }) : Effect.void,
+    close: () => {
+      if (tool === "execute" && nativeExecuteParents.get(context as object) === invocationID)
+        nativeExecuteParents.delete(context as object)
+      return started
+    },
+  }
+}
+
 export function make(context: Context, emit: (event: Event) => Effect.Effect<void>) {
   const parent = Object.freeze({
-    invocation_id: crypto.randomUUID(),
+    invocation_id: nativeExecuteParents.get(context as object) ?? crypto.randomUUID(),
     session_id: context.sessionID, message_id: context.messageID, call_id: context.id,
   })
   const actor = Object.freeze({ agent: context.agent, session_id: context.sessionID, message_id: context.messageID })
@@ -58,7 +131,7 @@ export function make(context: Context, emit: (event: Event) => Effect.Effect<voi
     // Allocate order before the observer can await I/O. Every published object
     // owns its data; no observer gets the live tool arguments or returned object.
     const event = Object.freeze({
-      schema: "opencode-local-observation/v1", sequence: ++sequence,
+      schema: "opencode-local-observation/v1", sequence: nextSequence(),
       parent, actor, observer_failures: lost, ...body,
     })
     return Effect.suspend(() => emit(event)).pipe(
@@ -91,9 +164,6 @@ export function make(context: Context, emit: (event: Event) => Effect.Effect<voi
             dispatched: dispatched.has(call.id), boundary: "codemode-json-return" }
           if (result.status === "success") return send({ ...base, outcome: "returned", result: field(result.value) })
           if (result.status === "interrupted") return send({ ...base, outcome: "interrupted" })
-          // The same helper constructs the Error name/message the interpreter's
-          // catch handler receives. This is a labelled view, not serialization
-          // of arbitrary Error identity, host causes, or memory.
           return send({ ...base, outcome: "threw", error: field(CodeMode.callerError(result.error)),
             error_representation: "codemode-catch-name-message/v1" })
         }),
@@ -103,7 +173,6 @@ export function make(context: Context, emit: (event: Event) => Effect.Effect<voi
       terminals: ended.size, missing_terminals: [...admitted].filter((id) => !ended.has(id)).length,
       unsupported_dispatches: [...admitted].filter((id) => !dispatched.has(id)).length,
       unavailable_fields: unavailable, scope: "one-codemode-engine-invocation",
-      // Origin/protection and run-wide completeness are intentionally not asserted.
       evidence_eligible: false }),
   }
 }

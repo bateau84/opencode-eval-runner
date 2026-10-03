@@ -1,64 +1,121 @@
 # Local OpenCode observation patch
 
 This is a downstream patch maintained **in this runner repository**, not an
-upstream OpenCode PR and not another Code Mode interpreter. The normal image and
-host installation remain unchanged. The experimental image builds the existing
-OpenCode CLI from `cd9a14a6b688d4021bee381dfd39d2cef9c0f862` (v2.0.18), with
-`apply.py` checking every changed source blob before applying exact substitutions.
+upstream OpenCode PR and not another Code Mode interpreter. The normal release
+image and host installation remain unchanged.
 
-## Runtime seam
+The experimental **normal-invoke** image builds the existing OpenCode CLI from
+`cd9a14a6b688d4021bee381dfd39d2cef9c0f862` (v2.0.18). `apply.py` verifies every
+changed upstream blob before applying exact substitutions.
 
-Set `OPENCODE_EVAL_OBSERVATIONS=1` in the experimental image. A Loom producer can
-subscribe with `ctx.tool.hook("execute.observed", callback)`. This local API emits
-`opencode-local-observation/v1` events; it is **not** PR #41's HMAC wire protocol or
-an agreed replacement for Loom's draft contract.
+## Compatibility boundary
 
-The patch carries a new child invocation ID through the existing Code Mode tool
-bridge. It records actual decoded executable inputs after before-hooks, actual
-registration/catalog identities, and actor/session/message/enclosing-call values
-from the runtime context. Existing product call IDs are not replaced. Start and
-terminal events share the generated identity, not a FIFO/input-equality guess.
+The patch exists underneath Loom's current path:
 
-Returns are observed after existing output-changing hooks, content conversion,
-output validation, and the Code Mode JSON round trip. Failures and interruption
-use the interpreter's existing terminal path, including caught throws. The error
-representation is explicitly `codemode-catch-name-message/v1`: a shared helper also
-constructs the name/message of the Error seen by the interpreter's catch handler.
-It is not a claim to serialize host exception identity, stack, or arbitrary causes.
+```text
+bun run eval:live ...
+  -> scripts/run-evals.py
+  -> opencode-eval-runner invoke
+  -> patched OpenCode
+```
 
-Snapshots own their data and reject unsupported values without invoking getters
-or `toJSON`. They are **unredacted in-memory events**. Loom still owns safe producer
-redaction before persistence and its actual assertion consumer. There is no raw
-trace writer, collector, signer, or positive evidence admission in this patch.
-Observer callback failures are counted and suppressed; they must not replace the
-tool outcome. A callback that never completes remains an unproved noninterference
-case and is not covered by the exception-failure test.
+No alternate Loom case runner is introduced. The restricted `observe` command and
+remote-tool profile are a separate supplemental experiment and are not applied to
+this image.
 
-`parent_start` / `parent_end` bracket one Code Mode engine invocation. They do not
-pretend to capture the final native outer-tool result or prove run-wide capture
-closure. Missing terminals, unsupported dispatches, unavailable fields, and
-observer failures remain explicit. The parent-end record sets
-`evidence_eligible: false`: a plugin hook alone is not a protected evidence channel.
+The image enables:
 
-## Build and test
+```text
+OPENCODE_EVAL_OBSERVATIONS=1
+OPENCODE_EVAL_HOST_OBSERVATIONS=1
+```
 
-The `Local runtime observation patch` workflow applies the pinned patch, runs
-source tests against the real core/interpreter, builds the CLI, and publishes a
-commit-and-run-scoped experimental image. It records the immutable registry digest
-in `image.txt`, then probes that exact published image using a deterministic
-container-local provider with `--network none` and disposable state.
+Those flags only expose diagnostic hook events. They do not change tool inputs,
+permissions, session selection, provider flow or normal result handling.
 
-The image probe adds a diagnostic subscriber and an input-changing fixture hook
-to a temporary copy of the existing runner fixture. The original fixture and its
-historical artifacts are not overwritten. It covers identical overlapping calls,
-reverse completion, actual actor/input bindings, final modified returns, caught
-throws, observer exceptions, and a target-written forged sidecar. The forged file
-is tested against PR #41's importer; the diagnostic subscriber is not admitted as
-a legitimate producer and is not a proof of protected producer feasibility.
+## Runtime seams
 
-This is **not Loom's preserved smoke**. The supplied contract identifies its
-producer/smoke/consumer files as uncommitted and does not contain their bytes.
-Those exact files must be available and adapted to the agreed local seam before
-claiming a preserved Loom producer-to-consumer run. Independent code review,
-native-final-result capture, run-wide completeness, and protected export remain
-separate requirements. No merge or full-handoff acceptance follows from these tests.
+### Native/direct tool boundary
+
+A plugin may subscribe to:
+
+```ts
+ctx.tool.hook("execute.native-observed", callback)
+```
+
+The central Tool service emits `opencode-native-observation/v1` starts and final
+returns/errors for normal native calls, including the outer `execute` call.
+
+The start is emitted after input decoding, using the real Tool.Context:
+session, agent, assistant message and runtime call ID. The terminal is emitted
+after existing `execute.after` hooks and final content normalization.
+
+### Code Mode inner boundary
+
+The existing downstream seam remains:
+
+```ts
+ctx.tool.hook("execute.observed", callback)
+```
+
+It emits `opencode-local-observation/v1` records for actual Code Mode inner calls.
+The runtime-generated inner invocation ID survives to the final interpreter
+terminal. Returned values are captured after Code Mode conversion; caught throws
+use the explicit `codemode-catch-name-message/v1` view.
+
+Native and inner events share one monotonic runtime sequence. With host-semantics
+observation enabled, the inner parent invocation ID is the actual native outer
+`execute` observation ID; it is not reconstructed from input equality or FIFO.
+
+The observation metadata is kept outside tool input. Existing product call IDs
+and Tool.Context values are not replaced.
+
+## Evidence boundary
+
+These events are **diagnostic, not protected evidence**.
+
+The normal Loom plugin is loaded inside the same OpenCode process as the runtime
+seam. Code in that process shares the authority needed to reach same-process
+files, sockets, descriptors and any signing/collector capability exposed there.
+A hidden filename, HMAC key, random FD or localhost listener does not establish a
+supported isolation boundary against arbitrary in-process plugin code.
+
+Therefore the normal-invoke image proves semantic feasibility, not target-unforgeable
+collection. Do not turn these events into PASS evidence merely because their
+schema validates.
+
+The restricted direct-session profile proves a different property by moving
+evaluated tools out of collector authority. It intentionally changes the host
+execution shape and cannot replace normal Loom eval semantics.
+
+## Build and verification
+
+The `Normal-invoke runtime observation seam` workflow:
+
+1. applies only `apply.py` — **not** the restricted `apply-protected.py`;
+2. runs source tests against the real core/interpreter;
+3. builds `OpenCode 2.0.18-eval.3`;
+4. publishes a commit/run-scoped immutable image in a separate credentialed job;
+5. probes the runtime with a deterministic local provider;
+6. runs `run_eval_live_compat_probe.py` through the public
+   `opencode-eval-runner invoke` CLI.
+
+The compatibility probe verifies that the existing runner result behavior remains
+usable while native and Code Mode observations are emitted underneath it. It uses
+disposable HOME/XDG/workspace state and no real-provider credentials.
+
+The runtime probe additionally covers overlapping identical inner calls, reverse
+completion, actual actor/input bindings, parent linkage, final modified returns,
+caught throws and observer callback failure.
+
+## Remaining feasibility boundary
+
+The central runtime seam is suitable for Loom to test its existing host behavior
+without moving its tool implementations behind a new service.
+
+What is **not** solved by this patch is a protected collector for an arbitrary
+in-process Loom plugin. Achieving that requires a real plugin isolation/capability
+boundary while retaining the APIs and lifecycle semantics Loom depends on. That is
+a broader runtime project and must not be implemented implicitly in PR #41.
+
+See [Loom host-semantics feasibility](../docs/loom-host-semantics-feasibility.md).
