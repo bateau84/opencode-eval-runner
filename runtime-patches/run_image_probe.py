@@ -100,7 +100,7 @@ def run(image: str, output: Path):
         "inner_observation_test_toggle": not observations("off") and bool(observations("on")),
         "observer_failure_does_not_change_results": probe.scenario_completed(reports["observer-fails"]),
         "normal_invoke_runtime_version": all(
-            "2.0.18-eval.3" in str(r.get("opencode_version") or "") for r in reports.values()
+            "2.0.18-eval.4" in str(r.get("opencode_version") or "") for r in reports.values()
         ),
         "forged_sidecar_rejected": reports["forged"]["observed_execution"]["issues"] == ["authentication_failed"],
         "no_false_capture_acceptance": all(r["observed_execution"]["evidence_eligible"] is False for r in reports.values()),

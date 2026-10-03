@@ -11,9 +11,25 @@ let sequence = 0
 const nativeExecuteParents = new WeakMap<object, string>()
 
 type Event = Readonly<Record<string, unknown>>
-type Field = { readonly state: "available"; readonly value: unknown } | { readonly state: "omitted"; readonly reason: string }
+type Field =
+  | { readonly state: "available"; readonly value: unknown }
+  | { readonly state: "omitted"; readonly reason: string }
+
+type NativeState = {
+  readonly invocationID: string
+  readonly context: Context
+  readonly tool: string
+  readonly actor: Readonly<{ agent: string; session_id: string; message_id: string }>
+  readonly emit: (event: Event) => Effect.Effect<void>
+  lost: number
+  unavailable: number
+}
+
+const nativeStates = new Map<string, NativeState>()
 
 const nextSequence = () => ++sequence
+const nativeKey = (sessionID: string, messageID: string, callID: string) =>
+  [sessionID, messageID, callID].join("\u0000")
 
 export function snapshot(value: unknown): Field {
   const seen = new Set<object>()
@@ -47,79 +63,115 @@ export function snapshot(value: unknown): Field {
   }
 }
 
-export function makeNative(context: Context, tool: string, emit: (event: Event) => Effect.Effect<void>) {
-  const invocationID = crypto.randomUUID()
-  const actor = Object.freeze({ agent: context.agent, session_id: context.sessionID, message_id: context.messageID })
-  let lost = 0
-  let unavailable = 0
-  let started = false
-  const send = (body: Event) => Effect.suspend(() => {
+const sendNative = (state: NativeState, body: Event) =>
+  Effect.suspend(() => {
     const event = Object.freeze({
-      schema: "opencode-native-observation/v1",
+      schema: "opencode-native-observation/v2",
       sequence: nextSequence(),
-      actor,
-      observer_failures: lost,
+      actor: state.actor,
+      observer_failures: state.lost,
       ...body,
     })
-    return Effect.suspend(() => emit(event)).pipe(
-      Effect.catchCause(() => Effect.sync(() => { lost++ })),
+    return Effect.suspend(() => state.emit(event)).pipe(
+      Effect.catchCause(() => Effect.sync(() => { state.lost++ })),
     )
   })
-  const field = (value: unknown) => {
-    const result = snapshot(value)
-    if (result.state !== "available") unavailable++
-    return result
+
+const nativeField = (state: NativeState, value: unknown) => {
+  const result = snapshot(value)
+  if (result.state !== "available") state.unavailable++
+  return result
+}
+
+/**
+ * Begin observation only after Tool runtime input decoding succeeds.
+ *
+ * The terminal is deliberately NOT emitted here: the canonical native result
+ * crosses ToolOutput.truncate and SessionEvent publication later in the Step
+ * writer. finishNative() is called at that final session-owned boundary.
+ */
+export function makeNative(context: Context, tool: string, emit: (event: Event) => Effect.Effect<void>) {
+  const invocationID = crypto.randomUUID()
+  const key = nativeKey(context.sessionID, context.messageID, context.id)
+  const state: NativeState = {
+    invocationID,
+    context,
+    tool,
+    actor: Object.freeze({ agent: context.agent, session_id: context.sessionID, message_id: context.messageID }),
+    emit,
+    lost: 0,
+    unavailable: 0,
   }
-  // The same Tool.Context object is passed into the internal Code Mode tool.
-  // Keep the native execute invocation only as an internal parent binding; do
-  // not add observation metadata to the public tool input or plugin context.
-  if (tool === "execute") nativeExecuteParents.set(context as object, invocationID)
+  let started = false
   return {
     invocationID,
-    start: (input: unknown) => Effect.suspend(() => {
-      started = true
-      return send({
-        kind: "call_start",
-        invocation_id: invocationID,
-        call_id: context.id,
-        tool,
-        mode: "native",
-        parent: null,
-        input: field(input),
-        boundary: "executable-input",
-      })
-    }),
-    returned: (result: unknown) => started ? send({
-      kind: "call_end",
-      invocation_id: invocationID,
-      call_id: context.id,
-      outcome: "returned",
-      result: field(result),
-      boundary: "native-tool-return",
-      unavailable_fields: unavailable,
-    }) : Effect.void,
-    threw: (error: unknown) => started ? send({
-      kind: "call_end",
-      invocation_id: invocationID,
-      call_id: context.id,
-      outcome: "threw",
-      error: field(error),
-      error_representation: "tool-error-message-metadata/v1",
-      boundary: "native-tool-error",
-      unavailable_fields: unavailable,
-    }) : Effect.void,
-    close: () => {
-      if (tool === "execute" && nativeExecuteParents.get(context as object) === invocationID)
-        nativeExecuteParents.delete(context as object)
-      return started
-    },
+    start: (input: unknown) =>
+      Effect.suspend(() => {
+        // Duplicate runtime call identity is a diagnostic capture defect, not
+        // permission to perturb the real tool execution. Leave it unsupported.
+        if (nativeStates.has(key)) return Effect.void
+        started = true
+        nativeStates.set(key, state)
+        // The same Context object reaches the Code Mode outer tool.
+        if (tool === "execute") nativeExecuteParents.set(context as object, invocationID)
+        return sendNative(state, {
+          kind: "call_start",
+          invocation_id: invocationID,
+          call_id: context.id,
+          tool,
+          mode: "native",
+          parent: null,
+          input: nativeField(state, input),
+          boundary: "executable-input",
+        })
+      }),
+    started: () => started,
   }
+}
+
+/**
+ * Emit the native terminal after the normal Session writer has published the
+ * same canonical result/error. Missing starts remain non-events, never invented
+ * terminals.
+ */
+export function finishNative(input: {
+  readonly sessionID: string
+  readonly messageID: string
+  readonly callID: string
+  readonly outcome: "returned" | "threw"
+  readonly value: unknown
+  readonly errorRepresentation?: string
+}) {
+  const key = nativeKey(input.sessionID, input.messageID, input.callID)
+  const state = nativeStates.get(key)
+  if (!state) return Effect.void
+  nativeStates.delete(key)
+  if (state.tool === "execute" && nativeExecuteParents.get(state.context as object) === state.invocationID)
+    nativeExecuteParents.delete(state.context as object)
+  const terminalField = nativeField(state, input.value)
+  const common = {
+    kind: "call_end",
+    invocation_id: state.invocationID,
+    call_id: input.callID,
+    boundary: "session-tool-terminal",
+    unavailable_fields: state.unavailable,
+  }
+  return input.outcome === "returned"
+    ? sendNative(state, { ...common, outcome: "returned", result: terminalField })
+    : sendNative(state, {
+        ...common,
+        outcome: "threw",
+        error: terminalField,
+        error_representation: input.errorRepresentation ?? "session-error/v1",
+      })
 }
 
 export function make(context: Context, emit: (event: Event) => Effect.Effect<void>) {
   const parent = Object.freeze({
     invocation_id: nativeExecuteParents.get(context as object) ?? crypto.randomUUID(),
-    session_id: context.sessionID, message_id: context.messageID, call_id: context.id,
+    session_id: context.sessionID,
+    message_id: context.messageID,
+    call_id: context.id,
   })
   const actor = Object.freeze({ agent: context.agent, session_id: context.sessionID, message_id: context.messageID })
   const admitted = new Set<string>()
@@ -127,17 +179,20 @@ export function make(context: Context, emit: (event: Event) => Effect.Effect<voi
   const ended = new Set<string>()
   let lost = 0
   let unavailable = 0
-  const send = (body: Event) => Effect.suspend(() => {
-    // Allocate order before the observer can await I/O. Every published object
-    // owns its data; no observer gets the live tool arguments or returned object.
-    const event = Object.freeze({
-      schema: "opencode-local-observation/v1", sequence: nextSequence(),
-      parent, actor, observer_failures: lost, ...body,
+  const send = (body: Event) =>
+    Effect.suspend(() => {
+      const event = Object.freeze({
+        schema: "opencode-local-observation/v1",
+        sequence: nextSequence(),
+        parent,
+        actor,
+        observer_failures: lost,
+        ...body,
+      })
+      return Effect.suspend(() => emit(event)).pipe(
+        Effect.catchCause(() => Effect.sync(() => { lost++ })),
+      )
     })
-    return Effect.suspend(() => emit(event)).pipe(
-      Effect.catchCause(() => Effect.sync(() => { lost++ })),
-    )
-  })
   const field = (value: unknown) => {
     const result = snapshot(value)
     if (result.state !== "available") unavailable++
@@ -145,34 +200,59 @@ export function make(context: Context, emit: (event: Event) => Effect.Effect<voi
   }
   return {
     open: () => send({ kind: "parent_start", boundary: "codemode-engine", mode: "code_mode" }),
-    dispatch: (call: CodeMode.ToolInvocation, registration: string, input: unknown) => Effect.suspend(() => {
-      dispatched.add(call.id)
-      return send({ kind: "call_start", invocation_id: call.id, tool: registration,
-        catalog_path: call.name, input: field(input), boundary: "executable-input" })
-    }),
+    dispatch: (call: CodeMode.ToolInvocation, registration: string, input: unknown) =>
+      Effect.suspend(() => {
+        dispatched.add(call.id)
+        return send({
+          kind: "call_start",
+          invocation_id: call.id,
+          tool: registration,
+          catalog_path: call.name,
+          input: field(input),
+          boundary: "executable-input",
+        })
+      }),
     hooks: (original: CodeMode.Hooks): CodeMode.Hooks => ({
       ...original,
-      "tool.before": (call) => Effect.suspend(() => {
-        admitted.add(call.id)
-        return original["tool.before"]?.(call) ?? Effect.void
-      }),
-      "tool.after": (call, result) => Effect.andThen(
-        original["tool.after"]?.(call, result) ?? Effect.void,
+      "tool.before": (call) =>
         Effect.suspend(() => {
-          ended.add(call.id)
-          const base = { kind: "call_end", invocation_id: call.id,
-            dispatched: dispatched.has(call.id), boundary: "codemode-json-return" }
-          if (result.status === "success") return send({ ...base, outcome: "returned", result: field(result.value) })
-          if (result.status === "interrupted") return send({ ...base, outcome: "interrupted" })
-          return send({ ...base, outcome: "threw", error: field(CodeMode.callerError(result.error)),
-            error_representation: "codemode-catch-name-message/v1" })
+          admitted.add(call.id)
+          return original["tool.before"]?.(call) ?? Effect.void
         }),
-      ),
+      "tool.after": (call, result) =>
+        Effect.andThen(
+          original["tool.after"]?.(call, result) ?? Effect.void,
+          Effect.suspend(() => {
+            ended.add(call.id)
+            const base = {
+              kind: "call_end",
+              invocation_id: call.id,
+              dispatched: dispatched.has(call.id),
+              boundary: "codemode-json-return",
+            }
+            if (result.status === "success")
+              return send({ ...base, outcome: "returned", result: field(result.value) })
+            if (result.status === "interrupted") return send({ ...base, outcome: "interrupted" })
+            return send({
+              ...base,
+              outcome: "threw",
+              error: field(CodeMode.callerError(result.error)),
+              error_representation: "codemode-catch-name-message/v1",
+            })
+          }),
+        ),
     }),
-    close: () => send({ kind: "parent_end", admitted: admitted.size, dispatched: dispatched.size,
-      terminals: ended.size, missing_terminals: [...admitted].filter((id) => !ended.has(id)).length,
-      unsupported_dispatches: [...admitted].filter((id) => !dispatched.has(id)).length,
-      unavailable_fields: unavailable, scope: "one-codemode-engine-invocation",
-      evidence_eligible: false }),
+    close: () =>
+      send({
+        kind: "parent_end",
+        admitted: admitted.size,
+        dispatched: dispatched.size,
+        terminals: ended.size,
+        missing_terminals: [...admitted].filter((id) => !ended.has(id)).length,
+        unsupported_dispatches: [...admitted].filter((id) => !dispatched.has(id)).length,
+        unavailable_fields: unavailable,
+        scope: "one-codemode-engine-invocation",
+        evidence_eligible: false,
+      }),
   }
 }

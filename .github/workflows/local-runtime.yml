@@ -60,7 +60,7 @@ jobs:
       - name: Build the existing CLI with the local patch
         working-directory: .runtime-source
         env:
-          OPENCODE_VERSION: 2.0.18-eval.3
+          OPENCODE_VERSION: 2.0.18-eval.4
           OPENCODE_CHANNEL: latest
         run: |
           bun run packages/cli/script/build.ts --skip-install --target=opencode-linux-x64 \

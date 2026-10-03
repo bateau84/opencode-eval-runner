@@ -67,7 +67,7 @@ test("real core and interpreter: identical overlap, final conversion, caught err
   expect(events.at(-1)).toMatchObject({ kind: "parent_end", missing_terminals: 0, unsupported_dispatches: 0, evidence_eligible: false })
 })
 
-test("native outer observation binds the actual Code Mode parent without changing context", async () => {
+test("native outer start binds the actual Code Mode parent; finalization is session-owned", async () => {
   const nativeEvents: any[] = []
   const innerEvents: any[] = []
   const native = LocalObservation.makeNative(context, "execute", (event) => Effect.sync(() => nativeEvents.push(event)))
@@ -81,15 +81,20 @@ test("native outer observation binds the actual Code Mode parent without changin
       return { content: "INNER-FINAL" }
     })
   const tool = CodeModeTool.create(inventory as any, execute as any, (event) => Effect.sync(() => innerEvents.push(event)))
-  const result = await Effect.runPromise(tool.execute({ code: "return await tools.fixture.echo({});" }, context))
-  await Effect.runPromise(native.returned(result))
-  native.close()
+  await Effect.runPromise(tool.execute({ code: "return await tools.fixture.echo({});" }, context))
+  await Effect.runPromise(LocalObservation.finishNative({
+    sessionID: context.sessionID,
+    messageID: context.messageID,
+    callID: context.id,
+    outcome: "returned",
+    value: { content: [{ type: "text", text: "SESSION-FINAL" }], metadata: { truncated: false }, executed: false },
+  }))
 
   const nativeStart = nativeEvents.find((event) => event.kind === "call_start")
   const nativeEnd = nativeEvents.find((event) => event.kind === "call_end")
   const innerStart = innerEvents.find((event) => event.kind === "call_start")
   expect(nativeStart).toMatchObject({
-    schema: "opencode-native-observation/v1",
+    schema: "opencode-native-observation/v2",
     invocation_id: native.invocationID,
     call_id: "shared-parent",
     tool: "execute",
@@ -97,14 +102,20 @@ test("native outer observation binds the actual Code Mode parent without changin
     parent: null,
     actor: { agent: "actual-agent", session_id: "actual-session", message_id: "actual-message" },
   })
-  expect(nativeEnd.invocation_id).toBe(native.invocationID)
+  expect(nativeEnd).toMatchObject({
+    invocation_id: native.invocationID,
+    boundary: "session-tool-terminal",
+    outcome: "returned",
+  })
+  expect(nativeEnd.result.value.metadata.truncated).toBe(false)
   expect(innerStart.parent.invocation_id).toBe(native.invocationID)
   expect(innerStart.parent.call_id).toBe("shared-parent")
   expect(nativeStart.sequence).toBeLessThan(innerStart.sequence)
+  expect(innerEvents.at(-1).sequence).toBeLessThan(nativeEnd.sequence)
   expect(context).not.toHaveProperty("evaluationInvocationID")
 })
 
-test("native observation keeps delegated actor identity as supplied by the real tool context", async () => {
+test("native observation keeps delegated actor identity from the real tool context", async () => {
   const child = {
     sessionID: "child-session", messageID: "child-message", id: "child-call", agent: "reviewer",
     progress: () => Effect.void,
@@ -112,18 +123,33 @@ test("native observation keeps delegated actor identity as supplied by the real 
   const events: any[] = []
   const observation = LocalObservation.makeNative(child, "read", (event) => Effect.sync(() => events.push(event)))
   await Effect.runPromise(observation.start({ file: "README.md" }))
-  await Effect.runPromise(observation.returned({ output: "ok", content: [] }))
-  observation.close()
+  await Effect.runPromise(LocalObservation.finishNative({
+    sessionID: child.sessionID,
+    messageID: child.messageID,
+    callID: child.id,
+    outcome: "threw",
+    value: { error: { type: "aborted", message: "cancelled" }, executed: false },
+    errorRepresentation: "session-tool-failed/v1",
+  }))
   expect(events[0].actor).toEqual({ agent: "reviewer", session_id: "child-session", message_id: "child-message" })
   expect(events[0]).toMatchObject({ call_id: "child-call", mode: "native", parent: null })
-  expect(events[1].invocation_id).toBe(events[0].invocation_id)
+  expect(events[1]).toMatchObject({
+    invocation_id: events[0].invocation_id,
+    outcome: "threw",
+    error_representation: "session-tool-failed/v1",
+  })
 })
 
 test("native decode failures do not fabricate terminal-only observations", async () => {
   const events: any[] = []
-  const observation = LocalObservation.makeNative(context, "read", (event) => Effect.sync(() => events.push(event)))
-  await Effect.runPromise(observation.threw({ message: "decode failed" }))
-  observation.close()
+  LocalObservation.makeNative(context, "read", (event) => Effect.sync(() => events.push(event)))
+  await Effect.runPromise(LocalObservation.finishNative({
+    sessionID: context.sessionID,
+    messageID: context.messageID,
+    callID: context.id,
+    outcome: "threw",
+    value: { error: { type: "tool.input", message: "decode failed" } },
+  }))
   expect(events).toEqual([])
 })
 
@@ -149,8 +175,13 @@ test("observer failure does not replace actual return", async () => {
 
   const native = LocalObservation.makeNative(context, "read", () => Effect.die("native-observer-failure"))
   await Effect.runPromise(native.start({ path: "x" }))
-  await Effect.runPromise(native.returned({ output: "UNCHANGED", content: [] }))
-  native.close()
+  await Effect.runPromise(LocalObservation.finishNative({
+    sessionID: context.sessionID,
+    messageID: context.messageID,
+    callID: context.id,
+    outcome: "returned",
+    value: { content: [{ type: "text", text: "UNCHANGED" }], executed: false },
+  }))
 })
 
 test("snapshots are owned, immutable, and do not call getters/toJSON", () => {

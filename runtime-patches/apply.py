@@ -15,6 +15,7 @@ PINS = {
     "packages/core/src/codemode/tool.ts": "74742f64997e085aee5e8ee15dba30ee63bf5a6a",
     "packages/core/src/tool.ts": "5e2ca8401aa550b1bd980cd9d7f513a3db9da0bc",
     "packages/core/src/tool/runtime.ts": "f21c67a533ed942c06747f51474908bce099fc33",
+    "packages/core/src/session/runner/publish-llm-event.ts": "03367a8ed1b020f031d9f75eaedcb4a215ba6d18",
     "packages/plugin/src/effect/tool.ts": "04494b2630eda63a169a8905815b438fae8358ba",
 }
 
@@ -72,12 +73,81 @@ def apply(root: Path):
     edit(p, 'execute(tool, input, context).pipe(', 'execute(tool, input, context, observedInput).pipe(')
     edit(p, '    ) {\n      const execution = yield* execute(tool, input, context, observedInput).pipe(',
          '    ) {\n      const nativeObservation =\n        observedInput === undefined && process.env.OPENCODE_EVAL_HOST_OBSERVATIONS === "1"\n          ? LocalObservation.makeNative(context, name, (event) =>\n              hooks.trigger("tool", "execute.native-observed", event).pipe(Effect.asVoid),\n            )\n          : undefined\n      const execution = yield* execute(tool, input, context, observedInput ?? nativeObservation?.start).pipe(')
-    edit(p, '        yield* hooks.trigger("tool", "execute.after", afterEvent)\n        return yield* afterEvent.error',
-         '        yield* hooks.trigger("tool", "execute.after", afterEvent)\n        if (nativeObservation) {\n          yield* nativeObservation.threw({ message: afterEvent.error.message, metadata: afterEvent.error.metadata ?? null })\n          nativeObservation.close()\n        }\n        return yield* afterEvent.error')
-    edit(p, '      const afterContent = yield* normalizeImages(normalizeContent(afterEvent.result.content, afterEvent.result.output))\n      return {\n        ...(afterEvent.result.output === undefined ? {} : { output: afterEvent.result.output }),\n        content: afterContent,\n        ...(afterEvent.result.metadata === undefined ? {} : { metadata: afterEvent.result.metadata }),\n      }',
-         '      const afterContent = yield* normalizeImages(normalizeContent(afterEvent.result.content, afterEvent.result.output))\n      const result = {\n        ...(afterEvent.result.output === undefined ? {} : { output: afterEvent.result.output }),\n        content: afterContent,\n        ...(afterEvent.result.metadata === undefined ? {} : { metadata: afterEvent.result.metadata }),\n      }\n      if (nativeObservation) {\n        yield* nativeObservation.returned(result)\n        nativeObservation.close()\n      }\n      return result')
     edit(p, 'CodeModeTool.create(codeModeInventory, (name, tool, input, context) =>\n                beforeExecute(name, input, context).pipe(\n                  Effect.flatMap((event) => executeTool(tool, name, event.input, context)),\n                ),\n              )',
          'CodeModeTool.create(codeModeInventory, (name, tool, input, context, observedInput) =>\n                beforeExecute(name, input, context).pipe(\n                  Effect.flatMap((event) => executeTool(tool, name, event.input, context, observedInput)),\n                ),\n                process.env.OPENCODE_EVAL_OBSERVATIONS === "1"\n                  ? (event) => hooks.trigger("tool", "execute.observed", event).pipe(Effect.asVoid)\n                  : undefined,\n              )')
+    p = "packages/core/src/session/runner/publish-llm-event.ts"
+    edit(p, 'import type { Tool } from "../../tool.js"',
+         'import type { Tool } from "../../tool.js"\nimport { LocalObservation } from "../../codemode/local-observation.js"')
+    edit(p, '''    yield* bus.publish(SessionEvent.Tool.Failed, {
+      sessionID: input.sessionID,
+      assistantMessageID,
+      id,
+      error:
+        tool.name === "subagent" && error.type === "aborted" && typeof tool.progress?.sessionID === "string"
+          ? { ...error, message: `\${error.message} (sessionID: \${tool.progress.sessionID})` }
+          : error,
+      ...failureSnapshot(tool, metadata),
+      executed: tool.providerExecuted,
+    })
+    return true''',
+         '''    const terminal = {
+      sessionID: input.sessionID,
+      assistantMessageID,
+      id,
+      error:
+        tool.name === "subagent" && error.type === "aborted" && typeof tool.progress?.sessionID === "string"
+          ? { ...error, message: `\${error.message} (sessionID: \${tool.progress.sessionID})` }
+          : error,
+      ...failureSnapshot(tool, metadata),
+      executed: tool.providerExecuted,
+    }
+    yield* bus.publish(SessionEvent.Tool.Failed, terminal)
+    if (process.env.OPENCODE_EVAL_HOST_OBSERVATIONS === "1")
+      yield* LocalObservation.finishNative({
+        sessionID: input.sessionID,
+        messageID: assistantMessageID,
+        callID: id,
+        outcome: "threw",
+        value: {
+          error: terminal.error,
+          ...(terminal.metadata === undefined ? {} : { metadata: terminal.metadata }),
+          executed: terminal.executed,
+        },
+        errorRepresentation: "session-tool-failed/v1",
+      })
+    return true''')
+    edit(p, '''    yield* bus.publish(SessionEvent.Tool.Success, {
+      sessionID: input.sessionID,
+      assistantMessageID,
+      id,
+      content,
+      ...(result.metadata === undefined ? {} : { metadata: result.metadata }),
+      executed: tool.providerExecuted,
+    })
+  })''',
+         '''    const terminal = {
+      sessionID: input.sessionID,
+      assistantMessageID,
+      id,
+      content,
+      ...(result.metadata === undefined ? {} : { metadata: result.metadata }),
+      executed: tool.providerExecuted,
+    }
+    yield* bus.publish(SessionEvent.Tool.Success, terminal)
+    if (process.env.OPENCODE_EVAL_HOST_OBSERVATIONS === "1")
+      yield* LocalObservation.finishNative({
+        sessionID: input.sessionID,
+        messageID: assistantMessageID,
+        callID: id,
+        outcome: "returned",
+        value: {
+          content: terminal.content,
+          ...(terminal.metadata === undefined ? {} : { metadata: terminal.metadata }),
+          executed: terminal.executed,
+        },
+      })
+  })''')
+
     p = "packages/plugin/src/effect/tool.ts"
     edit(p, 'export interface ToolHooks {',
          'export interface ToolHooks {\n  /** Downstream eval-only observations; not an authenticated evidence channel. */\n  readonly "execute.observed": Readonly<Record<string, unknown>>\n  /** Native/tool-service observations for normal invoke feasibility; also unauthenticated. */\n  readonly "execute.native-observed": Readonly<Record<string, unknown>>')

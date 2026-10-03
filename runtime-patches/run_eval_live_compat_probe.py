@@ -29,7 +29,12 @@ export default {
       editor.add({
         name: "native", description: "native sentinel", input: { type: "object", properties: {}, additionalProperties: false },
         options: { namespace: "captureprobe", codemode: false },
-        execute: async () => ({ content: "NATIVE-RAW" }),
+        execute: async () => ({ content: "NATIVE-RAW\n" + "x".repeat(60000) }),
+      })
+      editor.add({
+        name: "nativefail", description: "native failure sentinel", input: { type: "object", properties: {}, additionalProperties: false },
+        options: { namespace: "captureprobe", codemode: false },
+        execute: async () => { throw new Error("NATIVE-FAIL-RAW") },
       })
       editor.add({
         name: "echo", description: "Code Mode sentinel",
@@ -79,6 +84,16 @@ def run(image: str, output: Path) -> int:
                 }]}
                 finish = "tool_calls"
             elif stage == 1:
+                nativefail = next((name for name in names if "captureprobe" in name and name.endswith("nativefail")), None)
+                if nativefail is None:
+                    self.send_error(400, "native failure fixture tool missing")
+                    return
+                delta = {"role": "assistant", "tool_calls": [{
+                    "index": 0, "id": "native-fail-call", "type": "function",
+                    "function": {"name": nativefail, "arguments": "{}"},
+                }]}
+                finish = "tool_calls"
+            elif stage == 2:
                 if "execute" not in names:
                     self.send_error(400, "execute tool missing")
                     return
@@ -164,6 +179,19 @@ def run(image: str, output: Path) -> int:
             inner_starts = [event for event in inner if event.get("kind") == "call_start"]
             inner_ends = [event for event in inner if event.get("kind") == "call_end"]
             evidence = result.get("tool_result_evidence", {}).get("events", [])
+            native_success_starts = [event for event in native_starts if event.get("tool", "").endswith("native")]
+            native_failure_starts = [event for event in native_starts if event.get("tool", "").endswith("nativefail")]
+            native_success_end = (
+                native_ends.get(native_success_starts[0].get("invocation_id"))
+                if len(native_success_starts) == 1 else None
+            )
+            native_failure_end = (
+                native_ends.get(native_failure_starts[0].get("invocation_id"))
+                if len(native_failure_starts) == 1 else None
+            )
+            native_success_value = (native_success_end or {}).get("result", {}).get("value", {})
+            native_failure_value = (native_failure_end or {}).get("error", {}).get("value", {})
+            native_success_content = native_success_value.get("content", []) if isinstance(native_success_value, dict) else []
             checks = {
                 "existing_invoke_entrypoint": command[1:3] == [str(ROOT / "bin/opencode-eval-runner"), "invoke"],
                 "transport_success": proc.returncode == 0 and result.get("exit_code") == 0,
@@ -172,11 +200,34 @@ def run(image: str, output: Path) -> int:
                     event.get("tool", "").endswith("native") and "NATIVE-RAW" in str(event.get("output", ""))
                     for event in evidence
                 ),
+                "native_failure_product_result_preserved": any(
+                    event.get("tool", "").endswith("nativefail")
+                    and event.get("status") == "error"
+                    and "NATIVE-FAIL-RAW" in str(event.get("error", ""))
+                    for event in evidence
+                ),
                 "execute_product_result_preserved": any(
                     event.get("tool") == "execute" and "INNER-RAW" in str(event.get("output", ""))
                     for event in evidence
                 ),
-                "native_observation_present": any(event.get("tool", "").endswith("native") for event in native_starts),
+                "native_observation_schema_v2": bool(native) and all(
+                    event.get("schema") == "opencode-native-observation/v2" for event in native
+                ),
+                "native_observation_present": len(native_success_starts) == 1,
+                "native_final_is_post_truncation_session_terminal": (
+                    isinstance(native_success_value, dict)
+                    and native_success_value.get("metadata", {}).get("truncated") is True
+                    and any("[showing " in str(part.get("text", "")) for part in native_success_content if isinstance(part, dict))
+                    and (native_success_end or {}).get("boundary") == "session-tool-terminal"
+                ),
+                "native_final_error_is_session_terminal": (
+                    (native_failure_end or {}).get("outcome") == "threw"
+                    and (native_failure_end or {}).get("boundary") == "session-tool-terminal"
+                    and (native_failure_end or {}).get("error_representation") == "session-tool-failed/v1"
+                    and isinstance(native_failure_value, dict)
+                    and native_failure_value.get("error", {}).get("type") == "tool.execution"
+                    and "NATIVE-FAIL-RAW" in str(native_failure_value.get("error", {}).get("message", ""))
+                ),
                 "outer_execute_observation_present": len(outer) == 1 and outer[0].get("invocation_id") in native_ends,
                 "inner_final_observation_present": len(inner_starts) == len(inner_ends) == 1
                     and inner_ends[0].get("result", {}).get("value") == "INNER-RAW",
@@ -193,7 +244,7 @@ def run(image: str, output: Path) -> int:
             }
             summary = {
                 "kind": "eval-live-invoke-compatibility",
-                "version": 1,
+                "version": 2,
                 "image": image,
                 "runner_entrypoint": "opencode-eval-runner invoke",
                 "loom_entrypoint_contract": "bun run eval:live -> python3 scripts/run-evals.py -> opencode-eval-runner invoke",
@@ -201,7 +252,7 @@ def run(image: str, output: Path) -> int:
                 "passed": all(checks.values()),
                 "semantic_scope": {
                     "normal_invoke": "demonstrated",
-                    "native_tool_final_result": "demonstrated",
+                    "native_tool_final_result_and_error": "demonstrated_after_session_truncation/publication",
                     "codemode_inner_final_result": "demonstrated",
                     "delegated_session_identity": "not_exercised",
                     "in_process_plugin_protection": "unsupported",
