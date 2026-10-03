@@ -34,6 +34,9 @@ def image_info(reference):
     info = strict_json(run(["docker", "image", "inspect", reference]).stdout)[0]
     _require(reference in info.get("RepoDigests", []), "image_digest_not_resolved")
     _require(bool(re.fullmatch(r"sha256:[0-9a-f]{64}", info.get("Id", ""))), "invalid_image_id")
+    # Docker otherwise creates anonymous persistent storage before the later
+    # mount audit can reject it. This profile permits no image-declared volumes.
+    _require(not (info.get("Config") or {}).get("Volumes"), "image_declares_volumes")
     return info
 
 
@@ -142,12 +145,16 @@ def invoke(args: argparse.Namespace, *, _test_receive=None, _test_prepare=None, 
             # Test-only oracle access. Never a CLI option or an evidence producer.
             if _test_target_probe is not None:
                 _test_target_probe(target, runtime_state, target_state)
+        except CaptureError as exc:
+            result["observed_execution"] = empty_projection(run_id)
+            result["observed_execution"]["issues"] = [str(exc)]
+            code = 2
         except (OSError, subprocess.SubprocessError, ValueError, TypeError, KeyError, RecursionError):
             result["observed_execution"] = empty_projection(run_id)
             result["observed_execution"]["issues"] = ["protected_transport_failed"]
             code = 2
         finally:
-            for command in (["docker", "rm", "-f", runtime], ["docker", "rm", "-f", target], ["docker", "network", "rm", network]):
+            for command in (["docker", "rm", "--volumes", "-f", runtime], ["docker", "rm", "--volumes", "-f", target], ["docker", "network", "rm", network]):
                 try:
                     cleanup = subprocess.run(command, capture_output=True, timeout=20, check=False)
                     if cleanup.returncode and code == 0:
