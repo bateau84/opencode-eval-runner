@@ -21,30 +21,61 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 PROFILE = "codemode-inner/direct-session/v1"
 
 
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        raise urllib.error.HTTPError(req.full_url, code, "redirect_refused", headers, fp)
+
+
+def health_check(url):
+    # A target-controlled /health response must not redirect into runtime services.
+    with urllib.request.build_opener(NoRedirect).open(url, timeout=1) as response:
+        return response.status == 200
+
+
+def safe_output(value, policy):
+    """Script diagnostics follow the same redact-before-retain rule as capture."""
+    if not isinstance(value, str):
+        return {"state": "omitted", "reason": "not_observed"}
+    secrets = {form for raw in policy["secrets"] for form in
+               (raw, base64.b64encode(raw.encode()).decode(), raw.encode().hex(), urllib.parse.quote(raw, safe="~()*!.'-"))}
+    safe = value
+    for secret in sorted(secrets, key=len, reverse=True):
+        safe = safe.replace(secret, "[REDACTED]")
+    if safe not in policy["allowed_values"]:
+        return {"state": "omitted", "reason": "policy_omission"}
+    if len(safe.encode()) > 16384:
+        return {"state": "truncated", "reason": "field_limit"}
+    return {"state": "available" if safe == value else "redacted", "value": safe}
+
+
 def main():
     request = json.loads(Path("/input/request.json").read_text())
     policy_raw = Path("/input/policy.json").read_bytes()
     if hashlib.sha256(policy_raw).hexdigest() != request["policy_id"]:
         raise ValueError("policy_mismatch")
-    if hashlib.sha256(Path("/input/launch.json").read_bytes()).hexdigest() != request["launch_id"]:
+    launch_raw = Path("/input/launch.json").read_bytes()
+    if hashlib.sha256(launch_raw).hexdigest() != request["launch_id"]:
         raise ValueError("launch_mismatch")
+    launch = json.loads(launch_raw)
+    tools_raw = Path("/input/tools.json").read_bytes()
+    if (launch["run_id"] != request["run_id"] or launch["profile"] != PROFILE
+            or launch["program_sha256"] != hashlib.sha256(request["program"].encode()).hexdigest()
+            or launch["tools_sha256"] != hashlib.sha256(tools_raw).hexdigest()
+            or json.loads(tools_raw) != request["tools"] or launch["policy_sha256"] != request["policy_id"]):
+        raise ValueError("launch_inputs_mismatch")
     version = subprocess.run(["opencode", "--version"], capture_output=True, text=True, check=True).stdout.strip()
     if version != "opencode v2.0.18-eval.2":
         raise ValueError("protected_runtime_version_required")
     for attempt in range(100):
         try:
-            with urllib.request.urlopen(request["tool_url"] + "/health", timeout=1) as response:
-                if response.status == 200:
-                    break
+            if health_check(request["tool_url"] + "/health"):
+                break
         except OSError:
             time.sleep(0.05)
     else:
         raise ValueError("isolated_tool_unavailable")
     stage, script_output = 0, {"state": "omitted", "reason": "not_observed"}
     policy = json.loads(policy_raw)
-    allowed = policy.get("allowed_values", [])
-    literals = [v for s in policy["secrets"] for v in
-                (s, base64.b64encode(s.encode()).decode(), s.encode().hex(), urllib.parse.quote(s, safe=""))]
 
     class Provider(BaseHTTPRequestHandler):
         def log_message(self, *args):
@@ -66,8 +97,7 @@ def main():
                 messages = [m for m in body.get("messages", []) if m.get("role") == "tool"]
                 if messages:
                     value = messages[-1].get("content")
-                    if isinstance(value, str) and value in allowed and not any(s in value for s in literals):
-                        script_output = {"state": "available", "value": value}
+                    script_output = safe_output(value, policy)
                 delta, finish = {"role": "assistant", "content": "capture-complete"}, "stop"
             stage += 1
             common = {"id": "protected-fixture-" + str(stage), "created": 1, "model": body["model"]}
@@ -145,10 +175,18 @@ def main():
                 out.write((json.dumps(footer) + "\n").encode())
     # Host and container may have different UIDs. The host's mode-0700 temporary
     # parent provides privacy; only this runtime container receives the child mount.
+    receipt = None
     if path.is_file():
         path.chmod(0o644)
-    print(json.dumps({"profile": PROFILE, "run_id": request["run_id"], "runtime_exit": runtime_exit,
-                      "writer_exited": exited, "script_output": script_output}))
+        # Independent trusted control channel; not a hash accepted from this file.
+        # The launcher checks this receipt against the received capture, so editing
+        # records and recomputing the inline footer cannot conceal the alteration.
+        sealed = path.read_bytes()
+        if exited and len(sealed) <= 8 * 1024 * 1024:
+            receipt = {"sha256": hashlib.sha256(sealed).hexdigest(), "bytes": len(sealed)}
+    print(json.dumps({"profile": PROFILE, "run_id": request["run_id"], "launch_id": request["launch_id"],
+                      "runtime_exit": runtime_exit, "writer_exited": exited,
+                      "script_output": script_output, "receipt": receipt}))
     return 0 if exited and runtime_exit == 0 else 2
 
 

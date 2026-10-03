@@ -60,11 +60,12 @@ def main():
     originals = {}
     with tempfile.TemporaryDirectory(prefix="protected-proof-") as tmp:
         root = Path(tmp)
-        names = ("echo", "denied", "denied_object", "null", "throws", "attack", "spoof", "secret", "encoded", "structured", "unknown", "large")
+        names = ("echo", "denied", "denied_object", "null", "throws", "attack", "spoof", "redirect", "secret", "encoded", "structured", "unknown", "large")
         tools = [{"name": name, "input": {"type": "object", "properties": {"tag": {"type": "string"}}, "additionalProperties": False}} for name in names]
         policy = {"version": 1, "secrets": [SECRET], "allowed_values": [
             {}, {"tag": "identical"}, "CALL-1", "CALL-2", '{"ok":false,"error":"denied"}',
             {"ok": False, "error": "denied"}, None, {"name": "Error", "message": "THROW-RAW"}, ATTACK, SPOOF,
+            {"name": "Error", "message": "isolated_tool_transport_failed"},
             "script-output-only", "[REDACTED]", {"password": "[REDACTED]"}, "ø" * 9000,
         ]}
         for name, value in (("tools.json", tools), ("policy.json", policy)):
@@ -97,6 +98,9 @@ def main():
         projection = good["observed_execution"]
         records = projection["records"]
         checks["legitimate_connection_eligible"] = code == 0 and projection["evidence_eligible"] is True
+        checks["separate_receipt_binds_capture"] = good.get("collection_receipt") == {
+            "sha256": hashlib.sha256(originals["good"]).hexdigest(), "bytes": len(originals["good"])}
+        checks["receipt_profile_explicit"] = projection.get("version") == 4 and projection.get("launch_id") == good["launch_id"]
         echo = [r for r in records if r["tool"] == "isolated_echo"]
         checks["distinct_correlated_reverse_completion"] = (len(echo) == 2 and echo[0]["invocation_id"] != echo[1]["invocation_id"]
             and echo[0]["input"]["value"] == echo[1]["input"]["value"] == {"tag": "identical"}
@@ -157,7 +161,12 @@ def main():
             frames[-1]["sha256"] = hashlib.sha256(prefix).hexdigest()
             frames[-1]["event_count"] = len(frames) - 2
             return prefix + (json.dumps(frames[-1]) + "\n").encode()
-        transforms = {"rehashed_deletion": rehash_deleted_terminal, "forged": replace_result, "replay": lambda raw: originals["good"], "deleted_record": remove_middle,
+        def rehash_forged_result(raw):
+            lines = replace_result(raw).splitlines(keepends=True)
+            footer = json.loads(lines[-1])
+            footer["sha256"] = hashlib.sha256(b"".join(lines[:-1])).hexdigest()
+            return b"".join(lines[:-1]) + (json.dumps(footer) + "\n").encode()
+        transforms = {"resealed_forgery": rehash_forged_result, "rehashed_deletion": rehash_deleted_terminal, "forged": replace_result, "replay": lambda raw: originals["good"], "deleted_record": remove_middle,
                       "deleted_footer": lambda raw: b"".join(raw.splitlines(keepends=True)[:-1]),
                       "partial": lambda raw: raw[:-5], "reordered": reorder,
                       "appended": lambda raw: raw + b'{"kind":"observation"}\n'}
@@ -165,7 +174,7 @@ def main():
             args.output = str(out / (name + ".json"))
             code = protected.invoke(args, _test_receive=receive(name, transform))
             result = json.loads(Path(args.output).read_text())
-            checks[name + "_real_stream_rejected"] = code != 0 and result["observed_execution"]["evidence_eligible"] is False and result["observed_execution"]["records"] == []
+            checks[name + "_real_stream_rejected"] = (out / (name + ".received.jsonl")).exists() and code != 0 and result["observed_execution"]["evidence_eligible"] is False and result["observed_execution"]["records"] == []
             print(name, code, result["observed_execution"]["issues"], flush=True)
 
         args.output = str(out / "io-failure.json")
@@ -181,6 +190,13 @@ def main():
         snapshot_code = protected.invoke(args, _test_prepare=change_original)
         snapshot_result = json.loads(Path(args.output).read_text())
         checks["executes_the_same_input_snapshot"] = snapshot_code == 0 and snapshot_result["script_output"] == {"state": "available", "value": "script-output-only"}
+        (root / "program.js").write_text('try { await tools.isolated.redirect({}); } catch (e) {} return "script-output-only";')
+        args.output = str(out / "redirect.json")
+        redirect_code = protected.invoke(args, _test_receive=receive("redirect"))
+        redirect_result = json.loads(Path(args.output).read_text())
+        redirect_records = redirect_result["observed_execution"]["records"]
+        checks["tool_cannot_redirect_bridge_to_local_services"] = (redirect_code == 0 and len(redirect_records) == 1
+            and redirect_records[0].get("error", {}).get("value") == {"name": "Error", "message": "isolated_tool_transport_failed"})
         (root / "program.js").write_text(REDACTION_PROGRAM)
         args.output = str(out / "redaction.json")
         code = protected.invoke(args, _test_receive=receive("redaction"))

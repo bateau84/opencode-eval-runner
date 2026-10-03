@@ -112,7 +112,8 @@ export default {
         name: definition.name, description: definition.description ?? definition.name,
         input: definition.input, output: {}, options: { namespace: "isolated", codemode: true },
         execute: async (input: unknown, tool: any) => {
-          if (!token.test(tool.evaluationInvocationID) || !Number.isSafeInteger(tool.evaluationDispatchOrdinal))
+          if (typeof tool.evaluationInvocationID !== "string" || !token.test(tool.evaluationInvocationID)
+              || !Number.isSafeInteger(tool.evaluationDispatchOrdinal) || tool.evaluationDispatchOrdinal < 0)
             throw new Error("protected_runtime_context_missing")
           const response = await fetch(request.tool_url + "/call", {
             method: "POST", headers: { "content-type": "application/json" },
@@ -120,7 +121,7 @@ export default {
               invocation_id: tool.evaluationInvocationID, ordinal: tool.evaluationDispatchOrdinal,
               agent: tool.agent, session_id: tool.sessionID, message_id: tool.messageID, call_id: tool.id,
             }}), signal: AbortSignal.timeout(10000), redirect: "error",
-          })
+          }).catch(() => { throw new Error("isolated_tool_transport_failed") })
           if (!response.ok) throw new Error("isolated_tool_transport_failed")
           if (!response.body) throw new Error("isolated_tool_invalid_response")
           const reader = response.body.getReader()

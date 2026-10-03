@@ -1,160 +1,176 @@
-# Loom handoff: protected direct-session capture
+# Loom handoff: isolated capture profile
 
-## What the runner owns
+## Scope of this change
 
-The runner now supplies a restricted, opt-in connection from the locally patched
-OpenCode runtime to the host importer. The trusted runtime and collector are in
-one container; evaluated tool implementations execute in another. Only the
-runtime receives the private capture and launch-input mounts. The existing Code
-Mode interpreter is retained; its script network extension is disabled for this
-profile, regardless of whether observation is enabled.
+The runner owns the isolated launch, private transport, collector adapter, import
+validation and finalized host artifact. Its downstream OpenCode patch owns the
+existing interpreter's final inner-return observation point. No second interpreter
+or synthetic inner-result extractor is introduced.
 
-This is **primarily a runner/runtime change, but it is not a drop-in flag for the
-current in-process Loom plugin**. An untrusted plugin cannot remain in the
-collector's process and still satisfy this threat model. Loom needs an execution
-adapter as well as script/consumer changes. No Loom repository files are modified
-by this PR, and no native or delegated-session coverage is claimed.
+The working profile is **`codemode-inner/direct-session/v1`**, exposed by the
+runner's **`observe`** command. It is a provider-free, direct-session profile for
+Code Mode programs calling isolated remote tools. The current result projection
+is **`observed_execution.version = 4`**, with
+`collection_profile = "private-supervisor-receipt/v1"`.
 
-The runtime supplies actual `execute.observed` events. The fixed trusted bridge
-is a transport/redaction adapter for that seam, not another interpreter. This
-implementation has not incorporated the uncommitted Loom observer prototype or
-claimed that its original bytes were tested. Preserve and pin those bytes before
-adapting it; do not run a competing target-writable logger and promote its output.
+This is not a drop-in protected replacement for Loom's normal `invoke` path.
+Arbitrary evaluated plugins cannot share the trusted OpenCode/collector process.
+Native final results, delegated sessions and full Loom acceptance remain open.
+The scope restriction is the same with observation on and off; it is not a claim
+that restricting the profile leaves an unrestricted product environment unchanged.
 
-## Tested runner baseline
+## Runner-side boundary
 
-Use implementation commit `c1629415a814476f7b62f159530e7edd29fde738` or its
-reviewed descendant, and this protected runtime image:
+The launcher snapshots program, tool definitions and redaction policy once. Its
+launch record binds their exact hashes, the requested immutable runtime/tool
+image digests, Docker's resolved image config digests, the fresh run ID, profile,
+and host collector source hashes. Docker's actual started containers are checked
+against that launch record. Input originals are never reopened for execution.
 
-```text
-ghcr.io/bateau84/opencode-eval-runner@sha256:658f4a53fba33c74f653abb613a6f38f82ec763891bc7f8c09ce1c7b7b19483d
+Only the trusted runtime receives private `/input` and `/capture` mounts. The
+evaluated tool server gets neither, no host workspace or Docker socket, and no
+shared PID namespace. The runtime loads only its image-owned adapter. Code Mode
+has no direct network extension in this profile; external calls go through that
+adapter. Remote redirects are rejected, including the tool readiness endpoint.
+Both containers are non-root with read-only roots, bounded resources, dropped
+capabilities, and no retained raw container logs. The provider binds only loopback.
+
+The adapter records existing runtime events and redacts before writing. After the
+runtime writer exits, the supervisor seals the file and returns a receipt
+`{sha256, bytes}` over its separate, trusted control output. The host requires that
+receipt as well as the file's header/footer, exact run/launch/policy bindings,
+source/wire sequencing, real invocation IDs, parent identity and complete counts.
+Recomputing the file's own checksum cannot replace the control receipt.
+
+**No HMAC or signing service is used by this connection.** A checksum alone is not
+authentication. The host launcher, selected trusted runtime image, immutable
+adapter, and Docker/kernel isolation protect both paths. A compromised host,
+collector runtime or container escape is outside this claim. Calling a parser
+with invented bytes and an invented receipt does not reproduce the protected
+launcher. The final JSON is a host artifact, not a portable signed attestation.
+
+## Required Loom work
+
+### 1. Preserve and pin the actual producer and smoke
+
+Commit or otherwise supply the exact bytes of Loom's existing
+`scripts/fixtures/eval-tool-observer.ts`,
+`scripts/fixtures/eval-observer-smoke-tools.ts`, and
+`scripts/test_eval_observer_image.py`, plus its assertion consumer and any imports.
+The previously supplied Architect draft explicitly said those prototype files
+were uncommitted. A surrounding Loom HEAD does not pin their contents.
+
+Keep that original smoke and its past artifacts intact. Add a separate integration
+variant for this profile; do not relabel a runner fixture run as the original
+Loom smoke, backfill old results, or reconstruct missing records from script output.
+
+### 2. Move evaluated code out of collector authority
+
+For a fixture/tool-level pilot, package the actual evaluated tool implementations
+as an isolated tool-server image. It must serve `GET /health` and `POST /call` on
+port 8080. The request is:
+
+```json
+{
+  "name": "tool_name",
+  "input": {},
+  "context": {
+    "invocation_id": "runtime-allocated-id",
+    "ordinal": 0,
+    "agent": "actual-agent",
+    "session_id": "actual-session",
+    "message_id": "actual-message",
+    "call_id": "enclosing-runtime-call"
+  }
+}
 ```
 
-The runner's 33-check connection run used adversarial fixture tools, not the real
-Loom plugin. See [the validation record](protected-channel.md#completed-connection-run-2026-10-03).
-The architecture and implementation remain draft pending independent review.
+Returned data uses `{"outcome":"returned","result":<JSON>}`; a remote failure
+uses `{"outcome":"threw","error":"message"}`. The same code path and permissions
+must be exercised in the pilot with observation on and off. Keep tool business
+logic in its existing owner; do not write separate toy replacements to claim Loom
+integration. The runtime/adapter chooses execution identity; identity echoed by
+the untrusted server is never admitted as an observation.
 
-## 1. Isolate actual Loom execution
+The registered runtime name is `isolated_<name>` and its catalog path is
+`isolated.<name>`. Do not rename these records as native `loom_*` invocations.
+The error view is explicitly `codemode-catch-name-message/v1`, not preservation of
+arbitrary JavaScript exception identity, stack or cause.
 
-Package the actual evaluated Loom tool implementations behind a service in a
-separate non-root image. Do not copy or reimplement their behavior in a sentinel
-fixture. Keep any needed mutable state disposable and inside that tool boundary;
-there is no mount for the user's installation-wide Loom database.
+**For Loom's whole in-process plugin, this is architecture work, not script glue.**
+Loom operations that require OpenCode plugin/session APIs need an explicit,
+restricted broker before they can run in the tool container. This runner does not
+provide a generic session API tunnel. Do not mount the collector state, move the
+observer into the tool container, expose its callbacks, or grant a signing oracle
+to make the plugin work. The whole-plugin/delegation profile remains unsupported
+until that separate interface and its identity/permission semantics are reviewed.
 
-The initial runner adapter expects a service on port 8080:
+### 3. Supply reviewed redaction policy
 
-- `GET /health` returns HTTP 200.
-- `POST /call` receives `{name,input,context}`. `input` is the exact dispatched
-  input, not modified to carry observation metadata.
-- `context` contains `invocation_id`, `ordinal`, `agent`, `session_id`,
-  `message_id`, and `call_id` from the trusted runtime dispatch. It is not supplied
-  by Code Mode source or reconstructed from a reply. `ordinal` is dispatch order,
-  not network arrival order and not a replacement for invocation identity.
-- Replies use either `{outcome:"returned",result:<JSON>}` or
-  `{outcome:"threw",error:<message>}`. The trusted adapter retains its own context;
-  target replies cannot replace actor or invocation identity.
+Materialize host-selected `tools.json` and `policy.json`. Policy v1 contains
+`secrets` and `allowed_values`. The latter permits retention of exact safe values
+for deterministic fixtures; it never substitutes expected values for observations.
+A real unexpected return remains omitted/ineligible, not replaced with a sentinel.
+Include both positive and denial/error outcomes where safe.
 
-The current adapter registers names as `isolated_<name>` and exposes catalog
-paths `isolated.<name>`. **Do not relabel them as native Loom registrations.** A
-future mapping must preserve the actual registration identity and be explicitly
-versioned/reviewed. Session delegation and permissions that depended on an
-in-process plugin require real integration work; this transport alone does not
-preserve every Loom behavior. Do not bypass those checks to make a smoke pass.
+Unknown free text is not automatically declared safe. The collector scrubs known
+literal/encoded secrets and sensitive structured keys before persistence/limits.
+Changed fields remain `redacted`; unsupported, unknown and oversized fields cannot
+be exact evidence. A general Loom redactor must be explicitly reviewed and placed
+on the trusted side, reusing Loom's owned logic where appropriate. Do not forward
+raw Loom observer files and assume host-side scrubbing undoes prior disclosure.
 
-## 2. Adapt the launcher in `scripts/run-evals.py`
+### 4. Call the host command and enforce the new admission rule
 
-For cases explicitly declaring the supported profile, invoke the PR checkout:
+Use tested immutable digests from the completed **Protected runtime channel**
+workflow's `protected-image.txt` and `fixture-tools-image.txt` (the latter is a
+runner fixture only; substitute Loom's independently pinned actual tool image).
+Record the runner/producer/consumer revisions and launch hashes.
 
 ```sh
 bin/opencode-eval-runner observe \
-  --image <approved-protected-runtime@sha256:digest> \
-  --tool-image <actual-isolated-Loom-tools@sha256:digest> \
-  --program-file <preserved-smoke-program.js> \
-  --tools-file <selected-tool-catalog.json> \
-  --policy-file <reviewed-redaction-policy.json> \
-  --output <host-artifact.json>
+  --image "$VERIFIED_PROTECTED_RUNTIME_DIGEST" \
+  --tool-image "$PINNED_LOOM_TOOL_IMAGE_DIGEST" \
+  --program-file program.js \
+  --tools-file tools.json \
+  --policy-file policy.json \
+  --output results.json
 ```
 
-The runner reads inputs once, creates a private read-only snapshot, and records
-its hashes and the actual launched image identities. Do not reopen mutable source
-files after verification. Keep the result file on the trusted host, not in a
-workspace the evaluated code can write.
+The consumer must explicitly support projection version 4 and this profile. Require
+matching expected run ID, launch ID, image/input/policy hashes, complete coverage,
+no issues and eligible matching records before checking an outcome. Distinguish
+`returned` from domain success. Interpret JSON-looking result strings only through
+an explicit predicate; preserve their recorded type. The shared `runtime_call_id`
+is not the unique child ID: use `invocation_id` and the full parent identity.
 
-`observe` currently uses a deterministic loopback provider that asks the real
-OpenCode CLI to execute one supplied program. It is **not** a replacement for the
-normal multi-turn `invoke` transport. Do not route arbitrary existing agent evals
-through it and claim equivalent agent/session behavior.
+An eligible restricted capture still has `full_handoff_eligible: false` and explicit
+native/delegated/in-process-plugin exclusions. A case requiring any excluded
+surface must be BLOCKED/unsupported, not PASS. No expected call can pass on an empty
+record set. Required incomplete capture exits nonzero. Never recover eligibility
+from prose, outer script results, old metadata, or model claims.
 
-`--no-observe` executes the same restricted profile without capture for comparison.
-The capture switch does not enable/disable additional product permissions.
+### 5. Run the preserved integration composition
 
-## 3. Agree redaction and explicitly consume the projection
+Run the real producer → patched image → runner host CLI/importer → actual Loom
+predicates. Test overlapping identical calls with reversed completion, actual
+actor/input/parent bindings, discarded returns, caught errors, denial data/null,
+replayed/edited/deleted/incomplete capture, and I/O failure with unchanged outcomes.
+Compare observation on/off in the same restricted profile. Preserve new and altered
+fault-injection captures separately. Run with disposable HOME/XDG/workspace state
+and local deterministic provider only, no installation-wide database or paid model.
 
-The current conservative policy is:
+Runner tests and independent Loom composition are separate evidence. Independent
+code/security review remains outstanding; no merge or full acceptance follows
+from CI or the fixture proof alone.
 
-```json
-{"version":1,"secrets":[],"allowed_values":[]}
-```
+## Signing remains separate
 
-Known secret forms and sensitive structured keys are scrubbed before capture
-persistence. Only exact host-approved safe values are retained; changed values
-are marked redacted, unknown values omitted, and oversized values truncated
-without a preview. All such losses prevent positive evidence. **This exact-value
-policy is intended for deterministic smoke fixtures, not yet a general live-eval
-redactor.** A broader policy must be reviewed and demonstrated before deployment.
-
-Wire schema is `opencode-protected-observation/v2`. Exported `observed_execution`
-uses **version 3**, profile **`codemode-inner/direct-session/v1`**. These are not
-aliases for the earlier v1 HMAC importer or v2 projection.
-
-Adapt the existing Loom deterministic assertion consumer to require the agreed
-version/profile and the expected launcher-owned `run_id`, `launch_id`, images,
-input hashes and policy. A result cannot choose its own trust policy. Require
-`status == "complete"`, `evidence_eligible is true`, no issues, complete coverage,
-and eligible matching records with exact available fields before an assertion.
-Then evaluate the actual outcome; returned denial JSON is not operation success.
-Check `start_sequence` and `terminal_sequence` separately. A complete capture is
-not itself an eval PASS, and an empty capture cannot satisfy an expected call.
-
-`full_handoff_eligible` remains false. Required native calls, delegated actors or
-in-process untrusted plugins must stay unsupported, not silently ignored. Never
-fall back to source text, target stdout, outer script output, requested actor,
-legacy metadata, or exit zero. Nonzero runner outcomes also require non-PASS.
-
-## 4. Preserve and rerun Loom's own smoke
-
-Pin the actual revisions/bytes of:
-
-- `scripts/fixtures/eval-tool-observer.ts`
-- `scripts/fixtures/eval-observer-smoke-tools.ts`
-- `scripts/test_eval_observer_image.py`
-- the actual deterministic assertion consumer and adapter.
-
-The supplied Architect draft said those prototype files were uncommitted; the
-old Loom HEAD is not a pin for them. Retain the old smoke and reports. Add a new,
-explicit profile-specific run rather than weakening assertions or rewriting old
-artifacts. Use the newly published runtime digest plus the actual isolated Loom
-image and record loaded configuration and all revisions.
-
-Exercise legitimate capture, reversed completion of identical overlapping calls,
-discarded/transformed results, caught errors, returned strings/objects/null,
-target forgery attempts, replay/deletion/interruption, redaction and I/O failure.
-Compare observation on/off, then run the real Loom predicates. The runner's own
-fixture/oracle tests are not a substitute for this composition test.
-
-## Remaining review and signing
-
-The host launcher/importer, pinned runtime/collector image, host storage and
-Docker/kernel isolation are trusted. Target code has no collector endpoint or
-signing capability. The checksum is for corruption detection, not protection
-against a malicious host that can rewrite and rehash the whole stream.
-
-Image Cosign verification and finalized-result signing remain separate follow-up
-work; this profile does not perform them. Do not infer signer approval from an
-image label, digest pin, fixture test, or an `evidence_eligible` field. A future
-verifier must get allowed signer identities from trusted policy, and sign results
-only after protected collection/finalization. HMAC is not required by this path.
-
-Independent implementation review, native/delegated-session support, production
-redaction, and full Loom acceptance remain distinct open requirements. Nothing
-in this handoff authorizes a merge.
+The result explicitly reports `image_signatures_verified: false` and
+`artifact_signed: false` until signing and identity verification are implemented.
+Cosign should authenticate the image from the expected approved build workflow
+and the finalized host JSON from the expected results signer. The trusted verifier
+policy must name those identities; target JSON does not choose trusted signers.
+Keep signing/OIDC authority outside both evaluated code and arbitrary artifact
+submission. Signed eval input files must be verified before executing the same
+snapshot. These steps complement, not replace, the protected collection path.

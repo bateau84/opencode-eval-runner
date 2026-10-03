@@ -1,3 +1,9 @@
+import importlib.util
+from pathlib import Path
+import tempfile
+import os
+import base64
+from runner.protected_launch import bounded_file
 """Parser unit cases. These fixtures are not runtime integration evidence."""
 import copy
 import hashlib
@@ -34,10 +40,24 @@ def stream(events=None):
 
 
 def load(raw, **kwargs):
-    return import_capture(raw, run_id=RUN, policy_id=POLICY, launch_id=LAUNCH, tools={"isolated_echo"}, transport_ok=kwargs.get("transport_ok", True))
+    return import_capture(raw, run_id=RUN, policy_id=POLICY, launch_id=LAUNCH, receipt=kwargs.get("receipt", {"sha256": hashlib.sha256(raw).hexdigest(), "bytes": len(raw)}), tools={"isolated_echo"}, transport_ok=kwargs.get("transport_ok", True))
 
 
 class ProtectedParserTests(unittest.TestCase):
+    def test_receipt_rejects_rewritten_resealed_realistic_stream(self):
+        raw = stream()
+        receipt = {"sha256": hashlib.sha256(raw).hexdigest(), "bytes": len(raw)}
+        events = [json.loads(line)["observation"] for line in raw.splitlines()[1:-1]]
+        events[2]["result"]["value"] = "forged"
+        rewritten = stream(events)  # attacker also recomputes the inline footer
+        result = load(rewritten, receipt=receipt)
+        self.assertEqual(result["issues"], ["receipt_mismatch"])
+        self.assertFalse(result["evidence_eligible"])
+        self.assertEqual(result["records"], [])
+
+    def test_no_separate_receipt_is_not_protected_evidence(self):
+        self.assertFalse(load(stream(), receipt=None)["evidence_eligible"])
+
     def test_complete_restricted_profile_preserves_all_bindings(self):
         value = load(stream())
         self.assertTrue(value["evidence_eligible"])
@@ -50,7 +70,7 @@ class ProtectedParserTests(unittest.TestCase):
 
     def test_wrong_launch_binding_rejected(self):
         value = import_capture(stream(), run_id=RUN, policy_id=POLICY, launch_id="e" * 64,
-                               tools={"isolated_echo"}, transport_ok=True)
+                               receipt={"sha256": hashlib.sha256(stream()).hexdigest(), "bytes": len(stream())}, tools={"isolated_echo"}, transport_ok=True)
         self.assertFalse(value["evidence_eligible"])
         self.assertEqual(value["issues"], ["wrong_launch"])
 
@@ -101,9 +121,6 @@ class ProtectedParserTests(unittest.TestCase):
         self.assertFalse(load(stream(events))["evidence_eligible"])
 
 
-if __name__ == "__main__":
-    unittest.main()
-
 class ProtectedLaunchTests(unittest.TestCase):
     def test_bounded_snapshot_is_independent_of_later_input_change(self):
         import tempfile
@@ -121,5 +138,72 @@ class ProtectedLaunchTests(unittest.TestCase):
     def test_new_wire_and_projection_are_explicit_not_v1_aliases(self):
         result = load(stream())
         self.assertEqual(SCHEMA, "opencode-protected-observation/v2")
-        self.assertEqual(result["version"], 3)
+        self.assertEqual(result["version"], 4)
         self.assertEqual(result["profile"], PROFILE)
+
+
+class ProtectedSupervisorTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        path = Path(__file__).resolve().parents[1] / "protected-runtime/invoke.py"
+        spec = importlib.util.spec_from_file_location("protected_supervisor", path)
+        cls.supervisor = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cls.supervisor)
+
+    def test_readiness_redirect_does_not_reach_second_endpoint(self):
+        import threading
+        import urllib.error
+        from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+        hits = []
+        class Handler(BaseHTTPRequestHandler):
+            def log_message(self, *args):
+                pass
+            def do_GET(self):
+                hits.append(self.path)
+                if self.path == "/health":
+                    self.send_response(302)
+                    self.send_header("Location", "/private")
+                else:
+                    self.send_response(200)
+                self.end_headers()
+        server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        thread = threading.Thread(target=server.serve_forever)
+        thread.start()
+        try:
+            with self.assertRaises(urllib.error.HTTPError):
+                self.supervisor.health_check(f"http://127.0.0.1:{server.server_port}/health")
+            self.assertEqual(hits, ["/health"])
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join()
+
+    def test_script_diagnostics_redact_encoded_secrets_before_retaining(self):
+        secret = "fixture-private"
+        variants = (secret, base64.b64encode(secret.encode()).decode(), secret.encode().hex())
+        policy = {"secrets": [secret], "allowed_values": [*variants, "[REDACTED]"]}
+        for value in variants:
+            self.assertEqual(self.supervisor.safe_output(value, policy),
+                             {"state": "redacted", "value": "[REDACTED]"})
+        self.assertEqual(self.supervisor.safe_output("unknown", policy)["state"], "omitted")
+
+    def test_script_diagnostic_limits_follow_redaction(self):
+        secret = "x" * 20000
+        policy = {"secrets": [secret], "allowed_values": ["[REDACTED]", "ø" * 9000]}
+        self.assertEqual(self.supervisor.safe_output(secret, policy)["state"], "redacted")
+        self.assertEqual(self.supervisor.safe_output("ø" * 9000, policy)["state"], "truncated")
+
+    def test_input_read_is_bounded_and_rejects_fifo_without_blocking(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "input"
+            path.write_bytes(b"1234")
+            with self.assertRaises(ValueError):
+                bounded_file(path, 2)
+            path.unlink()
+            os.mkfifo(path)
+            with self.assertRaises(ValueError):
+                bounded_file(path, 2)
+
+
+if __name__ == "__main__":
+    unittest.main()

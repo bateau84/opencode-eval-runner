@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import re
 import secrets
+import stat
 import subprocess
 import tempfile
 
@@ -20,7 +21,9 @@ def run(command, *, timeout=120):
 
 def bounded_file(path, limit):
     # Open each input once, then execute this snapshot, not a reopened original.
-    with Path(path).open("rb") as source:
+    fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK)
+    with os.fdopen(fd, "rb") as source:
+        _require(stat.S_ISREG(os.fstat(source.fileno()).st_mode), "input_not_regular")
         raw = source.read(limit + 1)
     _require(len(raw) <= limit, "input_limit")
     return raw
@@ -58,8 +61,8 @@ def invoke(args: argparse.Namespace, *, _test_receive=None, _test_prepare=None, 
     run_id = secrets.token_hex(32)
     prefix = "capture-" + run_id[:16]
     network, target, runtime = prefix + "-net", prefix + "-tools", prefix + "-runtime"
-    output = Path(args.output).resolve()
-    _require(all(output != Path(p).resolve() for p in (args.program_file, args.tools_file, args.policy_file)), "output_overwrites_input")
+    output = Path(os.path.abspath(args.output))
+    _require(all(output.resolve() != Path(p).resolve() for p in (args.program_file, args.tools_file, args.policy_file)), "output_overwrites_input")
     output.parent.mkdir(parents=True, exist_ok=True)
     policy_id = hashlib.sha256(policy_raw).hexdigest()
     repo = Path(__file__).resolve().parents[1]
@@ -70,7 +73,8 @@ def invoke(args: argparse.Namespace, *, _test_receive=None, _test_prepare=None, 
               "tools_sha256": hashlib.sha256(tools_raw).hexdigest()}
     result = {"schema": "opencode-eval-runner/v1", "profile": PROFILE, "run_id": run_id,
               "runtime_image": args.image, "tool_image": args.tool_image, "policy_id": policy_id,
-              "observed_execution": empty_projection(run_id)}
+              "observed_execution": empty_projection(run_id),
+              "image_signatures_verified": False, "artifact_signed": False}
     code = 4
     with tempfile.TemporaryDirectory(prefix="protected-capture-") as tmp:
         root = Path(tmp)
@@ -90,6 +94,7 @@ def invoke(args: argparse.Namespace, *, _test_receive=None, _test_prepare=None, 
                        "policy_id": policy_id, "launch_id": launch_id, "observe": not args.no_observe}
             (inputs / "request.json").write_text(json.dumps(request))
             (inputs / "policy.json").write_bytes(policy_raw)
+            (inputs / "tools.json").write_bytes(tools_raw)
             (inputs / "launch.json").write_bytes(launch_raw)
             for file in inputs.iterdir():
                 file.chmod(0o644)
@@ -115,8 +120,10 @@ def invoke(args: argparse.Namespace, *, _test_receive=None, _test_prepare=None, 
             _require(not target_state.get("Mounts") and not target_state["HostConfig"].get("PidMode"), "unexpected_target_access")
             result["launched_images_verified"] = True
             envelope = strict_json(completed.stdout)
-            _shape(envelope, ("profile", "run_id", "runtime_exit", "script_output", "writer_exited"))
-            _require(envelope["profile"] == PROFILE and envelope["run_id"] == run_id, "invalid_supervisor")
+            _shape(envelope, ("profile", "run_id", "launch_id", "runtime_exit", "script_output", "writer_exited", "receipt"))
+            _require(envelope["profile"] == PROFILE and envelope["run_id"] == run_id
+                     and envelope["launch_id"] == launch_id, "invalid_supervisor")
+            result["collection_receipt"] = envelope["receipt"]
             result.update(runtime_exit=envelope["runtime_exit"], script_output=envelope["script_output"])
             transport_ok = completed.returncode == 0 and type(envelope["runtime_exit"]) is int and envelope["runtime_exit"] == 0 and envelope["writer_exited"] is True
             if args.no_observe:
@@ -130,7 +137,7 @@ def invoke(args: argparse.Namespace, *, _test_receive=None, _test_prepare=None, 
                 if _test_receive is not None:
                     raw = _test_receive(raw, run_id, policy_id)
                 result["observed_execution"] = import_capture(raw, run_id=run_id, policy_id=policy_id, launch_id=launch_id,
-                    tools={"isolated_" + t["name"] for t in tools}, transport_ok=transport_ok)
+                    receipt=envelope["receipt"], tools={"isolated_" + t["name"] for t in tools}, transport_ok=transport_ok)
                 code = 0 if result["observed_execution"]["evidence_eligible"] else 4
             # Test-only oracle access. Never a CLI option or an evidence producer.
             if _test_target_probe is not None:

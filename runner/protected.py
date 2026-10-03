@@ -84,7 +84,7 @@ def _field(value):
 
 def empty_projection(run_id: str) -> dict:
     return {
-        "kind": "execution-observer-projection", "version": 3,
+        "kind": "execution-observer-projection", "version": 4,
         "profile": PROFILE, "run_id": run_id, "status": "unavailable",
         "evidence_eligible": False, "full_handoff_eligible": False,
         "records": [], "parents": [], "issues": [],
@@ -95,7 +95,7 @@ def empty_projection(run_id: str) -> dict:
     }
 
 
-def import_capture(raw: bytes, *, run_id: str, policy_id: str, launch_id: str, tools: set[str], transport_ok: bool) -> dict:
+def import_capture(raw: bytes, *, run_id: str, policy_id: str, launch_id: str, receipt: dict | None, tools: set[str], transport_ok: bool) -> dict:
     """Validate bytes read by the protected launcher, NOT arbitrary target bytes.
 
     A checksum detects stream damage; it is not an origin proof. Origin comes from
@@ -103,9 +103,14 @@ def import_capture(raw: bytes, *, run_id: str, policy_id: str, launch_id: str, t
     attest a file, and is deliberately not exposed as a file-import CLI command.
     """
     result = empty_projection(run_id)
+    result["launch_id"] = launch_id
+    result["collection_profile"] = "private-supervisor-receipt/v1"
     parents, calls = {}, {}
     try:
         _require(len(raw) <= MAX_BYTES, "capture_limit")
+        _shape(receipt, ("sha256", "bytes"))
+        _require(type(receipt["bytes"]) is int and receipt["bytes"] == len(raw)
+                 and receipt["sha256"] == hashlib.sha256(raw).hexdigest(), "receipt_mismatch")
         _require(bool(raw) and raw.endswith(b"\n"), "missing_or_partial_capture")
         lines = raw.splitlines(keepends=True)
         _require(2 <= len(lines) <= MAX_EVENTS + 2, "frame_count")
