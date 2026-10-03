@@ -357,7 +357,7 @@ contract and consumer migration rather than relabeling an existing version.
 | Observer callback hang noninterference | unsupported |
 | Protection from arbitrary in-process evaluated plugins | unsupported |
 | Normal-host positive evidence projection | unsupported |
-| Cosign image/result authentication | trusted default-branch signer implemented separately; activation requires that workflow on the default branch |
+| Cosign image/result authentication | manual default-branch rebuild/sign workflow implemented separately; final signing requires protected `release-signing` environment approval |
 | Loom checkpoint `f8439e4` composition | Loom session reported provider-free composition PASS; runner fixtures remain separate evidence |
 
 ## Trust statement
@@ -390,6 +390,6 @@ This closes the focused foreground identity/ancestry/permission proof. Backgroun
 delivery, cancellation, and OQ-specific lifecycle behavior remain separate Loom
 composition obligations and are not inferred from this test.
 
-See [Cosign provenance](signing-provenance.md) for artifact authentication and
+See [Cosign provenance](signing-provenance.md) for the manual approved-rebuild signing path and
 [plugin isolation feasibility](plugin-isolation-feasibility.md) for the stronger
 same-process trust boundary.

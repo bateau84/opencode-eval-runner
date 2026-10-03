@@ -1,68 +1,111 @@
-# Cosign provenance for normal-invoke eval images and results
+# Cosign provenance for approved normal-invoke images and results
 
 ## Security goal
 
 Cosign authenticates **approved bytes and signer identity**. It does not make an
 observation truthful when evaluated code shares the collector's authority.
 
-The signing design therefore follows protected collection rather than replacing
-it:
+The trusted signing path is deliberately separate from pull-request CI:
 
 ```text
-unprivileged PR build/test
-  -> immutable image + finalized diagnostic evidence
-  -> trusted default-branch workflow_run signer
-       -> Cosign image signature
-       -> Cosign signed finalized result JSON
+reviewed PR commit
+  -> manual default-branch workflow_dispatch
+  -> unprivileged rebuild from that exact commit
+  -> immutable image publication
+  -> unprivileged provider-free verification
+  -> protected release-signing environment approval
+  -> Cosign image + finalized-result signatures
 ```
 
-## Why signing is not in the PR build job
+PR pushes and green PR workflows cannot automatically request a signature.
 
-A pull-request workflow definition is PR-controlled. Giving that workflow OIDC
-or a long-lived signing key would allow a modified PR workflow to request
-signatures for attacker-chosen material.
+## Why PR artifacts are not signed directly
 
-`.github/workflows/sign-normal-invoke-evidence.yml` is instead triggered by
-`workflow_run`. GitHub loads that signer definition from the repository's
-**default branch**.
+A PR controls its source files, Containerfile, test scripts, and workflow inputs.
+A default-branch signer that automatically consumes successful PR artifacts would
+authenticate attacker-controlled bytes after only self-produced checks.
 
-The signer:
+The signer therefore does **not** use `workflow_run` and does not consume
+`runtime-publication-*` or `local-runtime-*` PR artifacts.
 
-1. receives no repository checkout;
-2. executes no PR-provided script or image;
-3. verifies the triggering workflow's exact Git blob SHA against
-   `EXPECTED_BUILD_WORKFLOW_BLOB`;
-4. downloads only publication/verification artifacts from the completed run;
-5. independently pulls the immutable image digest and verifies its
-   `org.opencontainers.image.revision` and runtime-version labels;
-6. requires the eval-live, delegated-session, and runtime diagnostic summaries
-   to have their expected successful/non-evidence state;
-7. signs the image digest with GitHub OIDC;
-8. creates and signs a separate finalized result JSON.
+Instead, an authorized operator manually dispatches the trusted default-branch
+workflow with:
 
-Changing the build workflow therefore requires an explicit reviewed update to
-the trusted signer's allowed workflow blob.
+- the reviewed 40-hex source commit;
+- the PR number that currently has that exact head.
+
+The trusted workflow verifies the PR head, checks out the selected commit in an
+unprivileged build job, rebuilds the runtime from pinned OpenCode source, and
+reruns the provider-free runtime, eval-live compatibility, and delegated-session
+probes.
+
+## Privilege separation
+
+The workflow has four jobs.
+
+### build
+
+- runs only when the workflow definition itself is invoked from `refs/heads/main`;
+- has read-only repository permission;
+- validates the selected commit is the current head of the supplied PR;
+- rebuilds OpenCode from pinned upstream source plus the reviewed downstream
+  patch;
+- runs the source tests;
+- saves image bytes as an artifact;
+- has no package-write or OIDC authority.
+
+### publish
+
+- receives only the image archive;
+- has package-write permission but no OIDC token;
+- does not check out or execute source code;
+- publishes a commit/run-scoped image and returns its immutable digest.
+
+### verify
+
+- has read-only permission;
+- checks out the exact selected commit;
+- pulls the immutable digest;
+- verifies revision/runtime labels;
+- runs the real normal-invoke runtime probe, eval-live compatibility probe, and
+  delegated-session probe;
+- uploads the finalized diagnostic evidence;
+- has no package-write or OIDC authority.
+
+### sign
+
+- depends on successful build, publish, and verify;
+- uses the GitHub environment **`release-signing`**;
+- repository configuration must protect that environment with required
+  reviewers;
+- has OIDC and package-write permission;
+- checks out no source and executes no selected-commit scripts;
+- validates only fixed result shapes from the verified artifacts;
+- signs the exact immutable image and a separately finalized result JSON.
+
+Thus a PR push cannot obtain signing authority merely by making its own tests
+green. The final approval occurs after rebuild and verification.
 
 ## Signed result binding
 
-`eval-result.json` contains:
+`eval-result.json` version 2 contains:
 
-- source commit;
-- triggering workflow run ID and attempt;
+- reviewed source commit;
+- PR number;
+- trusted signing workflow run ID;
 - exact immutable image digest;
-- reviewed build-workflow blob SHA;
 - SHA-256 digests of the finalized compatibility, delegated-session, and runtime
   probe summaries;
 - their pass states;
 - explicit `protected_capture_accepted: false`;
 - explicit `in_process_plugin_protection: "unsupported"`.
 
-The signature cannot silently upgrade diagnostic evidence into protected
-evidence.
+The signature therefore authenticates the diagnostic result without upgrading it
+into a protected-capture claim.
 
 ## Expected signer identity
 
-The verifier derives the expected identity from the trusted signer workflow:
+When invoked from the protected default-branch workflow, the expected identity is:
 
 ```text
 https://github.com/bateau84/opencode-eval-runner/.github/workflows/sign-normal-invoke-evidence.yml@refs/heads/main
@@ -74,17 +117,27 @@ Issuer:
 https://token.actions.githubusercontent.com
 ```
 
-The workflow also verifies both signatures immediately after creation.
+The workflow verifies both the image signature and blob bundle immediately after
+creation.
+
+## Required repository configuration
+
+Before this signing path is treated as release authority:
+
+1. merge/install the workflow on the default branch;
+2. create the `release-signing` GitHub environment;
+3. configure required reviewers for that environment;
+4. limit who may deploy to it according to repository policy.
+
+Without those environment protections, the YAML alone is not a human approval
+gate.
 
 ## Current PR limitation
 
-PR #41 is intentionally **not merged**. A `workflow_run` signer added by this PR
-does not become a trusted default-branch workflow until that workflow file is
-installed on the default branch.
+PR #41 is intentionally unmerged. The trusted workflow therefore cannot yet be
+invoked from the default branch, and no valid release-signing environment run can
+be produced from this PR alone.
 
-Therefore the current experimental PR image can be published and tested, but it
-must remain **unsigned by the trusted signer**. Producing a signature from a
-PR-controlled copy of the signer would defeat the purpose of this design.
-
-This is an activation dependency created by the no-merge constraint, not an
-implementation gap to paper over with a weaker signing path.
+That limitation is intentional: producing a keyless signature from a PR-controlled
+copy of the workflow would defeat the security boundary this design is meant to
+provide.

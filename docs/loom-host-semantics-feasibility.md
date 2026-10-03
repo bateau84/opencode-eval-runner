@@ -96,8 +96,9 @@ PR #41 must not silently build that broader platform.
 | Unique child invocation correlation | **Runtime-generated IDs** | Protection blocked in normal in-process profile |
 | Separate start/completion ordering | **Shared runtime sequence** | Protection blocked in normal in-process profile |
 | Inner -> outer `execute` parent binding | **Runtime-bound, not FIFO/input inference** | Protection blocked in normal in-process profile |
-| Delegated child Session identity | **Same central Tool path; expected to carry child context** | **Composition proof still required** |
-| Session ancestry beyond executing Session ID | **Not yet emitted/proved** | Unsupported |
+| Delegated foreground child Session identity | **Exercised through real built-in subagent** | Protection blocked in normal in-process profile |
+| Child Session ancestry / parentID | **Verified by querying the actual child Session in the delegated probe** | Protection blocked in normal in-process profile |
+| Background delegation / cancellation / OQ lifecycle | **Not yet exercised by this focused runner probe** | Unsupported |
 | Normal permission/grant/plugin behavior | **Not replaced by the observation patch** | Loom composition proof still required |
 | Cancellation/lifecycle/OQ/gate continuation | **Normal host path retained** | Loom composition proof still required |
 | Collector unforgeable by arbitrary in-process Loom plugin | No | **Unsupported** |

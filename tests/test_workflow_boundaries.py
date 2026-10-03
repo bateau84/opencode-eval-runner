@@ -66,37 +66,59 @@ class PublicationBoundaryTests(unittest.TestCase):
             self.assertNotIn("continue-on-error", text)
             self.assertNotIn("pull_request_target", text)
 
-    def test_signer_is_default_branch_workflow_run_not_pr_code(self):
+    def test_signer_is_manual_default_branch_rebuild_with_approval_gate(self):
         text = (ROOT / ".github/workflows/sign-normal-invoke-evidence.yml").read_text()
         prefix, jobs = workflow_jobs("sign-normal-invoke-evidence.yml")
-        self.assertIn("workflow_run:", prefix)
+        self.assertIn("workflow_dispatch:", prefix)
+        self.assertNotIn("workflow_run:", prefix)
         self.assertNotIn("pull_request:", prefix)
-        self.assertNotIn("workflow_dispatch:", prefix)
-        self.assertEqual(set(jobs), {"sign"})
+        self.assertNotIn("pull_request_target", text)
+        self.assertEqual(set(jobs), {"build", "publish", "verify", "sign"})
+
+        build = jobs["build"]
+        self.assertIn("github.ref == 'refs/heads/main'", build)
+        self.assertIn("gh api", build)
+        self.assertIn(".head.sha", build)
+        self.assertIn("runtime-patches/apply.py", build)
+        self.assertIn("docker build", build)
+        self.assertNotIn("packages: write", build)
+        self.assertNotIn("id-token: write", build)
+
+        publisher = jobs["publish"]
+        self.assertIn("packages: write", publisher)
+        self.assertNotIn("id-token: write", publisher)
+        self.assertNotIn("actions/checkout", publisher)
+        self.assertNotIn("docker run", publisher)
+        self.assertIn("docker load", publisher)
+
+        verifier = jobs["verify"]
+        self.assertNotIn("packages: write", verifier)
+        self.assertNotIn("id-token: write", verifier)
+        self.assertIn("run_image_probe.py", verifier)
+        self.assertIn("run_eval_live_compat_probe.py", verifier)
+        self.assertIn("run_delegated_session_probe.py", verifier)
+
         signer = jobs["sign"]
-        self.assertIn("id-token: write", prefix)
-        self.assertIn("packages: write", prefix)
-        self.assertIn("actions: read", prefix)
+        self.assertIn("environment: release-signing", signer)
+        self.assertIn("packages: write", signer)
+        self.assertIn("id-token: write", signer)
         self.assertNotIn("actions/checkout", signer)
         self.assertNotIn("docker run", signer)
         self.assertNotIn("docker build", signer)
-        self.assertIn("EXPECTED_BUILD_WORKFLOW_BLOB", signer)
-        self.assertIn("gh api", signer)
         self.assertIn("cosign sign --yes", signer)
         self.assertIn("cosign sign-blob --yes", signer)
         self.assertIn("--certificate-identity", signer)
         self.assertIn("protected_capture_accepted", signer)
         self.assertIn('"unsupported"', signer)
-        self.assertIn("github.event.workflow_run.head_repository.full_name == github.repository", signer)
 
-    def test_signer_pins_reviewed_build_workflow_blob(self):
-        signer = (ROOT / ".github/workflows/sign-normal-invoke-evidence.yml").read_text()
-        runtime = (ROOT / ".github/workflows/local-runtime.yml").read_bytes()
-        import hashlib
-        blob = hashlib.sha1(b"blob " + str(len(runtime)).encode() + b"\0" + runtime).hexdigest()
-        match = re.search(r"EXPECTED_BUILD_WORKFLOW_BLOB:\s*([0-9a-f]{40})", signer)
-        self.assertIsNotNone(match)
-        self.assertEqual(match.group(1), blob)
+    def test_signer_never_auto_signs_pr_artifacts(self):
+        text = (ROOT / ".github/workflows/sign-normal-invoke-evidence.yml").read_text()
+        self.assertNotIn("github.event.workflow_run", text)
+        self.assertNotIn("runtime-publication-", text)
+        self.assertNotIn("local-runtime-", text)
+        self.assertIn("approved-build-", text)
+        self.assertIn("approved-evidence-", text)
+        self.assertIn("Reviewed 40-hex source commit", text)
 
 
 if __name__ == "__main__":

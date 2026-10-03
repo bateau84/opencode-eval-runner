@@ -33,7 +33,7 @@ profile. The `observe` command is a deterministic single-program transport, not
 a replacement for normal multi-turn `invoke`. Keep result artifacts on the
 trusted host. Pin actual adapter/producer/consumer bytes and preserve
 `scripts/test_eval_observer_image.py` and its original fixtures. See the current
-[handoff](loom-protected-channel-handoff.md) for version-4 admission and actual
+[handoff](loom-protected-channel-handoff.md) for version-5 admission and actual
 Loom execution-isolation work.
 
 
