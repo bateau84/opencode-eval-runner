@@ -1,5 +1,15 @@
 # Execution observer export v1 — integration candidate
 
+> **Normal-invoke note (PR #41 current direction):** this document describes the older
+> `--observer-key-file` / HMAC integration candidate. It is **not** the observation
+> interface Loom should consume for `bun run eval:live -> runner invoke`, and its
+> signing candidate does not establish protection from arbitrary same-process
+> evaluated plugins. See
+> [loom-normal-invoke-observation.md](loom-normal-invoke-observation.md) for the
+> current diagnostic runtime contract and
+> [plugin-isolation-feasibility.md](plugin-isolation-feasibility.md) for the
+> remaining protection boundary.
+
 ## Status and ownership
 
 This is the **runner-side export implementation and proposed producer contract**
