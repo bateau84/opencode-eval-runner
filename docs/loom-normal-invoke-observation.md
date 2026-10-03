@@ -349,16 +349,16 @@ contract and consumer migration rather than relabeling an existing version.
 | Actual direct-session actor/session/message/call identity | diagnostic support |
 | Runtime outer-execute -> inner parent binding | diagnostic support |
 | Shared native/inner ordering | diagnostic support |
-| Real delegated child-session composition | not yet exercised |
-| Session ancestry / parent Session ID | unsupported |
+| Real delegated foreground child-session identity/ancestry | exercised provider-free through built-in `subagent` |
+| Child Session parentID | verified in the delegated probe by querying the actual child Session; not emitted as a normal observation field |
 | Provider-hosted tool results | outside this local-execution seam |
 | Run-wide completeness | unsupported |
 | General live-eval redaction | unsupported |
 | Observer callback hang noninterference | unsupported |
 | Protection from arbitrary in-process evaluated plugins | unsupported |
 | Normal-host positive evidence projection | unsupported |
-| Cosign image/result authentication | separate, not implemented by this seam |
-| Loom checkpoint `f8439e4` composition | Loom-owned test still required |
+| Cosign image/result authentication | trusted default-branch signer implemented separately; activation requires that workflow on the default branch |
+| Loom checkpoint `f8439e4` composition | Loom session reported provider-free composition PASS; runner fixtures remain separate evidence |
 
 ## Trust statement
 
@@ -368,3 +368,28 @@ to report these runtime facts. That is a deployment trust decision.
 It is categorically different from proving that arbitrary evaluated plugin code
 cannot fabricate, suppress, or interfere with observations while sharing the same
 process. PR #41 does not claim the latter.
+
+
+## Delegated-session composition checkpoint
+
+The normal-invoke workflow includes a provider-free test using OpenCode's real
+built-in foreground `subagent` tool. It verifies:
+
+- the parent `subagent` invocation is observed under the actual parent actor and
+  Session;
+- the child provider request runs as the configured `reviewer` agent;
+- the child tool observation carries the child Session ID;
+- the child Session ID returned by the real `subagent` result matches the child
+  observation;
+- the actual child Session object's `parentID` matches the parent Session;
+- child tool completion precedes the foreground `subagent` terminal;
+- a resource-scoped permission denial for `subagent/reviewer` prevents any child
+  Session request or child-tool observation.
+
+This closes the focused foreground identity/ancestry/permission proof. Background
+delivery, cancellation, and OQ-specific lifecycle behavior remain separate Loom
+composition obligations and are not inferred from this test.
+
+See [Cosign provenance](signing-provenance.md) for artifact authentication and
+[plugin isolation feasibility](plugin-isolation-feasibility.md) for the stronger
+same-process trust boundary.

@@ -1,4 +1,4 @@
-"""Review checks for the two new fixed publication workflows.
+"""Review checks for publication/signing workflow trust boundaries.
 
 These inspect declared job boundaries; actual Actions runs must also exercise
 image publication and digest-based verification. No YAML parser dependency.
@@ -43,12 +43,44 @@ class PublicationBoundaryTests(unittest.TestCase):
                 self.assertIn("github.event.pull_request.head.repo.full_name == github.repository", jobs["build"])
 
     def test_external_actions_are_pinned_and_errors_not_ignored(self):
-        for name in ("protected-channel.yml", "local-runtime.yml"):
+        for name in ("protected-channel.yml", "local-runtime.yml", "sign-normal-invoke-evidence.yml"):
             text = (ROOT / ".github/workflows" / name).read_text()
             for action in re.findall(r"uses: (\S+)", text):
                 self.assertRegex(action, r"^[A-Za-z0-9_/-]+@[0-9a-f]{40}$")
             self.assertNotIn("continue-on-error", text)
             self.assertNotIn("pull_request_target", text)
+
+    def test_signer_is_default_branch_workflow_run_not_pr_code(self):
+        text = (ROOT / ".github/workflows/sign-normal-invoke-evidence.yml").read_text()
+        prefix, jobs = workflow_jobs("sign-normal-invoke-evidence.yml")
+        self.assertIn("workflow_run:", prefix)
+        self.assertNotIn("pull_request:", prefix)
+        self.assertNotIn("workflow_dispatch:", prefix)
+        self.assertEqual(set(jobs), {"sign"})
+        signer = jobs["sign"]
+        self.assertIn("id-token: write", prefix)
+        self.assertIn("packages: write", prefix)
+        self.assertIn("actions: read", prefix)
+        self.assertNotIn("actions/checkout", signer)
+        self.assertNotIn("docker run", signer)
+        self.assertNotIn("docker build", signer)
+        self.assertIn("EXPECTED_BUILD_WORKFLOW_BLOB", signer)
+        self.assertIn("gh api", signer)
+        self.assertIn("cosign sign --yes", signer)
+        self.assertIn("cosign sign-blob --yes", signer)
+        self.assertIn("--certificate-identity", signer)
+        self.assertIn("protected_capture_accepted", signer)
+        self.assertIn('"unsupported"', signer)
+        self.assertIn("github.event.workflow_run.head_repository.full_name == github.repository", signer)
+
+    def test_signer_pins_reviewed_build_workflow_blob(self):
+        signer = (ROOT / ".github/workflows/sign-normal-invoke-evidence.yml").read_text()
+        runtime = (ROOT / ".github/workflows/local-runtime.yml").read_bytes()
+        import hashlib
+        blob = hashlib.sha1(b"blob " + str(len(runtime)).encode() + b"\0" + runtime).hexdigest()
+        match = re.search(r"EXPECTED_BUILD_WORKFLOW_BLOB:\s*([0-9a-f]{40})", signer)
+        self.assertIsNotNone(match)
+        self.assertEqual(match.group(1), blob)
 
 
 if __name__ == "__main__":

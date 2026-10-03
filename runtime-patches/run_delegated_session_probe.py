@@ -19,6 +19,7 @@ import { appendFileSync } from "node:fs"
 
 const path = "/workspace/delegated-observations.jsonl"
 function log(event: any) { appendFileSync(path, JSON.stringify(event) + "\n") }
+const calls = new Map<string, { tool: string; parentSession: string }>()
 
 export default {
   id: "delegateprobe",
@@ -33,7 +34,32 @@ export default {
         execute: async (input: any) => ({ content: "MARKER-" + input.marker }),
       })
     })
-    await ctx.tool.hook("execute.native-observed", (event: any) => { log(event) })
+    await ctx.tool.hook("execute.native-observed", async (event: any) => {
+      log(event)
+      if (event.kind === "call_start") {
+        calls.set(String(event.invocation_id), {
+          tool: String(event.tool),
+          parentSession: String(event.actor?.session_id ?? ""),
+        })
+        return
+      }
+      if (event.kind !== "call_end") return
+      const call = calls.get(String(event.invocation_id))
+      if (!call) return
+      calls.delete(String(event.invocation_id))
+      const childID = event.outcome === "returned"
+        ? event.result?.value?.metadata?.sessionID
+        : undefined
+      if (call.tool === "subagent" && typeof childID === "string" && childID) {
+        const child = await ctx.session.get({ sessionID: childID })
+        log({
+          kind: "session_ancestry",
+          child_session_id: child.id,
+          child_parent_id: child.parentID ?? null,
+          parent_actor_session_id: call.parentSession,
+        })
+      }
+    })
     await ctx.session.hook("http.request", (event: any) => {
       const headers = new Headers(event.request.headers)
       headers.set("x-probe-session", String(event.sessionID))
@@ -208,6 +234,7 @@ def run_once(image: str, output: Path, *, denied: bool):
             events = read_jsonl(workspace/"delegated-observations.jsonl")
             starts = [e for e in events if e.get("kind")=="call_start"]
             ends = {e.get("invocation_id"):e for e in events if e.get("kind")=="call_end"}
+            ancestry = [e for e in events if e.get("kind")=="session_ancestry"]
             sub_start = next((e for e in starts if e.get("tool")=="subagent"), None)
             sub_end = ends.get(sub_start.get("invocation_id")) if sub_start else None
             child_start = next((e for e in starts if str(e.get("tool","")).endswith("delegateprobe_marker")), None)
@@ -235,6 +262,10 @@ def run_once(image: str, output: Path, *, denied: bool):
                         and child_start.get("actor",{}).get("agent")=="reviewer"
                         and child_start.get("actor",{}).get("session_id")==child_session,
                     "parent_and_child_sessions_distinct": bool(parent_session) and bool(child_session) and parent_session != child_session,
+                    "actual_session_parent_id_matches_parent": len(ancestry) == 1
+                        and ancestry[0].get("child_session_id") == child_session
+                        and ancestry[0].get("child_parent_id") == parent_session
+                        and ancestry[0].get("parent_actor_session_id") == parent_session,
                     "child_completed_before_parent_subagent_terminal": child_end is not None and sub_end is not None
                         and child_end.get("sequence",0) < sub_end.get("sequence",0),
                     "foreground_completion_delivered": sub_end is not None and "CHILD-DONE" in json.dumps(sub_end),
@@ -257,7 +288,7 @@ def main():
     denied=run_once(args.image,args.output,denied=True)
     summary={"kind":"delegated-session-normal-invoke","version":1,"image":args.image,
              "success":success["checks"],"denied":denied["checks"],"passed":success["passed"] and denied["passed"],
-             "scope":"real built-in foreground subagent + permission enforcement; provider-free",
+             "scope":"real built-in foreground subagent + actual Session parentID + permission enforcement; provider-free",
              "remaining":["background delegation and cancellation/OQ lifecycle are not exercised by this focused probe"]}
     (args.output/"summary.json").write_text(json.dumps(summary,indent=2)+"\n")
     print(json.dumps(summary,indent=2))

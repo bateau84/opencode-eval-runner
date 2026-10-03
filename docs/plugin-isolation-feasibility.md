@@ -43,7 +43,60 @@ runner invoke
 
 This is a feasibility direction, not accepted architecture.
 
-## Phase 0 — inventory, no implementation
+## Phase 0 result — Loom checkpoint `f8439e4`
+
+The inventory is bounded enough to justify a **separate prototype**, not an
+implicit expansion of PR #41.
+
+Static inspection of `plugins/loom/index.ts` at the checkpoint found these
+direct OpenCode-context capabilities:
+
+| Capability | Direct uses | Broker class |
+| --- | ---: | --- |
+| `storage.get` | 167 | typed request/response |
+| `storage.set` | 117 | typed request/response |
+| `storage.scan` | 10 | typed request/response/stream |
+| `location.directory` | 43 | immutable launch data |
+| `location.project` | 5 | immutable launch data |
+| `session.hook` | 2 | typed callback registration |
+| `session.synthetic` | 1 | typed request/response |
+| `session.get` | 1 | typed request/response |
+| `tool.hook` | 2 | typed callback registration |
+| `tool.transform` | 1 | typed registration transform |
+| `tool.list` | 1 | typed request/response |
+| `agent.transform` | 1 | typed registration transform |
+| `agent.list` | 1 | typed request/response |
+| `permission.hook` | 1 | typed callback registration |
+| `rpc.register` | 1 | plugin-owned RPC registration |
+
+The plugin also directly uses Node filesystem/path/crypto/async-hooks and
+`child_process.execFile`. Those do not require execution inside the trusted
+OpenCode process: an isolated Loom process can retain a disposable workspace
+mount and its own bounded OS process authority while the collector mount,
+signing authority, and OpenCode core remain absent from that process.
+
+### Phase 0 classification
+
+- **Pure/brokerable state:** storage get/set/scan, session get/synthetic,
+  tool/agent list.
+- **Typed lifecycle callbacks:** session/tool/agent/permission hooks and
+  transforms. These require ordered request/response callback RPC, but not a
+  generic `eval` or arbitrary function execution facility in the trusted
+  runtime.
+- **Launch facts:** location/project identity can be immutable launch data.
+- **Plugin-local authority:** workspace filesystem/process operations and Loom's
+  own RPC endpoint can remain in the isolated process.
+
+No direct checkpoint usage requires handing the isolated process arbitrary
+memory access, arbitrary module execution, or an unrestricted OpenCode API in
+the trusted collector process.
+
+**Phase 0 verdict: GO for a separate bounded prototype.** This is not approval to
+build it inside PR #41. The prototype must still falsify the assumption that the
+typed callback surface is sufficient for cancellation, grants, child delivery,
+OQ continuation, and all current plugin behavior.
+
+## Phase 0 — inventory method
 
 Pin Loom checkpoint `f8439e4` and inventory every OpenCode capability used by the
 actual plugin/smoke:
