@@ -231,6 +231,18 @@ def main():
             'AMBIENT-SESSION-MUST-NOT-BE-READ' not in json.dumps(r) and requests > 0)
         (out/'disposable-valid.json').write_bytes(S.encode(r)+b'\n')
 
+        # Synthetic-only diagnostic of the same expected-plugin lifecycle
+        # without the RSP envelope. This preserves the fixed fixture error in
+        # CI evidence so bootstrap/preflight failures can be distinguished
+        # without exposing real credentials.
+        raw_plugin,_,raw_plugin_code,_,raw_plugin_requests=once(
+            args.image,root,'disposable-expected-plugin-lifecycle','missing',
+            legacy=True,disposable=True,ambient_traps=True,expected_plugin=True
+        )
+        checks['disposable-expected-plugin-lifecycle:success']=raw_plugin_code==0
+        checks['disposable-expected-plugin-lifecycle:provider_after_preflight']=raw_plugin_requests>0
+        (out/'disposable-expected-plugin-lifecycle.json').write_text(json.dumps(raw_plugin,indent=2)+'\n')
+
         # Expected-plugin activation uses a Session API, but it must run in
         # separate temporary state. The production DB is re-attested after
         # preflight and must still report zero pre-inference Sessions.
