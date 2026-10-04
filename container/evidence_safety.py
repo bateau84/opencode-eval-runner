@@ -536,6 +536,11 @@ def validate_reply(raw: bytes | str, policy: Policy, run_id: str, revision: str,
                         require(type(action) is dict and set(action) == {'tool','args'})
                         require(type(action['tool']) is str and not policy.matches(action['tool']))
                         require(type(action['args']) is dict and policy.payload(action['args']) == (action['args'], False))
+                elif name == 'runtime_state':
+                    # Runtime-state counters/discriminators are reviewed protocol
+                    # structure. Credentials such as "0", "1", "text", or "low"
+                    # must not reclassify those fixed values as payload.
+                    require(validated_runtime_state(val) == val)
                 else:
                     projected = check.field(name, val, role=role, limit=200_000 if name == 'text' else 6000)
                     require(projected is not MISSING and check.fields[0]['state'] == 'exact')

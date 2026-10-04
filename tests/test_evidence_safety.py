@@ -70,9 +70,16 @@ class PolicyTests(unittest.TestCase):
             'first_migration':'20260127222353_familiar_lady_ursula',
             'last_migration':'20260923013825_project_time_active',
         }
-        r=S.project_result({**raw_result(),'runtime_state':state},S.Policy(inventory()))
+        policy=S.Policy(inventory(['0','1','text','low']))
+        r=S.project_result({**raw_result(),'runtime_state':state},policy)
         self.assertEqual(r['runtime_state'],state)
         self.assertEqual(disposition(r,'runtime_state')['state'],'exact')
+        run_id='a'*64; revision='b'*40; binding=b'c'*32
+        r['evidence_safety_ack']=S.receipt(policy,run_id,revision,binding)
+        self.assertEqual(
+            S.validate_reply(S.encode(r),policy,run_id,revision,binding)['runtime_state'],
+            state,
+        )
         bad={**state,'database_seed_present':True}
         r=S.project_result({**raw_result(),'runtime_state':bad},S.Policy(inventory()))
         self.assertNotIn('runtime_state',r)
