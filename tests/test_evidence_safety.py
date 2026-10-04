@@ -275,6 +275,27 @@ class HostBoundaryTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             S.validate_reply(S.encode(bad), p, 'c' * 64, REV)
 
+    def test_incomplete_policy_keeps_only_fixed_event_status_exact(self):
+        policy = S.Policy(inventory(complete=False))
+        run_id = 'c' * 64
+        revision = REV
+        binding = b'd' * 32
+        result = S.project_result(raw_result([tool('private-output')]), policy)
+        result['evidence_safety_ack'] = S.receipt(policy, run_id, revision, binding)
+        event_fields = [
+            item for item in result['evidence_safety']['fields']
+            if item.get('event') == 0
+        ]
+        status = next(item for item in event_fields if item['field'] == 'status')
+        self.assertEqual(status['state'], 'exact')
+        self.assertTrue(all(
+            item['state'] == 'omitted'
+            for item in event_fields if item['field'] != 'status'
+        ))
+        admitted = S.validate_reply(S.encode(result), policy, run_id, revision, binding)
+        self.assertEqual(admitted['tool_result_evidence']['events'][0]['status'], 'completed')
+        self.assertNotIn('private-output', json.dumps(admitted))
+
     def test_retained_event_requires_complete_field_dispositions(self):
         policy = S.Policy(inventory(['unrelated-secret']))
         run_id = 'c' * 64

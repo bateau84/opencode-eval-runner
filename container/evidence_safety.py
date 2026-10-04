@@ -468,7 +468,7 @@ def validate_reply(raw: bytes | str, policy: Policy, run_id: str, revision: str,
             require(item['reason'] in REASONS and item['stage'] == 'runner')
             counts[item['reason']] += 1
             require(state != 'redacted' or item['reason'] == 'credential_match')
-        require(policy.complete or state == 'omitted')
+        require(policy.complete or state == 'omitted' or (event is not None and name == 'status' and state == 'exact'))
         dispositions[(event, name)] = item
     require(counts == summary['loss_counts'])
     require(summary['coverage_complete'] == (policy.complete and not any(counts.values())))
