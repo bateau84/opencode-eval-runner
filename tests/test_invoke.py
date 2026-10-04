@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 import json
 import os
+import sqlite3
 import subprocess
 import tempfile
 import unittest
@@ -17,6 +18,7 @@ from container.invoke import (
     invoke_copilot,
     invoke_opencode,
     resolve_opencode_reasoning,
+    disposable_runtime_state,
     verify_expected_plugin,
 )
 
@@ -138,6 +140,33 @@ class OpenCodeTransportTests(unittest.TestCase):
                 },
             ],
         )
+
+    def test_disposable_runtime_state_attests_runtime_owned_bootstrap(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp); data=root/'data'/'opencode'; data.mkdir(parents=True); (root/'config').mkdir()
+            env={
+                'EVAL_OPENCODE_STATE_PROFILE':'disposable',
+                'EVAL_OPENCODE_DATABASE_SOURCE':'runtime-bootstrap',
+                'EVAL_OPENCODE_AUTH_SOURCE':'none',
+                'XDG_DATA_HOME':str(root/'data'),
+            }
+            migrations=['20260127222353_familiar_lady_ursula']+[f'202602{i:08d}_fixture' for i in range(1,47)]+['20260923013825_project_time_active']
+            def bootstrap(command,cwd,actual_env,timeout):
+                self.assertEqual(command[:3], ['opencode','session','list'])
+                db=data/'opencode.db'
+                with sqlite3.connect(db) as conn:
+                    conn.execute('CREATE TABLE session (id TEXT)')
+                    conn.execute('CREATE TABLE credential (id TEXT)')
+                    conn.execute('CREATE TABLE migration (id TEXT PRIMARY KEY, time_completed INTEGER NOT NULL)')
+                    conn.executemany('INSERT INTO migration VALUES (?,1)',[(m,) for m in migrations])
+                return subprocess.CompletedProcess(command,0,'[]','')
+            with patch('container.invoke.run', side_effect=bootstrap):
+                state=disposable_runtime_state(env,30)
+            self.assertEqual(state['migration_count'],48)
+            self.assertEqual(state['database_source'],'runtime-bootstrap')
+            self.assertFalse(state['database_seed_present'])
+            self.assertEqual(state['session_rows_before_inference'],0)
+            self.assertEqual(state['credential_rows_before_inference'],0)
 
     def test_v2_invocation_does_not_use_models_refresh_preflight(self):
         class Result:

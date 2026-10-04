@@ -8,6 +8,7 @@ import re
 import secrets
 import selectors
 import shutil
+import sqlite3
 import subprocess
 import sys
 import time
@@ -43,6 +44,11 @@ def rsp_module():
 RESULT_SCHEMA = "opencode-eval-runner/v1"
 OPENCODE_EVAL_TITLE = "opencode-eval-runner"
 COPILOT_AGENT_NAME = "eval-runner"
+RUNTIME_STATE_SCHEMA = "opencode-eval-runner/runtime-state/v1"
+DISPOSABLE_STATE_PROFILE = "disposable"
+EXPECTED_MIGRATION_COUNT = 48
+FIRST_MIGRATION = "20260127222353_familiar_lady_ursula"
+LAST_MIGRATION = "20260923013825_project_time_active"
 COPILOT_AUTH_ENVS = ("COPILOT_GITHUB_TOKEN", "GH_TOKEN", "GITHUB_TOKEN")
 COPILOT_EXCLUDED_TOOLS = (
     "bash", "powershell", "list_bash", "list_powershell", "read_bash",
@@ -338,6 +344,11 @@ def prepare_opencode_env() -> dict[str, str]:
     seed_models = Path("/seed/models.json")
     seed_database = Path("/seed/opencode.db")
     seed_config_root = Path("/seed/opencode-config")
+    state_profile = os.environ.get("EVAL_OPENCODE_STATE_PROFILE", "default")
+    if state_profile not in {"default", DISPOSABLE_STATE_PROFILE}:
+        raise RuntimeError("unsupported OpenCode state profile")
+    if state_profile == DISPOSABLE_STATE_PROFILE and seed_database.is_file():
+        raise RuntimeError("disposable profile forbids database seeds")
     if seed_config.is_file():
         shutil.copyfile(seed_config, config / "opencode.json")
     else:
@@ -390,6 +401,68 @@ def prepare_opencode_env() -> dict[str, str]:
         "OPENCODE_DISABLE_AUTOUPDATE": "1",
     })
     return env
+
+
+def disposable_runtime_state(env: dict[str, str], timeout: int) -> dict[str, Any] | None:
+    """Bootstrap and attest fresh OpenCode state before model inference."""
+    if env.get("EVAL_OPENCODE_STATE_PROFILE") != DISPOSABLE_STATE_PROFILE:
+        return None
+    if env.get("EVAL_OPENCODE_DATABASE_SOURCE") != "runtime-bootstrap":
+        raise RuntimeError("invalid disposable database source")
+    data = Path(env["XDG_DATA_HOME"]) / "opencode"
+    database = data / "opencode.db"
+    if Path("/seed/opencode.db").is_file() or database.exists():
+        raise RuntimeError("disposable database must start absent")
+    auth = data / "auth.json"
+    auth_source = env.get("EVAL_OPENCODE_AUTH_SOURCE")
+    if auth_source == "none" and auth.exists():
+        raise RuntimeError("disposable profile unexpectedly loaded auth state")
+    if auth_source == "explicit" and not auth.is_file():
+        raise RuntimeError("explicit disposable auth seed was not loaded")
+    if auth_source not in {"none", "explicit"}:
+        raise RuntimeError("invalid disposable auth source")
+
+    # This command initializes the normal OpenCode storage/session stack but
+    # does not invoke a model provider. The runtime owns schema/bootstrap and
+    # its migration journal; the runner does not fabricate either.
+    bootstrap = run(
+        ["opencode", "session", "list", "--standalone", "--format", "json", "--max-count", "1"],
+        Path("/workspace"), env, min(timeout, 30),
+    )
+    if bootstrap.returncode != 0:
+        raise RuntimeError("disposable database bootstrap failed")
+    if not database.is_file():
+        raise RuntimeError("disposable database bootstrap produced no database")
+    try:
+        with sqlite3.connect(f"file:{database}?mode=ro", uri=True) as db:
+            tables = {row[0] for row in db.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+            )}
+            migrations = [row[0] for row in db.execute("SELECT id FROM migration ORDER BY id")]
+            session_rows = db.execute("SELECT COUNT(*) FROM session").fetchone()[0]
+            credential_rows = db.execute("SELECT COUNT(*) FROM credential").fetchone()[0]
+    except sqlite3.Error as exc:
+        raise RuntimeError("disposable database attestation failed") from exc
+    if not {"session", "credential", "migration"} <= tables:
+        raise RuntimeError("disposable database schema incomplete")
+    if (len(migrations) != EXPECTED_MIGRATION_COUNT or
+            migrations[0] != FIRST_MIGRATION or migrations[-1] != LAST_MIGRATION):
+        raise RuntimeError("disposable database migration journal mismatch")
+    if session_rows != 0 or credential_rows != 0:
+        raise RuntimeError("disposable database bootstrap was not empty")
+    return {
+        "schema": RUNTIME_STATE_SCHEMA,
+        "profile": DISPOSABLE_STATE_PROFILE,
+        "database_source": "runtime-bootstrap",
+        "database_created": True,
+        "database_seed_present": False,
+        "auth_source": auth_source,
+        "session_rows_before_inference": session_rows,
+        "credential_rows_before_inference": credential_rows,
+        "migration_count": len(migrations),
+        "first_migration": migrations[0],
+        "last_migration": migrations[-1],
+    }
 
 
 def ensure_model_config(env: dict[str, str], model: str) -> None:
@@ -724,6 +797,7 @@ def invoke_opencode(
     reasoning: str = "",
 ) -> dict[str, Any]:
     env = prepare_opencode_env()
+    runtime_state = disposable_runtime_state(env, timeout)
     plugins = plugin_diagnostic(env)
     expected_plugin = os.environ.get("EVAL_EXPECT_PLUGIN", "").strip()
     plugin_preflight = verify_expected_plugin(env, agent, model, expected_plugin, timeout)
@@ -768,7 +842,7 @@ def invoke_opencode(
         )
         if stderr.strip():
             detail += "\n" + stderr.strip()
-        return {
+        result = {
             "schema": RESULT_SCHEMA,
             "transport": "opencode",
             "model": model,
@@ -799,6 +873,9 @@ def invoke_opencode(
             "plugin_diagnostic": plugins,
             "plugin_preflight": plugin_preflight,
         }
+        if runtime_state is not None:
+            result["runtime_state"] = runtime_state
+        return result
 
     run_seconds = time.perf_counter() - run_started
     events = parse_events(proc.stdout)
@@ -816,7 +893,7 @@ def invoke_opencode(
     export_seconds = 0.0
     export_exit_code: int | None = None
 
-    return {
+    result = {
         "schema": RESULT_SCHEMA,
         "transport": "opencode",
         "model": model,
@@ -846,6 +923,9 @@ def invoke_opencode(
         "plugin_diagnostic": plugins,
         "plugin_preflight": plugin_preflight,
     }
+    if runtime_state is not None:
+        result["runtime_state"] = runtime_state
+    return result
 
 
 def copilot_auth_source(env: dict[str, str]) -> str | None:

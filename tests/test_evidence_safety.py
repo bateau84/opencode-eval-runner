@@ -62,6 +62,22 @@ class PolicyTests(unittest.TestCase):
         self.assertTrue(p.valid and p.complete)
         self.assertEqual(set(p.values), {'0', '1', 'text', 'low'})
 
+    def test_disposable_runtime_state_has_strict_exact_shape(self):
+        state={
+            'schema':S.RUNTIME_STATE,'profile':'disposable','database_source':'runtime-bootstrap',
+            'database_created':True,'database_seed_present':False,'auth_source':'none',
+            'session_rows_before_inference':0,'credential_rows_before_inference':0,'migration_count':48,
+            'first_migration':'20260127222353_familiar_lady_ursula',
+            'last_migration':'20260923013825_project_time_active',
+        }
+        r=S.project_result({**raw_result(),'runtime_state':state},S.Policy(inventory()))
+        self.assertEqual(r['runtime_state'],state)
+        self.assertEqual(disposition(r,'runtime_state')['state'],'exact')
+        bad={**state,'database_seed_present':True}
+        r=S.project_result({**raw_result(),'runtime_state':bad},S.Policy(inventory()))
+        self.assertNotIn('runtime_state',r)
+        self.assertEqual(disposition(r,'runtime_state')['state'],'omitted')
+
     def test_missing_incompatible_and_incomplete_policy_never_complete(self):
         for data in (None, {}, {'values': ['secret']}, {**inventory(), 'complete': 1},
                      {**inventory(), 'policy_version': 'future'}, {**inventory(), 'schema': 'future'},
@@ -283,6 +299,16 @@ class HostBoundaryTests(unittest.TestCase):
                     self.assertNotEqual(code, 0)
                     self.assertNotIn('secret', (root/'result.json').read_text())
                     self.assertNotIn('secret', output.getvalue())
+
+    def test_disposable_profile_policy_must_match_explicit_seed_selection(self):
+        p=S.Policy(inventory())
+        command=['docker','--volume','/synthetic/config:/seed/opencode.json:ro',IMAGE]
+        q=safe_invoke.audit_selected_inputs(p,command,{}, {'config'}, 'disposable')
+        self.assertFalse(q.complete)  # policy claimed config not_selected
+        data=inventory(); data['sources']['config']='complete'
+        q=safe_invoke.audit_selected_inputs(S.Policy(data),command,{}, {'config'}, 'disposable')
+        self.assertTrue(q.complete)
+        self.assertEqual(q.private['sources']['credential_seed'],'not_selected')
 
     def test_selected_default_source_not_selected_downgrades_policy(self):
         p = S.Policy(inventory())

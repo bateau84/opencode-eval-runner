@@ -8,6 +8,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import sqlite3
 from pathlib import Path
 import subprocess
 import sys
@@ -53,7 +54,7 @@ def inventory(kind):
     return p
 
 
-def once(image, root, name, policy_kind, scenario='success', legacy=False):
+def once(image, root, name, policy_kind, scenario='success', legacy=False, disposable=False, database_override=False, ambient_traps=False):
     workspace=root/name; workspace.mkdir()
     (workspace/'.opencode/plugins').mkdir(parents=True)
     (workspace/'.opencode/plugins/rsp.ts').write_text(PLUGIN)
@@ -97,10 +98,26 @@ def once(image, root, name, policy_kind, scenario='success', legacy=False):
     state=workspace/'isolated';state.mkdir()
     for key in ('HOME','XDG_CONFIG_HOME','XDG_DATA_HOME','XDG_STATE_HOME','XDG_CACHE_HOME'):
         path=state/key;path.mkdir();env[key]=str(path)
+    ambient_db=None
+    if ambient_traps:
+        ambient_data=Path(env['XDG_DATA_HOME'])/'opencode';ambient_data.mkdir(parents=True)
+        (ambient_data/'auth.json').write_text(json.dumps({'token':'AMBIENT-AUTH-MUST-NOT-BE-READ'}))
+        ambient_db=ambient_data/'opencode.db'
+        with sqlite3.connect(ambient_db) as db:
+            db.execute('CREATE TABLE session (id TEXT PRIMARY KEY)')
+            db.execute("INSERT INTO session VALUES ('AMBIENT-SESSION-MUST-NOT-BE-READ')")
+            db.commit()
     command=[sys.executable,str(ROOT/'bin/opencode-eval-runner'),'invoke','--engine','docker',
              '--network','host','--image',image,'--workspace',str(workspace),'--workspace-mode','rw',
              '--model','fixture/mock','--config',str(workspace/'opencode.json'),'--prompt-file',str(prompt),'--output',str(output),
              '--timeout-seconds','4' if scenario=='timeout' else '30','--container-timeout','60','--print-result']
+    if disposable:
+        command += ['--opencode-state-profile','disposable']
+    if database_override:
+        explicit_db=root/(name+'-explicit.db')
+        with sqlite3.connect(explicit_db) as db:
+            db.execute('CREATE TABLE session (id TEXT PRIMARY KEY)')
+        command += ['--database',str(explicit_db)]
     if not legacy:
         command.append('--require-evidence-safety')
         policy=inventory(policy_kind)
@@ -114,7 +131,7 @@ def once(image, root, name, policy_kind, scenario='success', legacy=False):
         result=json.loads(output.read_bytes()) if output.is_file() else {}
         emitted=json.loads(proc.stdout) if proc.stdout.strip() else {}
         oracle=[m.get('content') for request in seen[1:] for m in request.get('messages',[]) if m.get('role')=='tool']
-        return result,emitted,proc.returncode,oracle
+        return result,emitted,proc.returncode,oracle,len(seen)
     finally:
         server.shutdown();server.server_close();t.join(3)
 
@@ -142,8 +159,8 @@ def main():
     args=parser.parse_args();out=Path(args.output);out.mkdir(parents=True,exist_ok=True);checks={}
     with tempfile.TemporaryDirectory(prefix='rsp-real-image-') as tmp:
         root=Path(tmp)
-        _,_,legacy_code,legacy_oracle=once(args.image,root,'legacy','missing',legacy=True)
-        r,e,code,oracle=once(args.image,root,'valid','valid')
+        _,_,legacy_code,legacy_oracle,_=once(args.image,root,'legacy','missing',legacy=True)
+        r,e,code,oracle,_=once(args.image,root,'valid','valid')
         checks.update(check_safety('valid',r,e,code,'valid'))
         fields=r.get('evidence_safety',{}).get('fields',[])
         outputs=[x for x in r.get('tool_result_evidence',{}).get('events',[]) if 'output' in x]
@@ -156,17 +173,51 @@ def main():
         for policy_kind in ('missing','incomplete','future'):
             for scenario in ('success','failure','timeout'):
                 name=policy_kind+'-'+scenario
-                r,e,code,_=once(args.image,root,name,policy_kind,scenario)
+                r,e,code,_,_=once(args.image,root,name,policy_kind,scenario)
                 checks.update(check_safety(name,r,e,code,policy_kind))
                 if scenario=='timeout':checks[name+':product_timeout_preserved']=r.get('timed_out') is True and r.get('exit_code')==124
                 (out/(name+'.json')).write_bytes(S.encode(r)+b'\n')
         for scenario in ('failure','oversize'):
-            r,e,code,_=once(args.image,root,scenario,'valid',scenario)
+            r,e,code,_,_=once(args.image,root,scenario,'valid',scenario)
             checks.update(check_safety(scenario,r,e,code,'valid'))
             fields=r.get('evidence_safety',{}).get('fields',[])
             if scenario=='failure':checks['actual_error_protected']=any(f['field']=='error' and f['state']=='redacted' for f in fields)
             else:checks['safe_then_size_omission']=any(f['field']=='output' and f['state']=='omitted' and f['reason']=='size_limit' for f in fields)
             (out/(scenario+'.json')).write_bytes(S.encode(r)+b'\n')
+
+        # DB handoff: real invoke, fresh runtime-owned DB, ambient host auth/DB traps present.
+        r,e,code,oracle,requests=once(
+            args.image,root,'disposable-valid','valid',disposable=True,ambient_traps=True
+        )
+        checks.update(check_safety('disposable-valid',r,e,code,'valid'))
+        state=r.get('runtime_state',{})
+        state_disp=next((x for x in r.get('evidence_safety',{}).get('fields',[])
+                         if x.get('event') is None and x.get('field')=='runtime_state'),{})
+        checks['disposable-valid:runtime_bootstrap_attested']=(
+            state.get('schema')=='opencode-eval-runner/runtime-state/v1' and
+            state.get('profile')=='disposable' and state.get('database_source')=='runtime-bootstrap' and
+            state.get('database_created') is True and state.get('database_seed_present') is False and
+            state.get('auth_source')=='none' and state.get('session_rows_before_inference')==0 and
+            state.get('credential_rows_before_inference')==0 and state.get('migration_count')==48 and
+            state.get('first_migration')=='20260127222353_familiar_lady_ursula' and
+            state.get('last_migration')=='20260923013825_project_time_active' and
+            state_disp.get('state')=='exact')
+        checks['disposable-valid:ambient_state_not_read']=(
+            'AMBIENT-AUTH-MUST-NOT-BE-READ' not in json.dumps(r) and
+            'AMBIENT-SESSION-MUST-NOT-BE-READ' not in json.dumps(r) and requests > 0)
+        (out/'disposable-valid.json').write_bytes(S.encode(r)+b'\n')
+
+        # Missing safety policy and incompatible explicit DB selection fail before provider inference.
+        r,e,code,_,requests=once(args.image,root,'disposable-missing','missing',disposable=True,ambient_traps=True)
+        checks['disposable-missing:pre_inference_fail']=code!=0 and requests==0 and not r.get('evidence_safety',{}).get('inventory_complete',True)
+        checks['disposable-missing:no_payload']=all(k not in r for k in ('text','tools','actions','session_id'))
+        (out/'disposable-missing.json').write_bytes(S.encode(r)+b'\n')
+
+        r,e,code,_,requests=once(args.image,root,'disposable-explicit-db','valid',disposable=True,database_override=True)
+        checks['disposable-explicit-db:pre_inference_fail']=code!=0 and requests==0
+        checks['disposable-explicit-db:no_payload']=all(k not in r for k in ('text','tools','actions','session_id'))
+        (out/'disposable-explicit-db.json').write_bytes(S.encode(r)+b'\n')
+
     summary={'schema':'rsp-image-proof/v1','image':args.image,'checks':checks,'passed':all(checks.values()),
              'source_commit':subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip(),
              'real_provider_inference':False,'full_capture_accepted':False,'loom_composition':'not_run'}

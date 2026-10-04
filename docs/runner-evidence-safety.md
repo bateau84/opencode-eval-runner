@@ -238,3 +238,16 @@ The deliberately unsafe baseline uses disposable synthetic data only and is not
 published as admitted evidence. These runner tests do not replace Loom's own
 composition tests. Both publication and test results must be checked on the
 actual PR source before acceptance.
+
+
+## Disposable OpenCode state profile
+
+For provider-free composition that must exclude installed auth/database state,
+use `--opencode-state-profile disposable`. The complete lifecycle and policy
+source-state contract are defined in
+[`disposable-opencode-state.md`](disposable-opencode-state.md).
+
+The disposable profile is opt-in. It does not change ordinary `invoke` defaults.
+In RSP mode its `opencode-eval-runner/runtime-state/v1` attestation is carried as
+an exact protocol field and must be understood by the Loom consumer before that
+composition can be admitted.

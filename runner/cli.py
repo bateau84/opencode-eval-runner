@@ -30,6 +30,14 @@ COPILOT_AUTH_ENVS = (
 
 RUNTIME_UID = 1000
 RUNTIME_GID = 1000
+OPENCODE_STATE_PROFILES = ("default", "disposable")
+RUNNER_SEED_ENVS = (
+    "OPENCODE_EVAL_RUNNER_AUTH",
+    "OPENCODE_EVAL_RUNNER_CONFIG",
+    "OPENCODE_EVAL_RUNNER_MODELS",
+    "OPENCODE_EVAL_RUNNER_DB",
+    "OPENCODE_EVAL_RUNNER_CONFIG_ROOT",
+)
 
 
 class RunnerError(RuntimeError):
@@ -179,6 +187,52 @@ def existing_dir(explicit: str | None, env_name: str) -> Path | None:
     return path
 
 
+def explicit_seed(explicit: str | None, label: str) -> Path | None:
+    if not explicit:
+        return None
+    path = Path(explicit).expanduser()
+    if not path.is_file():
+        raise RunnerError(f"{label} file not found: {path}")
+    return path
+
+
+def explicit_dir(explicit: str | None, label: str) -> Path | None:
+    if not explicit:
+        return None
+    path = Path(explicit).expanduser()
+    if not path.is_dir():
+        raise RunnerError(f"{label} directory not found: {path}")
+    return path
+
+
+def opencode_state_profile(args: argparse.Namespace, host_env: dict[str, str] | None = None) -> str:
+    profile = getattr(args, "opencode_state_profile", "default") or "default"
+    if profile not in OPENCODE_STATE_PROFILES:
+        raise RunnerError(f"unsupported OpenCode state profile: {profile}")
+    if profile == "disposable":
+        if args.transport != "opencode":
+            raise RunnerError("--opencode-state-profile disposable is only supported by the opencode transport")
+        if getattr(args, "database", None):
+            raise RunnerError("--database is incompatible with --opencode-state-profile disposable")
+        env = dict(os.environ) if host_env is None else host_env
+        selected = [name for name in RUNNER_SEED_ENVS if env.get(name)]
+        if selected:
+            raise RunnerError(
+                "--opencode-state-profile disposable rejects implicit runner seed overrides: "
+                + ", ".join(sorted(selected))
+            )
+    return profile
+
+
+def resolve_database_seed(
+    args: argparse.Namespace, destination: Path, host_env: dict[str, str] | None = None
+) -> Path | None:
+    if opencode_state_profile(args, host_env) == "disposable":
+        return None
+    source = existing_seed(args.database, "OPENCODE_EVAL_RUNNER_DB", default_database_path())
+    return sanitize_database_seed(source, destination) if source else None
+
+
 def host_environment_for_transport(transport: str) -> dict[str, str]:
     env = dict(os.environ)
     if transport != "github-copilot-cli" or any(env.get(name, "").strip() for name in COPILOT_AUTH_ENVS):
@@ -284,13 +338,19 @@ def build_container_command(
     for spec in getattr(args, "mount", []):
         command += extra_mount_arg(spec)
 
-    auth = existing_seed(args.auth, "OPENCODE_EVAL_RUNNER_AUTH", default_auth_path())
-    config = existing_seed(args.config, "OPENCODE_EVAL_RUNNER_CONFIG")
-    models = existing_seed(
-        args.models_catalog,
-        "OPENCODE_EVAL_RUNNER_MODELS",
-        default_models_path(),
-    )
+    state_profile = opencode_state_profile(args, host_env)
+    if state_profile == "disposable":
+        auth = explicit_seed(args.auth, "auth")
+        config = explicit_seed(args.config, "config")
+        models = explicit_seed(args.models_catalog, "models catalog")
+    else:
+        auth = existing_seed(args.auth, "OPENCODE_EVAL_RUNNER_AUTH", default_auth_path())
+        config = existing_seed(args.config, "OPENCODE_EVAL_RUNNER_CONFIG")
+        models = existing_seed(
+            args.models_catalog,
+            "OPENCODE_EVAL_RUNNER_MODELS",
+            default_models_path(),
+        )
     if auth:
         command += bind_arg(auth, "/seed/auth.json", readonly=True)
     if config:
@@ -299,7 +359,11 @@ def build_container_command(
         command += bind_arg(models, "/seed/models.json", readonly=True)
     if database_seed:
         command += bind_arg(database_seed, "/seed/opencode.db", readonly=True)
-    config_root = existing_dir(getattr(args, "config_root", None), "OPENCODE_EVAL_RUNNER_CONFIG_ROOT")
+    config_root = (
+        explicit_dir(getattr(args, "config_root", None), "config root")
+        if state_profile == "disposable"
+        else existing_dir(getattr(args, "config_root", None), "OPENCODE_EVAL_RUNNER_CONFIG_ROOT")
+    )
     if config_root:
         command += bind_arg(config_root, "/seed/opencode-config", readonly=True)
 
@@ -313,10 +377,17 @@ def build_container_command(
         "--env", "EVAL_PROMPT_FILE=/input/prompt.txt",
         "--env", "EVAL_SYSTEM_FILE=/input/system.txt",
         "--env", f"EVAL_TIMEOUT_SECONDS={args.timeout_seconds}",
+        "--env", f"EVAL_OPENCODE_STATE_PROFILE={state_profile}",
+        "--env", f"EVAL_OPENCODE_AUTH_SOURCE={'explicit' if auth else 'none' if state_profile == 'disposable' else 'implicit-or-none'}",
+        "--env", f"EVAL_OPENCODE_DATABASE_SOURCE={'runtime-bootstrap' if state_profile == 'disposable' else 'seed-or-runtime'}",
     ]
 
-    env_names = list(dict.fromkeys(DEFAULT_ENV_ALLOWLIST + tuple(args.env)))
-    if args.transport == "github-copilot-cli":
+    env_names = (
+        list(dict.fromkeys(tuple(args.env)))
+        if state_profile == "disposable"
+        else list(dict.fromkeys(DEFAULT_ENV_ALLOWLIST + tuple(args.env)))
+    )
+    if args.transport == "github-copilot-cli" and state_profile != "disposable":
         env_names.extend(COPILOT_AUTH_ENVS)
     pass_env(command, env_names, host_env)
 
@@ -353,18 +424,11 @@ def invoke(args: argparse.Namespace) -> int:
         else:
             (input_dir / "system.txt").write_text("", encoding="utf-8")
 
-        database_source = existing_seed(
-            args.database,
-            "OPENCODE_EVAL_RUNNER_DB",
-            default_database_path(),
-        )
-        database_seed = (
-            sanitize_database_seed(database_source, root / "opencode-credentials.db")
-            if database_source
-            else None
+        host_env = host_environment_for_transport(args.transport)
+        database_seed = resolve_database_seed(
+            args, root / "opencode-credentials.db", host_env
         )
 
-        host_env = host_environment_for_transport(args.transport)
         command, _ = build_container_command(
             args,
             input_dir,
@@ -472,6 +536,16 @@ def parser() -> argparse.ArgumentParser:
     run.add_argument("--config")
     run.add_argument("--models-catalog")
     run.add_argument("--database")
+    run.add_argument(
+        "--opencode-state-profile",
+        choices=OPENCODE_STATE_PROFILES,
+        default="default",
+        help=(
+            "OpenCode host-state lifecycle. 'default' preserves existing implicit auth/model/database seeds; "
+            "'disposable' rejects implicit runner seed overrides, disables ambient provider auth forwarding, "
+            "forbids database seeds, and lets OpenCode bootstrap a fresh migrated database in disposable XDG state."
+        ),
+    )
     run.add_argument("--config-root")
     run.add_argument("--env", action="append", default=[], metavar="NAME")
     run.add_argument("--timeout-seconds", type=int, default=240)

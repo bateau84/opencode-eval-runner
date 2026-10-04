@@ -29,7 +29,7 @@ def load_policy(path):
         return s.Policy()
 
 
-def audit_selected_inputs(policy, command, host_env, explicit_sources=None):
+def audit_selected_inputs(policy, command, host_env, explicit_sources=None, state_profile='default'):
     """Downgrade omissions/defaults not represented by Loom's selected profile.
 
     This does not discover new real state, classify arbitrary configs, or infer
@@ -57,6 +57,18 @@ def audit_selected_inputs(policy, command, host_env, explicit_sources=None):
                 contradictory |= actual not in policy.values
     states = policy.private['sources']
     contradictory |= any(states[category] != 'complete' for category in selected)
+    if state_profile == 'disposable':
+        # The disposable profile makes default database/auth/config selection an
+        # explicit runner guarantee. Policy source states must describe the
+        # actually selected explicit inputs, not an ambient fallback.
+        expected = {
+            'auth': 'complete' if 'auth' in selected else 'not_selected',
+            'config': 'complete' if 'config' in selected else 'not_selected',
+            'models': 'complete' if 'models' in selected else 'not_selected',
+            'credential_seed': 'not_selected',
+            'config_root': 'complete' if 'config_root' in selected else 'not_selected',
+        }
+        contradictory |= any(states[name] != value for name, value in expected.items())
     if explicit_sources is not None:
         # The v1 policy has no path bindings for runner-resolved defaults.
         # Never infer that a category label describes an ambient fallback.
@@ -165,14 +177,18 @@ def invoke(args):
                 shutil.copyfile(args.system_file, inputs / 'system.txt')
             else:
                 (inputs / 'system.txt').write_text('')
-            source = cli.existing_seed(args.database, 'OPENCODE_EVAL_RUNNER_DB', cli.default_database_path())
-            database = cli.sanitize_database_seed(source, root / 'credentials.db') if source else None
             host_env = cli.host_environment_for_transport(args.transport)
+            state_profile = cli.opencode_state_profile(args, host_env)
+            database = cli.resolve_database_seed(args, root / 'credentials.db', host_env)
             command, _ = cli.build_container_command(args, inputs, output, host_env, database)
             explicit = {name for name, value in {
                 'auth': args.auth, 'config': args.config, 'models': args.models_catalog,
                 'credential_seed': args.database, 'config_root': args.config_root}.items() if value}
-            policy = audit_selected_inputs(policy, command, host_env, explicit)
+            policy = audit_selected_inputs(policy, command, host_env, explicit, state_profile)
+            if state_profile == 'disposable' and not policy.complete:
+                result = s.fallback('inventory_incomplete', 'transport', policy)
+                write_projection(args.output, result, args.print_result)
+                return 4
             loaded = resolved_image(command)
             # Send only to the supervisor's consumed stdin; do not expose policy
             # values in a bind-mounted file, argv, or inherited runtime env.
@@ -187,6 +203,15 @@ def invoke(args):
             except (ValueError, TypeError, KeyError, RecursionError):
                 result = s.fallback('unsupported_schema')
             else:
+                runtime_state = result.get('runtime_state')
+                if state_profile == 'disposable':
+                    s.require(type(runtime_state) is dict and
+                              runtime_state.get('profile') == 'disposable' and
+                              runtime_state.get('database_source') == 'runtime-bootstrap' and
+                              runtime_state.get('database_seed_present') is False and
+                              runtime_state.get('database_created') is True)
+                else:
+                    s.require(runtime_state is None)
                 loaded['host_executable_sha256'] = hashlib.sha256(
                     (Path(__file__).resolve().parents[1] / 'bin/opencode-eval-runner').read_bytes()).hexdigest()
                 loaded['host_adapter_sha256'] = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()

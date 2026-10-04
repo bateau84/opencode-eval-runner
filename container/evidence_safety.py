@@ -22,6 +22,7 @@ ACK = 'opencode-eval-runner/evidence-safety-ack/v1'
 RESULT = 'opencode-eval-runner/safe-result/v1'
 EVENTS = 'opencode-eval-runner/safe-tool-results/v1'
 CONSUMER = 'runner-evidence-safety/v1'
+RUNTIME_STATE = 'opencode-eval-runner/runtime-state/v1'
 POLICY_LIMIT = 128_000
 WIRE_LIMIT = 132_096
 RESULT_LIMIT = 1_000_000
@@ -237,7 +238,25 @@ PUBLIC_FLAGS = {'timed_out', 'infrastructure_error', 'stdout_truncated', 'stderr
 DYNAMIC = {'model', 'reasoning', 'agent', 'skill', 'session_id', 'credential_source'}
 OPAQUE = {'stdout', 'stderr', 'plugin_diagnostic', 'plugin_preflight'}
 ALLOWED = PUBLIC_COUNTERS | PUBLIC_FLAGS | DYNAMIC | OPAQUE | {
-    'schema', 'transport', 'reasoning_source', 'text', 'tools', 'actions', 'skills_loaded', 'timing', 'tool_result_evidence'}
+    'schema', 'transport', 'reasoning_source', 'text', 'tools', 'actions', 'skills_loaded', 'timing',
+    'tool_result_evidence', 'runtime_state'}
+
+
+def validated_runtime_state(value: Any) -> dict[str, Any]:
+    require(type(value) is dict and set(value) == {
+        'schema', 'profile', 'database_source', 'database_created', 'database_seed_present',
+        'auth_source', 'session_rows_before_inference', 'credential_rows_before_inference',
+        'migration_count', 'first_migration', 'last_migration',
+    }, 'unsupported_schema')
+    require(value['schema'] == RUNTIME_STATE and value['profile'] == 'disposable', 'invalid')
+    require(value['database_source'] == 'runtime-bootstrap', 'invalid')
+    require(value['database_created'] is True and value['database_seed_present'] is False, 'invalid')
+    require(value['auth_source'] in {'none', 'explicit'}, 'invalid')
+    for name in ('session_rows_before_inference', 'credential_rows_before_inference', 'migration_count'):
+        require(type(value[name]) is int and 0 <= value[name] <= 2**53 - 1, 'invalid')
+    require(value['session_rows_before_inference'] == 0 and value['credential_rows_before_inference'] == 0, 'invalid')
+    require(type(value['first_migration']) is str and type(value['last_migration']) is str, 'invalid')
+    return owned(value)
 
 
 def project_result(raw: Any, policy: Policy, stage='runner') -> dict:
@@ -269,6 +288,13 @@ def project_result(raw: Any, policy: Policy, stage='runner') -> dict:
     # JSON, and generated runtime secrets. They have no safe typed adapter yet.
     for name in OPAQUE:
         p.omit(name, 'upstream_clipped' if raw.get(name + '_truncated') else 'opaque_payload_unverified')
+    if 'runtime_state' in raw:
+        try:
+            result['runtime_state'] = validated_runtime_state(raw['runtime_state'])
+            p.fields.append({'event': None, 'field': 'runtime_state', 'state': 'exact'})
+        except (Invalid, ValueError, UnicodeError, TypeError, RecursionError, OverflowError) as exc:
+            p.omit('runtime_state', str(exc) if type(exc) is Invalid else 'unsupported_representation')
+
     timing = raw.get('timing')
     timing_keys = {'run_seconds', 'export_seconds', 'export_exit_code', 'total_seconds'}
     if type(timing) is dict and not (set(timing) - timing_keys) and all(
@@ -409,7 +435,7 @@ def validate_reply(raw: bytes | str, policy: Policy, run_id: str, revision: str,
     require(ack == receipt(policy, run_id, revision, binding_key))
     allowed = (PUBLIC_COUNTERS | PUBLIC_FLAGS | DYNAMIC | {
         'schema', 'transport', 'reasoning_source', 'text', 'tools', 'actions', 'skills_loaded',
-        'timing', 'tool_result_evidence', 'evidence_safety', 'evidence_safety_ack'})
+        'timing', 'tool_result_evidence', 'runtime_state', 'evidence_safety', 'evidence_safety_ack'})
     require(not (set(reply) - allowed))
     summary = reply['evidence_safety']
     require(type(summary) is dict and set(summary) == {
@@ -422,7 +448,7 @@ def validate_reply(raw: bytes | str, policy: Policy, run_id: str, revision: str,
     require(type(summary['fields']) is list and len(summary['fields']) <= 10_000)
     dispositions = {}
     counts = {r: 0 for r in REASONS}
-    top_names = DYNAMIC | OPAQUE | {'transport', 'reasoning_source', 'text', 'tools', 'actions', 'skills_loaded', 'timing', 'tool_result_evidence'}
+    top_names = DYNAMIC | OPAQUE | {'transport', 'reasoning_source', 'text', 'tools', 'actions', 'skills_loaded', 'timing', 'tool_result_evidence', 'runtime_state'}
     event_names = {'event', 'tool', 'call_id', 'session_id', 'input', 'output', 'error', 'status', 'metadata'}
     for item in summary['fields']:
         require(type(item) is dict)
@@ -452,6 +478,9 @@ def validate_reply(raw: bytes | str, policy: Policy, run_id: str, revision: str,
         require(name not in reply or type(reply[name]) is bool)
     require('transport' not in reply or reply['transport'] in {'opencode', 'github-copilot-cli'})
     require('reasoning_source' not in reply or reply['reasoning_source'] in {'explicit', 'model-variant', 'provider-default'})
+    if 'runtime_state' in reply:
+        require(validated_runtime_state(reply['runtime_state']) == reply['runtime_state'])
+        require(dispositions.get((None, 'runtime_state'), {}).get('state') == 'exact')
     if 'tool_result_evidence' in reply:
         evidence = reply['tool_result_evidence']
         require(type(evidence) is dict and set(evidence) == {'schema', 'source', 'observed_events', 'omitted_events', 'events'})

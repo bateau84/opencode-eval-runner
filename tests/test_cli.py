@@ -21,6 +21,8 @@ from runner.cli import (
     sanitize_database_seed,
     resolve_engine,
     host_environment_for_transport,
+    opencode_state_profile,
+    resolve_database_seed,
 )
 
 
@@ -85,6 +87,48 @@ class RunnerCliTests(unittest.TestCase):
             self.assertIn('"type":"oauth"', credential[2])
             self.assertEqual(sessions, 0)
             self.assertEqual(migrations, 1)
+
+    def test_disposable_profile_ignores_ambient_default_auth_models_and_provider_tokens(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            workspace, input_dir, output_dir = root/'workspace', root/'input', root/'output'
+            for path in (workspace, input_dir, output_dir): path.mkdir()
+            data = root/'data'/'opencode'; data.mkdir(parents=True)
+            cache = root/'cache'/'opencode'; cache.mkdir(parents=True)
+            (data/'auth.json').write_text('{"token":"AMBIENT"}')
+            (cache/'models.json').write_text('{}')
+            config = root/'synthetic.json'; config.write_text('{}')
+            args = argparse.Namespace(
+                engine='podman', image='test-image', workspace=str(workspace), workspace_mode='ro',
+                output=str(root/'result.json'), transport='opencode', model='fixture/mock', agent='general',
+                skill=None, expected_plugin=None, reasoning=None, timeout_seconds=30, env=[], auth=None,
+                config=str(config), models_catalog=None, database=None, config_root=None, mount=[],
+                network=None, opencode_state_profile='disposable',
+            )
+            env={'XDG_DATA_HOME':str(root/'data'),'XDG_CACHE_HOME':str(root/'cache'),'OPENAI_API_KEY':'AMBIENT-TOKEN'}
+            with patch('runner.cli.shutil.which', return_value='/usr/bin/podman'):
+                command, _ = build_container_command(args,input_dir,output_dir,host_env=env,database_seed=None)
+            rendered=' '.join(command)
+            self.assertIn(str(config.resolve())+':/seed/opencode.json:ro', rendered)
+            self.assertNotIn(str((data/'auth.json').resolve()), rendered)
+            self.assertNotIn(str((cache/'models.json').resolve()), rendered)
+            self.assertNotIn('OPENAI_API_KEY', rendered)
+            self.assertIn('EVAL_OPENCODE_STATE_PROFILE=disposable', rendered)
+            self.assertIn('EVAL_OPENCODE_DATABASE_SOURCE=runtime-bootstrap', rendered)
+            self.assertIn('EVAL_OPENCODE_AUTH_SOURCE=none', rendered)
+
+    def test_disposable_profile_rejects_database_and_ambient_seed_overrides(self):
+        args=argparse.Namespace(transport='opencode', database='/tmp/seed.db', opencode_state_profile='disposable')
+        with self.assertRaisesRegex(RunnerError, '--database is incompatible'):
+            opencode_state_profile(args,{})
+        args.database=None
+        with self.assertRaisesRegex(RunnerError, 'rejects implicit runner seed overrides'):
+            opencode_state_profile(args,{'OPENCODE_EVAL_RUNNER_DB':'/private.db'})
+
+    def test_disposable_database_resolution_never_reads_host_default(self):
+        args=argparse.Namespace(transport='opencode', database=None, opencode_state_profile='disposable')
+        with tempfile.TemporaryDirectory() as tmp, patch('runner.cli.default_database_path', side_effect=AssertionError('host default read')):
+            self.assertIsNone(resolve_database_seed(args, Path(tmp)/'seed.db', {}))
 
     def test_extra_mount_defaults_to_read_only_and_accepts_rw(self):
         with tempfile.TemporaryDirectory() as tmp:
