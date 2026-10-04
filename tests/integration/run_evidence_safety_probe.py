@@ -258,8 +258,10 @@ def main():
             plugin_state.get('credential_rows_before_inference')==0 and
             requests > 0)
         checks['disposable-expected-plugin:preflight_active']=(
-            r.get('plugin_preflight',{}).get('expected')=='loom' and
-            r.get('plugin_preflight',{}).get('plugin',{}).get('state',{}).get('status')=='active')
+            raw_plugin.get('plugin_preflight',{}).get('expected')=='loom' and
+            raw_plugin.get('plugin_preflight',{}).get('plugin',{}).get('state',{}).get('status')=='active')
+        checks['disposable-expected-plugin:safe_result_omits_opaque_preflight']=(
+            'plugin_preflight' not in r)
         (out/'disposable-expected-plugin.json').write_bytes(S.encode(r)+b'\n')
 
         # Missing safety policy and incompatible explicit DB selection fail before provider inference.
