@@ -6,8 +6,11 @@ on:
     paths:
       - runtime-patches/**
       - runner/cli.py
+      - runner/observer.py
       - container/**
       - bin/opencode-eval-runner
+      - tests/integration/run_capture_probe.py
+      - tests/integration/capture_probe.ts
       - tests/test_workflow_boundaries.py
       - .github/workflows/local-runtime.yml
 

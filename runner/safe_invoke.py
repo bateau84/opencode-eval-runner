@@ -59,6 +59,7 @@ def audit_selected_inputs(policy, command, host_env, explicit_sources=None, stat
             name, _, inline = value.partition('=')
             actual = inline if '=' in value else host_env.get(name, '')
             if s.sensitive_key(name) and actual:
+                selected.add('env')
                 contradictory |= actual not in policy.values
     states = policy.private['sources']
     contradictory |= any(states[category] != 'complete' for category in selected)
@@ -77,7 +78,10 @@ def audit_selected_inputs(policy, command, host_env, explicit_sources=None, stat
     if explicit_sources is not None:
         # The v1 policy has no path bindings for runner-resolved defaults.
         # Never infer that a category label describes an ambient fallback.
-        contradictory |= bool(selected - explicit_sources)
+        # Environment selection is bound by the actual forwarded name/value
+        # above, not by a seed path. The explicit-source set covers only
+        # mount/path-backed seed categories.
+        contradictory |= bool((selected - {'env'}) - explicit_sources)
     if contradictory:
         private = dict(policy.private)
         private['complete'] = False

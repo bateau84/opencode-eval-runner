@@ -390,6 +390,31 @@ class HostBoundaryTests(unittest.TestCase):
         )
         self.assertFalse(legacy.complete)
 
+    def test_forwarded_sensitive_env_must_be_declared_selected_and_present(self):
+        command = ['docker', '--env', 'OPENAI_API_KEY', IMAGE]
+        host_env = {'OPENAI_API_KEY': 'synthetic-forwarded-secret'}
+
+        not_selected = inventory(['synthetic-forwarded-secret'])
+        not_selected['sources']['env'] = 'not_selected'
+        q = safe_invoke.audit_selected_inputs(
+            S.Policy(not_selected), command, host_env, set(), 'disposable'
+        )
+        self.assertFalse(q.complete)
+
+        complete = inventory(['synthetic-forwarded-secret'])
+        complete['sources']['env'] = 'complete'
+        q = safe_invoke.audit_selected_inputs(
+            S.Policy(complete), command, host_env, set(), 'disposable'
+        )
+        self.assertTrue(q.complete)
+
+        missing_value = inventory(['different-secret'])
+        missing_value['sources']['env'] = 'complete'
+        q = safe_invoke.audit_selected_inputs(
+            S.Policy(missing_value), command, host_env, set(), 'disposable'
+        )
+        self.assertFalse(q.complete)
+
     def test_selected_default_source_not_selected_downgrades_policy(self):
         p = S.Policy(inventory())
         q = safe_invoke.audit_selected_inputs(p, ['docker', '--volume', '/private/auth:/seed/auth.json:ro', IMAGE], {})

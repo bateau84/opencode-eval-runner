@@ -38,7 +38,15 @@ class PublicationBoundaryTests(unittest.TestCase):
 
     def test_normal_invoke_workflow_tracks_public_runner_implementation(self):
         text = (ROOT / ".github/workflows/local-runtime.yml").read_text()
-        for path in ("runtime-patches/**", "runner/cli.py", "container/**", "bin/opencode-eval-runner"):
+        for path in (
+            "runtime-patches/**",
+            "runner/cli.py",
+            "runner/observer.py",
+            "container/**",
+            "bin/opencode-eval-runner",
+            "tests/integration/run_capture_probe.py",
+            "tests/integration/capture_probe.ts",
+        ):
             self.assertIn("- " + path, text)
 
     def test_only_fresh_publisher_has_package_write_authority(self):
