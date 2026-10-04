@@ -185,6 +185,22 @@ def main():
             else:checks['safe_then_size_omission']=any(f['field']=='output' and f['state']=='omitted' and f['reason']=='size_limit' for f in fields)
             (out/(scenario+'.json')).write_bytes(S.encode(r)+b'\n')
 
+        # First discriminate the disposable lifecycle itself without the RSP
+        # envelope. All values in this fixture are synthetic, so preserving the
+        # fixed transport error in the artifact is safe and helps distinguish
+        # OpenCode bootstrap failures from safety-admission failures.
+        raw,e_raw,raw_code,_,raw_requests=once(
+            args.image,root,'disposable-lifecycle','missing',legacy=True,
+            disposable=True,ambient_traps=True
+        )
+        checks['disposable-lifecycle:bootstrap_succeeds']=raw_code==0
+        checks['disposable-lifecycle:runtime_state_attested']=(
+            raw.get('runtime_state',{}).get('profile')=='disposable' and
+            raw.get('runtime_state',{}).get('database_source')=='runtime-bootstrap' and
+            raw.get('runtime_state',{}).get('migration_count')==48)
+        checks['disposable-lifecycle:provider_after_bootstrap']=raw_requests>0
+        (out/'disposable-lifecycle.json').write_text(json.dumps(raw,indent=2)+'\n')
+
         # DB handoff: real invoke, fresh runtime-owned DB, ambient host auth/DB traps present.
         r,e,code,oracle,requests=once(
             args.image,root,'disposable-valid','valid',disposable=True,ambient_traps=True
