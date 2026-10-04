@@ -48,8 +48,13 @@ def audit_selected_inputs(policy, command, host_env, explicit_sources=None, stat
             target = value.rsplit(':', 2)[1]
             if target in categories:
                 selected.add(categories[target])
-                # The accepted source profile does not cover a plugin config root.
-                contradictory |= target == '/seed/opencode-config'
+                # The legacy/default profile has no path-role contract for an
+                # ambient plugin config root. The disposable profile does:
+                # explicit --config-root is allowed when Loom marks config_root
+                # complete and the explicit-source set agrees.
+                contradictory |= (
+                    target == '/seed/opencode-config' and state_profile != 'disposable'
+                )
         elif arg == '--env':
             name, _, inline = value.partition('=')
             actual = inline if '=' in value else host_env.get(name, '')

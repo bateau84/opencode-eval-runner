@@ -374,6 +374,22 @@ class HostBoundaryTests(unittest.TestCase):
         self.assertTrue(q.complete)
         self.assertEqual(q.private['sources']['credential_seed'],'not_selected')
 
+    def test_disposable_profile_accepts_explicit_config_root_when_inventory_matches(self):
+        data = inventory()
+        data['sources']['config_root'] = 'complete'
+        command = [
+            'docker', '--volume', '/synthetic/root:/seed/opencode-config:ro', IMAGE
+        ]
+        q = safe_invoke.audit_selected_inputs(
+            S.Policy(data), command, {}, {'config_root'}, 'disposable'
+        )
+        self.assertTrue(q.complete)
+
+        legacy = safe_invoke.audit_selected_inputs(
+            S.Policy(data), command, {}, {'config_root'}, 'default'
+        )
+        self.assertFalse(legacy.complete)
+
     def test_selected_default_source_not_selected_downgrades_policy(self):
         p = S.Policy(inventory())
         q = safe_invoke.audit_selected_inputs(p, ['docker', '--volume', '/private/auth:/seed/auth.json:ro', IMAGE], {})

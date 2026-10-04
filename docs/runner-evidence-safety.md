@@ -8,9 +8,14 @@ not change tool implementations, permissions, sessions, runtime call ordering,
 OpenCode's binary, or default image pins. It is explicitly opt-in at the host and
 ships in a separate immutable image variant.
 
-The ordinary `invoke` result remains unchanged without these options. A safety
-invocation uses a **new** result schema, never silently reinterprets older v1
-results, and must be consumed by a compatible Loom adapter.
+Without the safety options, ordinary `invoke` keeps its existing execution
+semantics and v1 product fields, but the host always owns the additive
+`observed_execution` field: it replaces any container-supplied value and reports
+`capture_not_requested` when `--observer-key-file` is absent. Consumers that
+validate exact result keys must therefore account for this host-owned projection.
+
+A safety invocation uses a **new** result schema, never silently reinterprets
+older v1 results, and must be consumed by a compatible Loom adapter.
 
 References: Loom's accepted `eval-evidence-safety-projection.md` at
 `1a85b1a9e6707f720b95bd81b1e245ffa73202bf`; branch
