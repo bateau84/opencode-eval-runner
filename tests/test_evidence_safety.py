@@ -296,6 +296,26 @@ class HostBoundaryTests(unittest.TestCase):
         self.assertEqual(admitted['tool_result_evidence']['events'][0]['status'], 'completed')
         self.assertNotIn('private-output', json.dumps(admitted))
 
+    def test_fallback_has_total_top_level_dispositions_and_preserves_outcome_metadata(self):
+        policy = S.Policy(inventory(complete=False))
+        run_id = 'f' * 64
+        revision = REV
+        binding = b'e' * 32
+        result = S.fallback('size_limit', 'runner', policy)
+        result['exit_code'] = 124
+        result['timed_out'] = True
+        result['evidence_safety_ack'] = S.receipt(policy, run_id, revision, binding)
+        top = {
+            item['field']: item
+            for item in result['evidence_safety']['fields']
+            if item.get('event') is None
+        }
+        self.assertEqual(set(top), S.TOP_LEVEL_REQUIRED)
+        self.assertTrue(all(item['state'] == 'omitted' for item in top.values()))
+        admitted = S.validate_reply(S.encode(result), policy, run_id, revision, binding)
+        self.assertEqual(admitted['exit_code'], 124)
+        self.assertTrue(admitted['timed_out'])
+
     def test_every_required_top_level_field_has_disposition(self):
         policy = S.Policy(inventory(['unrelated-secret']))
         run_id = 'c' * 64

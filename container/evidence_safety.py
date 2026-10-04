@@ -404,7 +404,7 @@ def receipt(policy: Policy, run_id: str, revision: str, binding_key: bytes = b''
 
 def fallback(reason='invalid', stage='transport', policy=None):
     p = Projection(policy or Policy(), stage)
-    for name in ('text', 'tools', 'actions', 'skills_loaded', 'stdout', 'stderr', 'tool_result_evidence', 'transport'):
+    for name in sorted(TOP_LEVEL_REQUIRED):
         p.omit(name, reason)
     return {'schema': RESULT, 'exit_code': 2, 'infrastructure_error': True, 'evidence_safety': p.summary()}
 
