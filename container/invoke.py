@@ -11,6 +11,7 @@ import shutil
 import sqlite3
 import subprocess
 import sys
+import tempfile
 import time
 import urllib.error
 import urllib.request
@@ -403,16 +404,12 @@ def prepare_opencode_env() -> dict[str, str]:
     return env
 
 
-def disposable_runtime_state(env: dict[str, str], timeout: int) -> dict[str, Any] | None:
-    """Bootstrap and attest fresh OpenCode state before model inference."""
-    if env.get("EVAL_OPENCODE_STATE_PROFILE") != DISPOSABLE_STATE_PROFILE:
-        return None
-    if env.get("EVAL_OPENCODE_DATABASE_SOURCE") != "runtime-bootstrap":
-        raise RuntimeError("invalid disposable database source")
+def attest_disposable_runtime_state(env: dict[str, str]) -> dict[str, Any]:
+    """Attest the production disposable database without mutating it."""
     data = Path(env["XDG_DATA_HOME"]) / "opencode"
     database = data / "opencode.db"
-    if Path("/seed/opencode.db").is_file() or database.exists():
-        raise RuntimeError("disposable database must start absent")
+    if not database.is_file():
+        raise RuntimeError("disposable database bootstrap produced no database")
     auth = data / "auth.json"
     auth_source = env.get("EVAL_OPENCODE_AUTH_SOURCE")
     if auth_source == "none" and auth.exists():
@@ -421,18 +418,6 @@ def disposable_runtime_state(env: dict[str, str], timeout: int) -> dict[str, Any
         raise RuntimeError("explicit disposable auth seed was not loaded")
     if auth_source not in {"none", "explicit"}:
         raise RuntimeError("invalid disposable auth source")
-
-    # This command initializes the normal OpenCode storage/session stack but
-    # does not invoke a model provider. The runtime owns schema/bootstrap and
-    # its migration journal; the runner does not fabricate either.
-    bootstrap = run(
-        ["opencode", "session", "list", "--standalone", "--format", "json", "--max-count", "1"],
-        Path("/workspace"), env, min(timeout, 30),
-    )
-    if bootstrap.returncode != 0:
-        raise RuntimeError("disposable database bootstrap failed")
-    if not database.is_file():
-        raise RuntimeError("disposable database bootstrap produced no database")
     try:
         with sqlite3.connect(f"file:{database}?mode=ro", uri=True) as db:
             tables = {row[0] for row in db.execute(
@@ -449,7 +434,7 @@ def disposable_runtime_state(env: dict[str, str], timeout: int) -> dict[str, Any
             migrations[0] != FIRST_MIGRATION or migrations[-1] != LAST_MIGRATION):
         raise RuntimeError("disposable database migration journal mismatch")
     if session_rows != 0 or credential_rows != 0:
-        raise RuntimeError("disposable database bootstrap was not empty")
+        raise RuntimeError("disposable database was mutated before model inference")
     return {
         "schema": RUNTIME_STATE_SCHEMA,
         "profile": DISPOSABLE_STATE_PROFILE,
@@ -463,6 +448,29 @@ def disposable_runtime_state(env: dict[str, str], timeout: int) -> dict[str, Any
         "first_migration": migrations[0],
         "last_migration": migrations[-1],
     }
+
+
+def disposable_runtime_state(env: dict[str, str], timeout: int) -> dict[str, Any] | None:
+    """Bootstrap and attest fresh OpenCode state before model inference."""
+    if env.get("EVAL_OPENCODE_STATE_PROFILE") != DISPOSABLE_STATE_PROFILE:
+        return None
+    if env.get("EVAL_OPENCODE_DATABASE_SOURCE") != "runtime-bootstrap":
+        raise RuntimeError("invalid disposable database source")
+    data = Path(env["XDG_DATA_HOME"]) / "opencode"
+    database = data / "opencode.db"
+    if Path("/seed/opencode.db").is_file() or database.exists():
+        raise RuntimeError("disposable database must start absent")
+
+    # This command initializes the normal OpenCode storage/session stack but
+    # does not invoke a model provider. The runtime owns schema/bootstrap and
+    # its migration journal; the runner does not fabricate either.
+    bootstrap = run(
+        ["opencode", "session", "list", "--standalone", "--format", "json", "--max-count", "1"],
+        Path("/workspace"), env, min(timeout, 30),
+    )
+    if bootstrap.returncode != 0:
+        raise RuntimeError("disposable database bootstrap failed")
+    return attest_disposable_runtime_state(env)
 
 
 def ensure_model_config(env: dict[str, str], model: str) -> None:
@@ -652,12 +660,32 @@ def verify_expected_plugin(
     # the plugin inventory on that same server.
     preflight_timeout = min(timeout, 30)
     started = time.monotonic()
-    server, base_url, authorization = _start_preflight_server(
-        inventory_env := dict(env),
-        preflight_timeout,
-    )
+    inventory_env = dict(env)
+    preflight_root: Path | None = None
+    if env.get("EVAL_OPENCODE_STATE_PROFILE") == DISPOSABLE_STATE_PROFILE:
+        # Plugin activation uses Session APIs, so it must not share the
+        # production disposable database whose zero-session state is attested
+        # for the actual model run. Keep the reviewed config/plugin tree but
+        # give the preflight its own disposable HOME/data/cache/state roots.
+        preflight_parent = Path(env.get("XDG_DATA_HOME", "/tmp/runtime/data")).parent
+        preflight_parent.mkdir(parents=True, exist_ok=True)
+        preflight_root = Path(tempfile.mkdtemp(prefix="plugin-preflight-", dir=preflight_parent))
+        for name in ("home", "data", "cache", "state", "config"):
+            (preflight_root / name).mkdir(parents=True, exist_ok=True)
+        inventory_env.update({
+            "HOME": str(preflight_root / "home"),
+            "XDG_DATA_HOME": str(preflight_root / "data"),
+            "XDG_CACHE_HOME": str(preflight_root / "cache"),
+            "XDG_STATE_HOME": str(preflight_root / "state"),
+            "XDG_CONFIG_HOME": str(preflight_root / "config"),
+        })
+    server = None
     logs = ""
     try:
+        server, base_url, authorization = _start_preflight_server(
+            inventory_env,
+            preflight_timeout,
+        )
         remaining = lambda: max(0.5, preflight_timeout - (time.monotonic() - started))
         created = _standalone_json_request(
             base_url,
@@ -729,13 +757,18 @@ def verify_expected_plugin(
                 + (f" ({ref})" if ref else "")
             )
     except Exception as exc:
-        logs = _stop_preflight_server(server)
+        if server is not None:
+            logs = _stop_preflight_server(server)
         raise RuntimeError(
             str(exc)
             + (f"; server logs: {evidence_slice(logs.strip(), 4000)}" if logs.strip() else "")
         ) from exc
     else:
-        logs = _stop_preflight_server(server)
+        if server is not None:
+            logs = _stop_preflight_server(server)
+    finally:
+        if preflight_root is not None:
+            shutil.rmtree(preflight_root, ignore_errors=True)
 
     return {
         "expected": expected_plugin,
@@ -801,6 +834,11 @@ def invoke_opencode(
     plugins = plugin_diagnostic(env)
     expected_plugin = os.environ.get("EVAL_EXPECT_PLUGIN", "").strip()
     plugin_preflight = verify_expected_plugin(env, agent, model, expected_plugin, timeout)
+    if runtime_state is not None:
+        # The activation preflight must not leave a Session or credential in the
+        # production disposable database. Re-attest after preflight and before
+        # the actual model/provider request.
+        runtime_state = attest_disposable_runtime_state(env)
     invoked_model, reasoning_label, reasoning_source = resolve_opencode_reasoning(model, reasoning)
 
     # OpenCode V2 has no documented force-refresh command for the model

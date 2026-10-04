@@ -168,6 +168,41 @@ class OpenCodeTransportTests(unittest.TestCase):
             self.assertEqual(state['session_rows_before_inference'],0)
             self.assertEqual(state['credential_rows_before_inference'],0)
 
+    def test_disposable_invoke_rechecks_production_state_after_plugin_preflight(self):
+        first = {
+            "schema": "opencode-eval-runner/runtime-state/v1",
+            "profile": "disposable",
+            "database_source": "runtime-bootstrap",
+            "database_created": True,
+            "database_seed_present": False,
+            "auth_source": "none",
+            "session_rows_before_inference": 0,
+            "credential_rows_before_inference": 0,
+            "migration_count": 48,
+            "first_migration": "20260127222353_familiar_lady_ursula",
+            "last_migration": "20260923013825_project_time_active",
+        }
+
+        class Result:
+            returncode = 0
+            stdout = ""
+            stderr = ""
+
+        with patch("container.invoke.prepare_opencode_env", return_value={"EVAL_OPENCODE_STATE_PROFILE": "disposable"}), patch(
+            "container.invoke.disposable_runtime_state", return_value=first
+        ) as bootstrap, patch(
+            "container.invoke.verify_expected_plugin", return_value={"expected":"loom"}
+        ) as preflight, patch(
+            "container.invoke.attest_disposable_runtime_state", return_value=first
+        ) as attest, patch(
+            "container.invoke.run", return_value=Result()
+        ):
+            invoke_opencode("openai/gpt-5.5", "general", "prompt", 30)
+
+        bootstrap.assert_called_once()
+        preflight.assert_called_once()
+        attest.assert_called_once()
+
     def test_v2_invocation_does_not_use_models_refresh_preflight(self):
         class Result:
             returncode = 0
@@ -569,6 +604,57 @@ class OpenCodeTransportTests(unittest.TestCase):
                 "/api/plugin?location%5Bdirectory%5D=%2Fworkspace",
             ],
         )
+
+    def test_disposable_expected_plugin_preflight_uses_separate_state(self):
+        server = object()
+        seen = {}
+
+        def fake_start(env, timeout):
+            seen.update(env)
+            return server, "http://127.0.0.1:1234", "Basic test-auth"
+
+        def fake_request(base_url, path, *, method="GET", payload=None, timeout=5.0, authorization=None):
+            if path == "/api/session":
+                return {"data": {"id": "ses_test"}}
+            if path == "/api/session/ses_test/prompt":
+                return {"data": {"id": "msg_test"}}
+            return {"data": [{"id": "loom", "state": {"status": "active"}}]}
+
+        with tempfile.TemporaryDirectory() as tmp, patch(
+            "container.invoke._start_preflight_server", side_effect=fake_start
+        ), patch(
+            "container.invoke._standalone_json_request", side_effect=fake_request
+        ), patch(
+            "container.invoke._stop_preflight_server", return_value=""
+        ):
+            root = Path(tmp)
+            config = root / "config" / "opencode"
+            plugins = config / "plugins"
+            plugins.mkdir(parents=True)
+            (plugins / "loom.ts").write_text("export default {}\n", encoding="utf-8")
+            production_data = root / "data"
+            production_cache = root / "cache"
+            production_state = root / "state"
+            production_home = root / "home"
+            for path in (production_data, production_cache, production_state, production_home):
+                path.mkdir(parents=True)
+            env = {
+                "OPENCODE_CONFIG_DIR": str(config),
+                "EVAL_OPENCODE_STATE_PROFILE": "disposable",
+                "XDG_DATA_HOME": str(production_data),
+                "XDG_CACHE_HOME": str(production_cache),
+                "XDG_STATE_HOME": str(production_state),
+                "XDG_CONFIG_HOME": str(root / "config"),
+                "HOME": str(production_home),
+            }
+            verify_expected_plugin(env, "general", "openai/gpt-5.5", "loom", 30)
+            isolated_data = Path(seen["XDG_DATA_HOME"])
+            isolated_root = isolated_data.parent
+            self.assertNotEqual(isolated_data, production_data)
+            self.assertNotEqual(Path(seen["XDG_STATE_HOME"]), production_state)
+            self.assertNotEqual(Path(seen["XDG_CACHE_HOME"]), production_cache)
+            self.assertEqual(seen["OPENCODE_CONFIG_DIR"], str(config))
+            self.assertFalse(isolated_root.exists())
 
     def test_expected_plugin_preflight_uses_bounded_server_timeout(self):
         seen = []

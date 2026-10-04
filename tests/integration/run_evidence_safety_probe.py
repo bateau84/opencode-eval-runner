@@ -54,7 +54,7 @@ def inventory(kind):
     return p
 
 
-def once(image, root, name, policy_kind, scenario='success', legacy=False, disposable=False, database_override=False, ambient_traps=False):
+def once(image, root, name, policy_kind, scenario='success', legacy=False, disposable=False, database_override=False, ambient_traps=False, expected_plugin=False):
     workspace=root/name; workspace.mkdir()
     (workspace/'.opencode/plugins').mkdir(parents=True)
     (workspace/'.opencode/plugins/rsp.ts').write_text(PLUGIN)
@@ -113,6 +113,12 @@ def once(image, root, name, policy_kind, scenario='success', legacy=False, dispo
              '--timeout-seconds','4' if scenario=='timeout' else '30','--container-timeout','60','--print-result']
     if disposable:
         command += ['--opencode-state-profile','disposable']
+    if expected_plugin:
+        config_root=workspace/'config-root'
+        plugin_root=config_root/'plugins'/'loom'
+        plugin_root.mkdir(parents=True)
+        (plugin_root/'index.ts').write_text('export default { id: "loom", async setup() {} };\n')
+        command += ['--config-root',str(config_root),'--expected-plugin','loom']
     if database_override:
         explicit_db=root/(name+'-explicit.db')
         with sqlite3.connect(explicit_db) as db:
@@ -122,6 +128,8 @@ def once(image, root, name, policy_kind, scenario='success', legacy=False, dispo
         command.append('--require-evidence-safety')
         policy=inventory(policy_kind)
         if policy is not None:
+            if expected_plugin and policy_kind == 'valid':
+                policy['sources']['config_root']='complete'
             private=root/(name+'-private-policy.json');private.write_text(json.dumps(policy));private.chmod(0o600)
             command+=['--evidence-policy-file',str(private)]
     else:
@@ -222,6 +230,25 @@ def main():
             'AMBIENT-AUTH-MUST-NOT-BE-READ' not in json.dumps(r) and
             'AMBIENT-SESSION-MUST-NOT-BE-READ' not in json.dumps(r) and requests > 0)
         (out/'disposable-valid.json').write_bytes(S.encode(r)+b'\n')
+
+        # Expected-plugin activation uses a Session API, but it must run in
+        # separate temporary state. The production DB is re-attested after
+        # preflight and must still report zero pre-inference Sessions.
+        r,e,code,oracle,requests=once(
+            args.image,root,'disposable-expected-plugin','valid',
+            disposable=True,ambient_traps=True,expected_plugin=True
+        )
+        checks.update(check_safety('disposable-expected-plugin',r,e,code,'valid'))
+        plugin_state=r.get('runtime_state',{})
+        checks['disposable-expected-plugin:production_db_still_empty']=(
+            plugin_state.get('profile')=='disposable' and
+            plugin_state.get('session_rows_before_inference')==0 and
+            plugin_state.get('credential_rows_before_inference')==0 and
+            requests > 0)
+        checks['disposable-expected-plugin:preflight_active']=(
+            r.get('plugin_preflight',{}).get('expected')=='loom' and
+            r.get('plugin_preflight',{}).get('plugin',{}).get('state',{}).get('status')=='active')
+        (out/'disposable-expected-plugin.json').write_bytes(S.encode(r)+b'\n')
 
         # Missing safety policy and incompatible explicit DB selection fail before provider inference.
         r,e,code,_,requests=once(args.image,root,'disposable-missing','missing',disposable=True,ambient_traps=True)

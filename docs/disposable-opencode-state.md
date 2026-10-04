@@ -84,6 +84,14 @@ new database read-only and attests:
 
 A mismatch fails before the model/provider request.
 
+If `--expected-plugin` is used, its activation barrier creates a temporary
+Session. Under the disposable profile that preflight runs against a **separate
+temporary OpenCode HOME/data/cache/state tree** while reusing only the reviewed
+config/plugin root. Its temporary state is deleted afterward. The production
+disposable database is re-attested after plugin preflight and before the actual
+model/provider request, so its reported zero Session/credential counts remain
+true at the inference boundary.
+
 This avoids the unsupported hand-built-schema path where a pre-created
 `session` table with no matching migration journal makes OpenCode replay the
 first migration and fail with `table session already exists`.
