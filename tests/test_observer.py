@@ -347,6 +347,25 @@ class TransportTests(unittest.TestCase):
                     cli.invoke(args)
         self.assertFalse(self.command_log.exists())
 
+    def test_embedded_key_encodings_are_rejected(self):
+        encodings = [
+            KEY.decode(),
+            KEY.hex(),
+            KEY.hex().upper(),
+            base64.b64encode(KEY).decode(),
+            base64.urlsafe_b64encode(KEY).decode(),
+            base64.b64encode(KEY).decode().rstrip("="),
+            base64.urlsafe_b64encode(KEY).decode().rstrip("="),
+        ]
+        for value in encodings:
+            with self.subTest(value=value[:24]):
+                with patch.dict(os.environ, {"KEY": "prefix-" + value + "-suffix"}):
+                    args = copy.deepcopy(self.args)
+                    args.env.append("KEY")
+                    with self.assertRaises(cli.RunnerError):
+                        cli.invoke(args)
+        self.assertFalse(self.command_log.exists())
+
     def test_encoded_key_and_nonprivate_key_are_rejected(self):
         for value in (KEY.hex(), base64.b64encode(KEY).decode()):
             with patch.dict(os.environ, {"KEY": value}):

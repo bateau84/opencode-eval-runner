@@ -320,7 +320,15 @@ class ObserverCapture:
         resolved = key_path.resolve()
         if resolved.stat().st_mode & 0o077:
             raise ValueError("observer key file must be private (mode 0600)")
-        key_encodings = {self.key, self.key.hex().encode(), base64.b64encode(self.key)}
+        key_encodings = {
+            self.key,
+            self.key.hex().encode("ascii"),
+            self.key.hex().upper().encode("ascii"),
+            base64.b64encode(self.key),
+            base64.urlsafe_b64encode(self.key),
+            base64.b64encode(self.key).rstrip(b"="),
+            base64.urlsafe_b64encode(self.key).rstrip(b"="),
+        }
         for index, argument in enumerate(command[:-1]):
             if argument not in {"--volume", "--env"}:
                 continue
@@ -337,7 +345,8 @@ class ObserverCapture:
             else:
                 name, _, inline = specification.partition("=")
                 value = inline if "=" in specification else host_env.get(name, "")
-                if value.encode("utf-8") in key_encodings:
+                value_bytes = value.encode("utf-8")
+                if any(encoded and encoded in value_bytes for encoded in key_encodings):
                     raise ValueError("observer key must not be forwarded in the environment")
                 if name.startswith("EVAL_OBSERVER_"):
                     raise ValueError("observer environment names are reserved")
