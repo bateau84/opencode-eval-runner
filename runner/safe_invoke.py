@@ -104,17 +104,27 @@ def resolved_image(command):
     info = s.strict_loads(inspect.stdout)[0]
     labels = info.get('Config', {}).get('Labels') or {}
     s.require(reference in info.get('RepoDigests', []))
+    checkout = Path(__file__).resolve().parents[1]
+    init_sha = hashlib.sha256((checkout / 'container/__init__.py').read_bytes()).hexdigest()
+    invoke_sha = hashlib.sha256((checkout / 'container/invoke.py').read_bytes()).hexdigest()
     s.require(labels.get('io.opencode-eval.evidence-safety') == s.CONSUMER)
+    s.require(labels.get('io.opencode-eval.evidence-safety-init') == init_sha)
     s.require(labels.get('io.opencode-eval.evidence-safety-module') == s.module_sha())
-    s.require(labels.get('io.opencode-eval.evidence-safety-invoke') == hashlib.sha256(
-        (Path(__file__).resolve().parents[1] / 'container/invoke.py').read_bytes()).hexdigest())
+    s.require(labels.get('io.opencode-eval.evidence-safety-invoke') == invoke_sha)
     revision = labels.get('org.opencontainers.image.revision')
     s.require(type(revision) is str and re.fullmatch('[0-9a-f]{40}', revision) is not None)
     config_id = info.get('Id')
     s.require(type(config_id) is str and re.fullmatch('sha256:[0-9a-f]{64}', config_id) is not None)
     # Execute that exact local content-addressed config, not a mutable tag.
     command[-1] = config_id
-    return {'image': reference, 'image_config': config_id, 'image_source_revision': revision}
+    return {
+        'image': reference,
+        'image_config': config_id,
+        'image_source_revision': revision,
+        'image_package_init_sha256': init_sha,
+        'image_policy_module_sha256': s.module_sha(),
+        'image_invoke_sha256': invoke_sha,
+    }
 
 
 def execute_container(command, request, timeout, run_id, host_env=None):

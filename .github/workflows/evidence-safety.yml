@@ -37,9 +37,10 @@ jobs:
           python3 -m unittest discover -s tests -p 'test_*.py' 2>&1 | tee evidence-safety-results/tests.txt
           python3 -m py_compile container/*.py runner/*.py tests/integration/run_evidence_safety_probe.py
           git rev-parse HEAD > evidence-safety-results/source-commit.txt
-          sha256sum container/evidence_safety.py container/invoke.py runner/safe_invoke.py runner/cli.py bin/opencode-eval-runner > evidence-safety-results/code.sha256
+          sha256sum container/__init__.py container/evidence_safety.py container/invoke.py runner/safe_invoke.py runner/cli.py bin/opencode-eval-runner > evidence-safety-results/code.sha256
           docker build -f evidence-safety/Containerfile \
             --build-arg RUNNER_REVISION="$(git rev-parse HEAD)" \
+            --build-arg PACKAGE_INIT_SHA256="$(sha256sum container/__init__.py | cut -d' ' -f1)" \
             --build-arg SAFETY_MODULE_SHA256="$(sha256sum container/evidence_safety.py | cut -d' ' -f1)" \
             --build-arg INVOKE_SHA256="$(sha256sum container/invoke.py | cut -d' ' -f1)" \
             -t evidence-safety:test .

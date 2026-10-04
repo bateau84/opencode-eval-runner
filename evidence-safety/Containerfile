@@ -1,17 +1,20 @@
 # Reuse the already-tested eval.4 OpenCode binary. Only runner adapters change.
 FROM ghcr.io/bateau84/opencode-eval-runner@sha256:590d5dd61faa6bbdad5d0cd8af3282b783c901ec7aaec84e79fc0057d8731be8
 ARG RUNNER_REVISION
+ARG PACKAGE_INIT_SHA256
 ARG SAFETY_MODULE_SHA256
 ARG INVOKE_SHA256
 LABEL org.opencontainers.image.revision=$RUNNER_REVISION \
       io.opencode-eval.evidence-safety="runner-evidence-safety/v1" \
+      io.opencode-eval.evidence-safety-init=$PACKAGE_INIT_SHA256 \
       io.opencode-eval.evidence-safety-module=$SAFETY_MODULE_SHA256 \
       io.opencode-eval.evidence-safety-invoke=$INVOKE_SHA256
 COPY container/__init__.py /opt/opencode-eval-runner/container/__init__.py
 COPY container/evidence_safety.py /opt/opencode-eval-runner/container/evidence_safety.py
 COPY container/invoke.py /opt/opencode-eval-runner/container/invoke.py
 USER root
-RUN echo "$SAFETY_MODULE_SHA256  /opt/opencode-eval-runner/container/evidence_safety.py" | sha256sum -c - \
+RUN echo "$PACKAGE_INIT_SHA256  /opt/opencode-eval-runner/container/__init__.py" | sha256sum -c - \
+ && echo "$SAFETY_MODULE_SHA256  /opt/opencode-eval-runner/container/evidence_safety.py" | sha256sum -c - \
  && echo "$INVOKE_SHA256  /opt/opencode-eval-runner/container/invoke.py" | sha256sum -c - \
  && printf '%s\n' "$RUNNER_REVISION" > /opt/opencode-eval-runner/container/evidence-safety-revision.txt
 USER 1000:1000

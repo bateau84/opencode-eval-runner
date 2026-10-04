@@ -71,14 +71,20 @@ class PublicationBoundaryTests(unittest.TestCase):
                 self.assertIn("needs.publish.outputs", jobs["verify"])
                 self.assertIn("github.event.pull_request.head.repo.full_name == github.repository", jobs["build"])
 
-    def test_evidence_safety_image_copies_only_reviewed_container_sources(self):
-        text = (ROOT / "evidence-safety/Containerfile").read_text()
-        self.assertNotIn("COPY container /opt/opencode-eval-runner/container", text)
+    def test_evidence_safety_image_copies_and_hashes_only_reviewed_container_sources(self):
+        containerfile = (ROOT / "evidence-safety/Containerfile").read_text()
+        workflow = (ROOT / ".github/workflows/evidence-safety.yml").read_text()
+        self.assertNotIn("COPY container /opt/opencode-eval-runner/container", containerfile)
         for path in ("__init__.py", "evidence_safety.py", "invoke.py"):
             self.assertIn(
                 f"COPY container/{path} /opt/opencode-eval-runner/container/{path}",
-                text,
+                containerfile,
             )
+            self.assertIn("container/" + path, workflow)
+        self.assertIn("ARG PACKAGE_INIT_SHA256", containerfile)
+        self.assertIn("io.opencode-eval.evidence-safety-init=$PACKAGE_INIT_SHA256", containerfile)
+        self.assertIn("$PACKAGE_INIT_SHA256  /opt/opencode-eval-runner/container/__init__.py", containerfile)
+        self.assertIn("--build-arg PACKAGE_INIT_SHA256=", workflow)
 
     def test_external_actions_are_pinned_and_errors_not_ignored(self):
         for name in ("protected-channel.yml", "local-runtime.yml", "sign-normal-invoke-evidence.yml"):

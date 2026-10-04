@@ -446,6 +446,40 @@ class HostBoundaryTests(unittest.TestCase):
             self.assertEqual(path.stat().st_mode & 0o777, 0o600)
             self.assertEqual(list(Path(tmp).glob('.safe*')), [])
 
+    def test_resolved_image_binds_all_executable_container_sources(self):
+        root = Path(safe_invoke.__file__).resolve().parents[1]
+        init_sha = __import__('hashlib').sha256((root/'container/__init__.py').read_bytes()).hexdigest()
+        invoke_sha = __import__('hashlib').sha256((root/'container/invoke.py').read_bytes()).hexdigest()
+        config_id = 'sha256:' + 'c' * 64
+        info = [{
+            'RepoDigests': [IMAGE],
+            'Id': config_id,
+            'Config': {'Labels': {
+                'io.opencode-eval.evidence-safety': S.CONSUMER,
+                'io.opencode-eval.evidence-safety-init': init_sha,
+                'io.opencode-eval.evidence-safety-module': S.module_sha(),
+                'io.opencode-eval.evidence-safety-invoke': invoke_sha,
+                'org.opencontainers.image.revision': REV,
+            }},
+        }]
+        command = ['docker', 'run', IMAGE]
+        with patch.object(
+            safe_invoke.subprocess, 'run',
+            return_value=subprocess.CompletedProcess([], 0, json.dumps(info).encode(), b''),
+        ):
+            loaded = safe_invoke.resolved_image(command)
+        self.assertEqual(command[-1], config_id)
+        self.assertEqual(loaded['image_package_init_sha256'], init_sha)
+        self.assertEqual(loaded['image_policy_module_sha256'], S.module_sha())
+        self.assertEqual(loaded['image_invoke_sha256'], invoke_sha)
+
+        info[0]['Config']['Labels']['io.opencode-eval.evidence-safety-init'] = '0' * 64
+        with patch.object(
+            safe_invoke.subprocess, 'run',
+            return_value=subprocess.CompletedProcess([], 0, json.dumps(info).encode(), b''),
+        ), self.assertRaises(ValueError):
+            safe_invoke.resolved_image(['docker', 'run', IMAGE])
+
     def test_unacknowledged_or_timeout_transport_never_writes_raw_details(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp); prompt = root/'prompt'; prompt.write_text('execute')
