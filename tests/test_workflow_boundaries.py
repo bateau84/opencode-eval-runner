@@ -15,9 +15,23 @@ JOB_ID = r"[A-Za-z_][A-Za-z0-9_-]*"
 
 def parse_workflow_jobs(text):
     prefix, body = text.split("\njobs:\n", 1)
-    matches = list(re.finditer(rf"^  ({JOB_ID}):\n", body, re.MULTILINE))
-    jobs = {m[1]: body[m.end(): matches[i + 1].start() if i + 1 < len(matches) else len(body)]
-            for i, m in enumerate(matches)}
+    matches = list(re.finditer(r"^  ([^\n:]+):\s*$", body, re.MULTILINE))
+    jobs = {}
+    parsed = []
+    for match in matches:
+        raw = match.group(1).strip()
+        if len(raw) >= 2 and raw[0] == raw[-1] and raw[0] in {'"', "'"}:
+            key = raw[1:-1]
+        else:
+            key = raw
+        if re.fullmatch(JOB_ID, key) is None or key in jobs:
+            raise ValueError(f"unsupported or duplicate workflow job key: {raw}")
+        parsed.append((key, match))
+        jobs[key] = None
+    if not parsed:
+        raise ValueError("workflow has no parseable jobs")
+    for i, (key, match) in enumerate(parsed):
+        jobs[key] = body[match.end(): parsed[i + 1][1].start() if i + 1 < len(parsed) else len(body)]
     return prefix, jobs
 
 
@@ -26,15 +40,21 @@ def workflow_jobs(name):
 
 
 class PublicationBoundaryTests(unittest.TestCase):
-    def test_job_parser_covers_digits_and_underscores(self):
+    def test_job_parser_covers_quoted_digits_and_underscores_fail_closed(self):
         prefix, jobs = parse_workflow_jobs(
             "name: fixture\non:\n  pull_request:\njobs:\n"
             "  build:\n    runs-on: ubuntu-latest\n"
-            "  publish_2:\n    runs-on: ubuntu-latest\n"
-            "  _verify9:\n    runs-on: ubuntu-latest\n"
+            "  \"publish_2\":\n    runs-on: ubuntu-latest\n"
+            "  '_verify9':\n    runs-on: ubuntu-latest\n"
         )
         self.assertIn("pull_request", prefix)
         self.assertEqual(set(jobs), {"build", "publish_2", "_verify9"})
+        with self.assertRaises(ValueError):
+            parse_workflow_jobs(
+                "name: fixture\njobs:\n"
+                "  build:\n    runs-on: ubuntu-latest\n"
+                "  \"bad job\":\n    runs-on: ubuntu-latest\n"
+            )
 
     def test_normal_invoke_workflow_tracks_public_runner_implementation(self):
         text = (ROOT / ".github/workflows/local-runtime.yml").read_text()
@@ -50,7 +70,7 @@ class PublicationBoundaryTests(unittest.TestCase):
             self.assertIn("- " + path, text)
 
     def test_only_fresh_publisher_has_package_write_authority(self):
-        for name in ("protected-channel.yml", "local-runtime.yml"):
+        for name in ("protected-channel.yml", "local-runtime.yml", "evidence-safety.yml"):
             with self.subTest(workflow=name):
                 prefix, jobs = workflow_jobs(name)
                 self.assertNotIn("packages: write", prefix)
@@ -87,7 +107,13 @@ class PublicationBoundaryTests(unittest.TestCase):
         self.assertIn("--build-arg PACKAGE_INIT_SHA256=", workflow)
 
     def test_external_actions_are_pinned_and_errors_not_ignored(self):
-        for name in ("protected-channel.yml", "local-runtime.yml", "sign-normal-invoke-evidence.yml"):
+        for name in (
+            "protected-channel.yml",
+            "local-runtime.yml",
+            "evidence-safety.yml",
+            "observer-integration.yml",
+            "sign-normal-invoke-evidence.yml",
+        ):
             text = (ROOT / ".github/workflows" / name).read_text()
             for action in re.findall(r"uses: (\S+)", text):
                 self.assertRegex(action, r"^[A-Za-z0-9_/-]+@[0-9a-f]{40}$")
