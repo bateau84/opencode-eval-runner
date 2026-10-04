@@ -147,8 +147,8 @@ class PublicationBoundaryTests(unittest.TestCase):
 
     def test_signer_expressions_are_not_escaped_literals(self):
         text = (ROOT / ".github/workflows/sign-normal-invoke-evidence.yml").read_text()
-        self.assertNotRegex(text, r"\\\\\$\{\{")
-        self.assertNotRegex(text, r"\\\\\$\{[A-Z_]")
+        self.assertNotIn("\\${{", text)
+        self.assertNotRegex(text, r"\\\$\{[A-Z_]")
 
     def test_signer_never_auto_signs_pr_artifacts(self):
         text = (ROOT / ".github/workflows/sign-normal-invoke-evidence.yml").read_text()
