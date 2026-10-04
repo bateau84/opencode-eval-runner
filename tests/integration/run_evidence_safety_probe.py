@@ -118,7 +118,7 @@ def once(image, root, name, policy_kind, scenario='success', legacy=False, dispo
         plugin_root=config_root/'plugins'/'loom'
         plugin_root.mkdir(parents=True)
         (plugin_root/'index.ts').write_text('export default { id: "loom", async setup() {} };\n')
-        command += ['--config-root',str(config_root),'--expected-plugin','loom']
+        command += ['--config-root',str(config_root),'--agent','general','--expected-plugin','loom']
     if database_override:
         explicit_db=root/(name+'-explicit.db')
         with sqlite3.connect(explicit_db) as db:
