@@ -155,7 +155,7 @@ class OpenCodeTransportTests(unittest.TestCase):
                 self.assertEqual(command[:3], ['opencode','session','list'])
                 db=data/'opencode.db'
                 with sqlite3.connect(db) as conn:
-                    conn.execute('CREATE TABLE session (id TEXT)')
+                    conn.execute('CREATE TABLE session_v2 (id TEXT)')
                     conn.execute('CREATE TABLE credential (id TEXT)')
                     conn.execute('CREATE TABLE migration (id TEXT PRIMARY KEY, time_completed INTEGER NOT NULL)')
                     conn.executemany('INSERT INTO migration VALUES (?,1)',[(m,) for m in migrations])

@@ -75,7 +75,7 @@ The runner does **not** create tables or fake migration-journal rows.
 For the pinned OpenCode source used by the eval image, the runner then opens the
 new database read-only and attests:
 
-- `session`, `credential`, and `migration` tables exist;
+- `session_v2`, `credential`, and `migration` tables exist;
 - the migration journal contains exactly 48 migrations;
 - first migration is `20260127222353_familiar_lady_ursula`;
 - last migration is `20260923013825_project_time_active`;

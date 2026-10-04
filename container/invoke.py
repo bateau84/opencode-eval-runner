@@ -439,11 +439,11 @@ def disposable_runtime_state(env: dict[str, str], timeout: int) -> dict[str, Any
                 "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
             )}
             migrations = [row[0] for row in db.execute("SELECT id FROM migration ORDER BY id")]
-            session_rows = db.execute("SELECT COUNT(*) FROM session").fetchone()[0]
+            session_rows = db.execute("SELECT COUNT(*) FROM session_v2").fetchone()[0]
             credential_rows = db.execute("SELECT COUNT(*) FROM credential").fetchone()[0]
     except sqlite3.Error as exc:
         raise RuntimeError("disposable database attestation failed") from exc
-    if not {"session", "credential", "migration"} <= tables:
+    if not {"session_v2", "credential", "migration"} <= tables:
         raise RuntimeError("disposable database schema incomplete")
     if (len(migrations) != EXPECTED_MIGRATION_COUNT or
             migrations[0] != FIRST_MIGRATION or migrations[-1] != LAST_MIGRATION):
