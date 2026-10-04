@@ -31,6 +31,11 @@ COPILOT_AUTH_ENVS = (
 RUNTIME_UID = 1000
 RUNTIME_GID = 1000
 OPENCODE_STATE_PROFILES = ("default", "disposable")
+DISPOSABLE_STATE_CONTROL_ENVS = {
+    "EVAL_OPENCODE_STATE_PROFILE",
+    "EVAL_OPENCODE_AUTH_SOURCE",
+    "EVAL_OPENCODE_DATABASE_SOURCE",
+}
 RUNNER_SEED_ENVS = (
     "OPENCODE_EVAL_RUNNER_AUTH",
     "OPENCODE_EVAL_RUNNER_CONFIG",
@@ -382,11 +387,16 @@ def build_container_command(
         "--env", f"EVAL_OPENCODE_DATABASE_SOURCE={'runtime-bootstrap' if state_profile == 'disposable' else 'seed-or-runtime'}",
     ]
 
-    env_names = (
-        list(dict.fromkeys(tuple(args.env)))
-        if state_profile == "disposable"
-        else list(dict.fromkeys(DEFAULT_ENV_ALLOWLIST + tuple(args.env)))
-    )
+    if state_profile == "disposable":
+        forbidden = sorted(DISPOSABLE_STATE_CONTROL_ENVS.intersection(args.env))
+        if forbidden:
+            raise RunnerError(
+                "--opencode-state-profile disposable reserves runner state environment names: "
+                + ", ".join(forbidden)
+            )
+        env_names = list(dict.fromkeys(tuple(args.env)))
+    else:
+        env_names = list(dict.fromkeys(DEFAULT_ENV_ALLOWLIST + tuple(args.env)))
     if args.transport == "github-copilot-cli" and state_profile != "disposable":
         env_names.extend(COPILOT_AUTH_ENVS)
     pass_env(command, env_names, host_env)

@@ -125,6 +125,30 @@ class RunnerCliTests(unittest.TestCase):
         with self.assertRaisesRegex(RunnerError, 'rejects implicit runner seed overrides'):
             opencode_state_profile(args,{'OPENCODE_EVAL_RUNNER_DB':'/private.db'})
 
+    def test_disposable_profile_rejects_runner_owned_state_env_overrides(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            workspace, input_dir, output_dir = root/'workspace', root/'input', root/'output'
+            for path in (workspace, input_dir, output_dir):
+                path.mkdir()
+            config = root/'synthetic.json'
+            config.write_text('{}')
+            for name in (
+                'EVAL_OPENCODE_STATE_PROFILE',
+                'EVAL_OPENCODE_AUTH_SOURCE',
+                'EVAL_OPENCODE_DATABASE_SOURCE',
+            ):
+                args = argparse.Namespace(
+                    engine='podman', image='test-image', workspace=str(workspace), workspace_mode='ro',
+                    output=str(root/'result.json'), transport='opencode', model='fixture/mock', agent='general',
+                    skill=None, expected_plugin=None, reasoning=None, timeout_seconds=30, env=[name], auth=None,
+                    config=str(config), models_catalog=None, database=None, config_root=None, mount=[],
+                    network=None, opencode_state_profile='disposable',
+                )
+                host_env={name:'default' if name == 'EVAL_OPENCODE_STATE_PROFILE' else 'forged'}
+                with self.assertRaisesRegex(RunnerError, 'reserves runner state environment names'):
+                    build_container_command(args,input_dir,output_dir,host_env=host_env,database_seed=None)
+
     def test_disposable_database_resolution_never_reads_host_default(self):
         args=argparse.Namespace(transport='opencode', database=None, opencode_state_profile='disposable')
         with tempfile.TemporaryDirectory() as tmp, patch('runner.cli.default_database_path', side_effect=AssertionError('host default read')):
