@@ -272,8 +272,8 @@ def build_container_command(
         command += ["--security-opt", "label=disable"]
     elif hasattr(os, "getuid") and os.getuid() != 0:
         # Rootful Docker preserves numeric ownership on bind mounts. Match the
-        # non-root host caller so mode-0600 seed files remain readable. When
-        # invoked by root, do not add --user: keep the image's non-root USER.
+        # non-root host caller so mode-0600 seed files stay readable. A root
+        # caller leaves the image's non-root USER intact.
         command += ["--user", f"{os.getuid()}:{os.getgid()}"]
     command += [
         "--workdir",
@@ -481,8 +481,15 @@ def parser() -> argparse.ArgumentParser:
 
 
 def main() -> int:
-    requested_safety = any(arg == '--require-evidence-safety' or arg == '--evidence-policy-file'
-                           or arg.startswith('--require-evidence-safety=') or arg.startswith('--evidence-policy-file=') for arg in sys.argv[1:])
+    # argparse accepts unambiguous long-option prefixes. Protect diagnostics
+    # for every candidate safety prefix (including ambiguous ones), not only
+    # the full spelling. Preserve normal option abbreviation behavior.
+    safety_options = ('--require-evidence-safety', '--evidence-policy-file')
+    requested_safety = any(
+        name.startswith('--') and len(name) > 2 and
+        any(option.startswith(name) for option in safety_options)
+        for arg in sys.argv[1:] for name in (arg.partition('=')[0],)
+    )
     if requested_safety:
         # argparse can echo invalid arguments (including accidental credential
         # values) before invoke has loaded policy. Emit only a fixed diagnostic.

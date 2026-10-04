@@ -103,6 +103,18 @@ class SafetyFailureTests(unittest.TestCase):
         self.assertNotIn('PRIVATE',proc.stdout+proc.stderr)
         self.assertNotIn('NOT-A-CREDENTIAL',proc.stdout+proc.stderr)
 
+    def test_cli_abbreviated_safety_flags_do_not_echo_failed_arguments(self):
+        for flag in ('--evidence-policy-fil', '--evidence-p', '--require-evidence-safet', '--require-e', '--e'):
+            for assigned in (False, True):
+                tail = ([flag + '=PRIVATE-POLICY'] if assigned else [flag, 'PRIVATE-POLICY'])
+                command = [sys.executable, str(Path(__file__).resolve().parents[1]/'bin/opencode-eval-runner'),
+                           'invoke', '--model', 'PRIVATE-MODEL', *tail, '--unknown=PRIVATE-VALUE']
+                proc = subprocess.run(command, capture_output=True, text=True)
+                with self.subTest(flag=flag, assigned=assigned):
+                    self.assertNotEqual(proc.returncode, 0)
+                    self.assertNotIn('PRIVATE', proc.stdout + proc.stderr)
+                    self.assertIn('invalid safety invocation', proc.stderr)
+
     def test_missing_policy_emit_success_failure_timeout_without_echo(self):
         # Real emitter and main path, not a substitute result serializer.
         for kw in ({'exit_code':0},{'exit_code':1},{'exit_code':124,'timed_out':True}):

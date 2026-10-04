@@ -40,22 +40,52 @@ def image_info(reference):
     return info
 
 
-def cleanup_resources(created, runtime, target, network):
-    """Remove only resources this invocation successfully created."""
+OWNER_LABEL = "io.opencode-eval-runner.capture-owner"
+
+
+def cleanup_resources(attempted, runtime, target, network, owner):
+    """Reconcile create attempts, including lost/timeout create responses.
+
+    A successful inventory with no matching name establishes absence. An
+    unreachable engine or malformed inventory is a cleanup failure, never
+    absence. Inspect the run label and delete by immutable resource ID so a
+    same-named resource from another run is not removed.
+    """
     failures = []
-    resources = (
-        ("runtime", ["docker", "rm", "--volumes", "-f", runtime]),
-        ("target", ["docker", "rm", "--volumes", "-f", target]),
-        ("network", ["docker", "network", "rm", network]),
-    )
-    for resource, command in resources:
-        if not created.get(resource, False):
+    for resource, name in (("runtime", runtime), ("target", target), ("network", network)):
+        if not attempted.get(resource, False):
             continue
+        kind = "network" if resource == "network" else "container"
+        command = ["docker", kind, "ls", "--no-trunc", "--filter", "name=" + name,
+                   "--format", "{{json .}}"]
+        if kind == "container":
+            command.append("--all")
         try:
-            cleanup = subprocess.run(command, capture_output=True, timeout=20, check=False)
-            if cleanup.returncode:
-                failures.append(resource)
-        except (OSError, subprocess.SubprocessError):
+            listed = subprocess.run(command, capture_output=True, text=True, timeout=20, check=False)
+            _require(listed.returncode == 0, "cleanup_failed")
+            rows = [strict_json(line) for line in listed.stdout.splitlines() if line.strip()]
+            name_field = "Name" if kind == "network" else "Names"
+            _require(all(isinstance(row, dict) and isinstance(row.get(name_field), str) for row in rows), "cleanup_failed")
+            matches = [row for row in rows if row[name_field].lstrip("/") == name]
+            if not matches:
+                continue
+            _require(len(matches) == 1, "cleanup_failed")
+            identity = matches[0].get("ID")
+            _require(isinstance(identity, str) and bool(re.fullmatch(r"[0-9a-f]{64}", identity)), "cleanup_failed")
+            inspected = subprocess.run(["docker", kind, "inspect", identity],
+                                       capture_output=True, text=True, timeout=20, check=False)
+            _require(inspected.returncode == 0, "cleanup_failed")
+            snapshots = strict_json(inspected.stdout)
+            _require(isinstance(snapshots, list) and len(snapshots) == 1, "cleanup_failed")
+            snapshot = snapshots[0]
+            labels = snapshot.get("Labels") if kind == "network" else (snapshot.get("Config") or {}).get("Labels")
+            _require(isinstance(labels, dict) and labels.get(OWNER_LABEL) == owner, "cleanup_failed")
+            _require(snapshot.get("Id") == identity and snapshot.get("Name", "").lstrip("/") == name, "cleanup_failed")
+            removal = (["docker", "network", "rm", identity] if kind == "network" else
+                       ["docker", "rm", "--volumes", "-f", identity])
+            cleaned = subprocess.run(removal, capture_output=True, timeout=20, check=False)
+            _require(cleaned.returncode == 0, "cleanup_failed")
+        except (OSError, subprocess.SubprocessError, ValueError, TypeError, KeyError, AttributeError):
             failures.append(resource)
     return failures
 
@@ -108,7 +138,7 @@ def invoke(args: argparse.Namespace, *, _test_receive=None, _test_prepare=None, 
         hardening = ["--read-only", "--cap-drop", "ALL", "--security-opt", "no-new-privileges",
                      "--pids-limit", "128", "--memory", "1g", "--cpus", "2", "--user", "1000:1000",
                      "--log-driver", "none"]
-        created = {"network": False, "target": False, "runtime": False}
+        attempted = {"network": False, "target": False, "runtime": False}
         try:
             runtime_info, target_info = image_info(args.image), image_info(args.tool_image)
             launch.update(runtime_config_digest=runtime_info["Id"], tool_config_digest=target_info["Id"])
@@ -125,22 +155,24 @@ def invoke(args: argparse.Namespace, *, _test_receive=None, _test_prepare=None, 
             result.update(launch=launch, launch_id=launch_id)
             if _test_prepare is not None:
                 _test_prepare(capture)
-            run(["docker", "network", "create", "--internal", network])
-            created["network"] = True
+            attempted["network"] = True
+            run(["docker", "network", "create", "--internal", "--label", OWNER_LABEL + "=" + run_id, network])
             # Create and start are separate so cleanup ownership is established
             # before an image entrypoint/start failure can occur.
-            run(["docker", "create", "--name", target, "--network", network, *hardening,
+            attempted["target"] = True
+            run(["docker", "create", "--name", target, "--network", network,
+                 "--label", OWNER_LABEL + "=" + run_id, *hardening,
                  "--tmpfs", "/tmp:rw,nosuid,nodev,size=64m", args.tool_image])
-            created["target"] = True
             run(["docker", "start", target])
             # No arbitrary mounts, plugin roots, host credentials or command override.
-            create_runtime = ["docker", "create", "--name", runtime, "--network", network, *hardening,
+            create_runtime = ["docker", "create", "--name", runtime, "--network", network,
+                              "--label", OWNER_LABEL + "=" + run_id, *hardening,
                               "--tmpfs", "/tmp:rw,exec,nosuid,nodev,size=1g",
                               "--tmpfs", "/workspace:rw,nosuid,nodev,size=32m,mode=1777",
                               "--volume", str(inputs) + ":/input:ro", "--volume", str(capture) + ":/capture:rw",
                               "--entrypoint", "python3", args.image, "/opt/protected/invoke.py"]
+            attempted["runtime"] = True
             run(create_runtime)
-            created["runtime"] = True
             completed = subprocess.run(
                 ["docker", "start", "--attach", runtime],
                 capture_output=True, text=True, timeout=args.timeout, check=False,
@@ -185,7 +217,7 @@ def invoke(args: argparse.Namespace, *, _test_receive=None, _test_prepare=None, 
             result["observed_execution"]["issues"] = ["protected_transport_failed"]
             code = 2
         finally:
-            cleanup_failures = cleanup_resources(created, runtime, target, network)
+            cleanup_failures = cleanup_resources(attempted, runtime, target, network, run_id)
             if cleanup_failures:
                 result["observed_execution"]["evidence_eligible"] = False
                 result["observed_execution"]["status"] = "incomplete"
