@@ -7,7 +7,9 @@ LABEL org.opencontainers.image.revision=$RUNNER_REVISION \
       io.opencode-eval.evidence-safety="runner-evidence-safety/v1" \
       io.opencode-eval.evidence-safety-module=$SAFETY_MODULE_SHA256 \
       io.opencode-eval.evidence-safety-invoke=$INVOKE_SHA256
-COPY container /opt/opencode-eval-runner/container
+COPY container/__init__.py /opt/opencode-eval-runner/container/__init__.py
+COPY container/evidence_safety.py /opt/opencode-eval-runner/container/evidence_safety.py
+COPY container/invoke.py /opt/opencode-eval-runner/container/invoke.py
 USER root
 RUN echo "$SAFETY_MODULE_SHA256  /opt/opencode-eval-runner/container/evidence_safety.py" | sha256sum -c - \
  && echo "$INVOKE_SHA256  /opt/opencode-eval-runner/container/invoke.py" | sha256sum -c - \

@@ -23,6 +23,9 @@ RESULT = 'opencode-eval-runner/safe-result/v1'
 EVENTS = 'opencode-eval-runner/safe-tool-results/v1'
 CONSUMER = 'runner-evidence-safety/v1'
 RUNTIME_STATE = 'opencode-eval-runner/runtime-state/v1'
+EXPECTED_MIGRATION_COUNT = 48
+FIRST_MIGRATION = '20260127222353_familiar_lady_ursula'
+LAST_MIGRATION = '20260923013825_project_time_active'
 POLICY_LIMIT = 128_000
 WIRE_LIMIT = 132_096
 RESULT_LIMIT = 1_000_000
@@ -255,7 +258,9 @@ def validated_runtime_state(value: Any) -> dict[str, Any]:
     for name in ('session_rows_before_inference', 'credential_rows_before_inference', 'migration_count'):
         require(type(value[name]) is int and 0 <= value[name] <= 2**53 - 1, 'invalid')
     require(value['session_rows_before_inference'] == 0 and value['credential_rows_before_inference'] == 0, 'invalid')
-    require(type(value['first_migration']) is str and type(value['last_migration']) is str, 'invalid')
+    require(value['migration_count'] == EXPECTED_MIGRATION_COUNT, 'invalid')
+    require(value['first_migration'] == FIRST_MIGRATION, 'invalid')
+    require(value['last_migration'] == LAST_MIGRATION, 'invalid')
     return owned(value)
 
 
@@ -348,6 +353,7 @@ def project_result(raw: Any, policy: Policy, stage='runner') -> dict:
             status = state.get('status')
             if status in {'pending', 'running', 'completed', 'error'}:
                 row['status'] = status
+                p.fields.append({'event': count - 1, 'field': 'status', 'state': 'exact'})
             else:
                 p.omit('status', 'invalid', count - 1)
             fields = {'tool': part.get('tool', MISSING), 'call_id': part.get('callID', part.get('id', MISSING)),
@@ -494,15 +500,28 @@ def validate_reply(raw: bytes | str, policy: Policy, run_id: str, revision: str,
             seq = event.get('sequence')
             require(type(seq) is int and 1 <= seq <= evidence['observed_events'] and seq not in seen)
             seen.add(seq)
-            for name in event_names - {'event', 'metadata', 'status'}:
-                item = dispositions.get((seq-1, name))
+            event_id = seq - 1
+            for required_name in ('tool', 'call_id', 'session_id', 'input', 'status'):
+                require((event_id, required_name) in dispositions)
+            require(any((event_id, name) in dispositions for name in ('output', 'error')))
+            for name in event_names - {'event', 'metadata'}:
+                item = dispositions.get((event_id, name))
                 if name in event:
                     require(item is not None and item['state'] != 'omitted')
                     if name in {'tool', 'call_id', 'session_id'}:
                         require(item['state'] == 'exact' and type(event[name]) is str)
+                    if name == 'status':
+                        require(item['state'] == 'exact')
                 if item and item['state'] == 'omitted':
                     require(name not in event)
-            require('status' not in event or event['status'] in {'pending', 'running', 'completed', 'error'})
+            status = event.get('status')
+            require(status is None or status in {'pending', 'running', 'completed', 'error'})
+            status_item = dispositions[(event_id, 'status')]
+            require((status is None) == (status_item['state'] == 'omitted'))
+            if status == 'completed':
+                require((event_id, 'output') in dispositions)
+            if status == 'error':
+                require((event_id, 'error') in dispositions)
     timing = reply.get('timing')
     if timing is not None:
         require(type(timing) is dict and not (set(timing) - {'run_seconds','export_seconds','export_exit_code','total_seconds'}))
@@ -541,6 +560,8 @@ def validate_reply(raw: bytes | str, policy: Policy, run_id: str, revision: str,
                     # structure. Credentials such as "0", "1", "text", or "low"
                     # must not reclassify those fixed values as payload.
                     require(validated_runtime_state(val) == val)
+                elif name == 'status':
+                    require(val in {'pending', 'running', 'completed', 'error'})
                 else:
                     projected = check.field(name, val, role=role, limit=200_000 if name == 'text' else 6000)
                     require(projected is not MISSING and check.fields[0]['state'] == 'exact')

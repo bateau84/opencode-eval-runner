@@ -63,6 +63,15 @@ class PublicationBoundaryTests(unittest.TestCase):
                 self.assertIn("needs.publish.outputs", jobs["verify"])
                 self.assertIn("github.event.pull_request.head.repo.full_name == github.repository", jobs["build"])
 
+    def test_evidence_safety_image_copies_only_reviewed_container_sources(self):
+        text = (ROOT / "evidence-safety/Containerfile").read_text()
+        self.assertNotIn("COPY container /opt/opencode-eval-runner/container", text)
+        for path in ("__init__.py", "evidence_safety.py", "invoke.py"):
+            self.assertIn(
+                f"COPY container/{path} /opt/opencode-eval-runner/container/{path}",
+                text,
+            )
+
     def test_external_actions_are_pinned_and_errors_not_ignored(self):
         for name in ("protected-channel.yml", "local-runtime.yml", "sign-normal-invoke-evidence.yml"):
             text = (ROOT / ".github/workflows" / name).read_text()
@@ -115,6 +124,12 @@ class PublicationBoundaryTests(unittest.TestCase):
         self.assertIn("--certificate-identity", signer)
         self.assertIn("protected_capture_accepted", signer)
         self.assertIn('"unsupported"', signer)
+        self.assertIn("docker login ghcr.io", signer)
+        self.assertIn('eval-live-invoke-compatibility', signer)
+        self.assertIn('delegated-session-normal-invoke', signer)
+        self.assertIn('normal-invoke-runtime-seam-probe', signer)
+        self.assertIn('.image == $image', signer)
+        self.assertIn('.runner_revision == $source', signer)
 
     def test_signer_expressions_are_not_escaped_literals(self):
         text = (ROOT / ".github/workflows/sign-normal-invoke-evidence.yml").read_text()

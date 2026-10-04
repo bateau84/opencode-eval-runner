@@ -141,3 +141,21 @@ be produced from this PR alone.
 That limitation is intentional: producing a keyless signature from a PR-controlled
 copy of the workflow would defeat the security boundary this design is meant to
 provide.
+
+
+## Final signer admission
+
+Before the protected `release-signing` job creates either signature, it validates
+the downloaded summaries against the immutable image selected for that run:
+
+- eval-live compatibility: kind `eval-live-invoke-compatibility`, version 2,
+  matching `image`, passed, and diagnostic/non-evidence status;
+- delegated-session proof: kind `delegated-session-normal-invoke`, version 1,
+  matching `image`, and passed;
+- runtime seam: kind `normal-invoke-runtime-seam-probe`, version 2, matching
+  `image`, matching reviewed source revision, seam passed, handoff still
+  `BLOCKED`, and independent-code-approval still false.
+
+The signing job authenticates to GHCR with its package-scoped `GITHUB_TOKEN`
+before `cosign sign`. GitHub OIDC provides the keyless certificate identity; it
+does not replace registry authentication for publishing the OCI signature.

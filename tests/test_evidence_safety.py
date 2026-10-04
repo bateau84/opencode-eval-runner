@@ -80,10 +80,15 @@ class PolicyTests(unittest.TestCase):
             S.validate_reply(S.encode(r),policy,run_id,revision,binding)['runtime_state'],
             state,
         )
-        bad={**state,'database_seed_present':True}
-        r=S.project_result({**raw_result(),'runtime_state':bad},S.Policy(inventory()))
-        self.assertNotIn('runtime_state',r)
-        self.assertEqual(disposition(r,'runtime_state')['state'],'omitted')
+        for bad in (
+            {**state,'database_seed_present':True},
+            {**state,'migration_count':47},
+            {**state,'first_migration':'wrong'},
+            {**state,'last_migration':'wrong'},
+        ):
+            r=S.project_result({**raw_result(),'runtime_state':bad},S.Policy(inventory()))
+            self.assertNotIn('runtime_state',r)
+            self.assertEqual(disposition(r,'runtime_state')['state'],'omitted')
 
     def test_missing_incompatible_and_incomplete_policy_never_complete(self):
         for data in (None, {}, {'values': ['secret']}, {**inventory(), 'complete': 1},
@@ -269,6 +274,37 @@ class HostBoundaryTests(unittest.TestCase):
         bad = dict(r); del bad['evidence_safety_ack']
         with self.assertRaises(ValueError):
             S.validate_reply(S.encode(bad), p, 'c' * 64, REV)
+
+    def test_retained_event_requires_complete_field_dispositions(self):
+        policy = S.Policy(inventory(['unrelated-secret']))
+        run_id = 'c' * 64
+        revision = REV
+        binding = b'd' * 32
+        result = S.project_result(raw_result([tool('safe-output')]), policy)
+        result['evidence_safety_ack'] = S.receipt(policy, run_id, revision, binding)
+        event_fields = {
+            item['field'] for item in result['evidence_safety']['fields']
+            if item.get('event') == 0
+        }
+        self.assertTrue({'tool','call_id','session_id','input','status','output'} <= event_fields)
+        self.assertEqual(S.validate_reply(S.encode(result), policy, run_id, revision, binding), result)
+
+        for field in ('tool','call_id','session_id','input','status'):
+            bad = copy.deepcopy(result)
+            bad['evidence_safety']['fields'] = [
+                item for item in bad['evidence_safety']['fields']
+                if not (item.get('event') == 0 and item.get('field') == field)
+            ]
+            with self.assertRaises(ValueError):
+                S.validate_reply(S.encode(bad), policy, run_id, revision, binding)
+
+        bad = copy.deepcopy(result)
+        bad['evidence_safety']['fields'] = [
+            item for item in bad['evidence_safety']['fields']
+            if not (item.get('event') == 0 and item.get('field') in {'output','error'})
+        ]
+        with self.assertRaises(ValueError):
+            S.validate_reply(S.encode(bad), policy, run_id, revision, binding)
 
     def test_omitted_value_smuggling_and_duplicate_disposition_rejected(self):
         p, r = self.reply()

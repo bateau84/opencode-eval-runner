@@ -197,9 +197,28 @@ jobs:
           set -euo pipefail
           test -z "$(find evidence -type l -print -quit)"
           test "$(du -sb evidence | cut -f1)" -le 25000000
-          jq -e '.passed == true and .evidence_status == "diagnostic_non_evidence"' evidence/eval-live-compat/summary.json >/dev/null
-          jq -e '.passed == true' evidence/delegated-session/summary.json >/dev/null
-          jq -e '.runtime_seam_passed == true and .handoff_acceptance == "BLOCKED"' evidence/probe/summary.json >/dev/null
+          jq -e --arg image "$IMAGE" '
+            .kind == "eval-live-invoke-compatibility" and
+            .version == 2 and
+            .image == $image and
+            .passed == true and
+            .evidence_status == "diagnostic_non_evidence"
+          ' evidence/eval-live-compat/summary.json >/dev/null
+          jq -e --arg image "$IMAGE" '
+            .kind == "delegated-session-normal-invoke" and
+            .version == 1 and
+            .image == $image and
+            .passed == true
+          ' evidence/delegated-session/summary.json >/dev/null
+          jq -e --arg image "$IMAGE" --arg source "$SOURCE_COMMIT" '
+            .kind == "normal-invoke-runtime-seam-probe" and
+            .version == 2 and
+            .image == $image and
+            .runner_revision == $source and
+            .runtime_seam_passed == true and
+            .handoff_acceptance == "BLOCKED" and
+            .independent_code_approval == false
+          ' evidence/probe/summary.json >/dev/null
           mkdir signed
           export SOURCE_COMMIT IMAGE PR_NUMBER
           python3 - <<'PY'
@@ -237,9 +256,12 @@ jobs:
         env:
           SOURCE_COMMIT: ${{ needs.build.outputs.source_commit }}
           IMAGE: ${{ needs.publish.outputs.image }}
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           identity="https://github.com/$GITHUB_WORKFLOW_REF"
+          printf '%s' "$REGISTRY_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          trap 'docker logout ghcr.io' EXIT
           cosign sign --yes -a "source_commit=$SOURCE_COMMIT" -a "workflow_run=$GITHUB_RUN_ID" "$IMAGE"
           cosign verify "$IMAGE" \
             --certificate-identity "$identity" \
