@@ -15,7 +15,7 @@ JOB_ID = r"[A-Za-z_][A-Za-z0-9_-]*"
 
 def parse_workflow_jobs(text):
     prefix, body = text.split("\njobs:\n", 1)
-    matches = list(re.finditer(r"^  ([^\n:]+):\s*$", body, re.MULTILINE))
+    matches = list(re.finditer(r"^  (\S[^\n:]*):\s*$", body, re.MULTILINE))
     jobs = {}
     parsed = []
     for match in matches:
@@ -44,6 +44,7 @@ class PublicationBoundaryTests(unittest.TestCase):
         prefix, jobs = parse_workflow_jobs(
             "name: fixture\non:\n  pull_request:\njobs:\n"
             "  build:\n    runs-on: ubuntu-latest\n"
+            "    steps:\n      - uses: example/action@deadbeef\n        with:\n          ref: main\n"
             "  \"publish_2\":\n    runs-on: ubuntu-latest\n"
             "  '_verify9':\n    runs-on: ubuntu-latest\n"
         )
