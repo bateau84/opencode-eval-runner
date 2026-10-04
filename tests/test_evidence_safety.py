@@ -296,6 +296,87 @@ class HostBoundaryTests(unittest.TestCase):
         self.assertEqual(admitted['tool_result_evidence']['events'][0]['status'], 'completed')
         self.assertNotIn('private-output', json.dumps(admitted))
 
+    def test_every_required_top_level_field_has_disposition(self):
+        policy = S.Policy(inventory(['unrelated-secret']))
+        run_id = 'c' * 64
+        revision = REV
+        binding = b'd' * 32
+        result = S.project_result(raw_result(), policy)
+        result['evidence_safety_ack'] = S.receipt(policy, run_id, revision, binding)
+        top = {
+            item['field'] for item in result['evidence_safety']['fields']
+            if item.get('event') is None
+        }
+        self.assertTrue(S.TOP_LEVEL_REQUIRED <= top)
+        self.assertEqual(S.validate_reply(S.encode(result), policy, run_id, revision, binding), result)
+
+        malformed = {
+            'schema': S.RESULT,
+            'evidence_safety_ack': S.receipt(policy, run_id, revision, binding),
+            'evidence_safety': {
+                'schema': S.SAFETY,
+                'policy_version': S.VERSION,
+                'inventory_complete': True,
+                'coverage_complete': True,
+                'fields': [],
+                'loss_counts': {reason: 0 for reason in S.REASONS},
+            },
+        }
+        with self.assertRaises(ValueError):
+            S.validate_reply(S.encode(malformed), policy, run_id, revision, binding)
+
+    def test_omitted_event_count_is_bound_to_event_dispositions(self):
+        policy = S.Policy(inventory(['unrelated-secret']))
+        run_id = 'c' * 64
+        revision = REV
+        binding = b'd' * 32
+        malformed_event = {
+            'type': 'tool_use',
+            'timestamp': 1,
+            'sessionID': 'session',
+            'part': {'type': 'tool', 'tool': 'broken', 'state': []},
+        }
+        result = S.project_result(raw_result([tool('safe-output'), malformed_event]), policy)
+        result['evidence_safety_ack'] = S.receipt(policy, run_id, revision, binding)
+        evidence = result['tool_result_evidence']
+        self.assertEqual(evidence['observed_events'], 2)
+        self.assertEqual(evidence['omitted_events'], 1)
+        self.assertEqual(
+            [item for item in result['evidence_safety']['fields']
+             if item.get('field') == 'event'],
+            [{'event': 1, 'field': 'event', 'state': 'omitted',
+              'reason': 'unsupported_schema', 'stage': 'runner'}],
+        )
+        self.assertEqual(S.validate_reply(S.encode(result), policy, run_id, revision, binding), result)
+
+        no_reason = copy.deepcopy(result)
+        no_reason['evidence_safety']['fields'] = [
+            item for item in no_reason['evidence_safety']['fields']
+            if item.get('field') != 'event'
+        ]
+        no_reason['evidence_safety']['loss_counts']['unsupported_schema'] -= 1
+        no_reason['evidence_safety']['coverage_complete'] = True
+        with self.assertRaises(ValueError):
+            S.validate_reply(S.encode(no_reason), policy, run_id, revision, binding)
+
+        retained_omitted = copy.deepcopy(result)
+        event_item = next(
+            item for item in retained_omitted['evidence_safety']['fields']
+            if item.get('field') == 'event'
+        )
+        event_item['event'] = 0
+        with self.assertRaises(ValueError):
+            S.validate_reply(S.encode(retained_omitted), policy, run_id, revision, binding)
+
+        out_of_range = copy.deepcopy(result)
+        event_item = next(
+            item for item in out_of_range['evidence_safety']['fields']
+            if item.get('field') == 'event'
+        )
+        event_item['event'] = 9
+        with self.assertRaises(ValueError):
+            S.validate_reply(S.encode(out_of_range), policy, run_id, revision, binding)
+
     def test_retained_event_requires_complete_field_dispositions(self):
         policy = S.Policy(inventory(['unrelated-secret']))
         run_id = 'c' * 64

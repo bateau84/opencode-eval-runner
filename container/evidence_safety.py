@@ -240,9 +240,12 @@ PUBLIC_COUNTERS = {'exit_code', 'stdout_total_chars', 'stderr_total_chars'}
 PUBLIC_FLAGS = {'timed_out', 'infrastructure_error', 'stdout_truncated', 'stderr_truncated'}
 DYNAMIC = {'model', 'reasoning', 'agent', 'skill', 'session_id', 'credential_source'}
 OPAQUE = {'stdout', 'stderr', 'plugin_diagnostic', 'plugin_preflight'}
-ALLOWED = PUBLIC_COUNTERS | PUBLIC_FLAGS | DYNAMIC | OPAQUE | {
-    'schema', 'transport', 'reasoning_source', 'text', 'tools', 'actions', 'skills_loaded', 'timing',
-    'tool_result_evidence', 'runtime_state'}
+TOP_LEVEL_REQUIRED = DYNAMIC | OPAQUE | {
+    'transport', 'reasoning_source', 'text', 'tools', 'actions', 'skills_loaded',
+    'timing', 'tool_result_evidence'
+}
+TOP_LEVEL_PROTOCOL = {'transport', 'reasoning_source', 'timing', 'tool_result_evidence', 'runtime_state'}
+ALLOWED = PUBLIC_COUNTERS | PUBLIC_FLAGS | TOP_LEVEL_REQUIRED | {'schema', 'runtime_state'}
 
 
 def validated_runtime_state(value: Any) -> dict[str, Any]:
@@ -268,7 +271,8 @@ def project_result(raw: Any, policy: Policy, stage='runner') -> dict:
     p = Projection(policy, stage)
     result = {'schema': RESULT}
     if type(raw) is not dict or set(raw) - ALLOWED or raw.get('schema') != 'opencode-eval-runner/v1':
-        p.omit('transport', 'unsupported_schema')
+        for name in TOP_LEVEL_REQUIRED:
+            p.omit(name, 'unsupported_schema')
         result['evidence_safety'] = p.summary()
         return result
     for name in ('transport', 'reasoning_source'):
@@ -276,6 +280,7 @@ def project_result(raw: Any, policy: Policy, stage='runner') -> dict:
                    'reasoning_source': {'explicit', 'model-variant', 'provider-default'}}[name]
         if raw.get(name) in options:
             result[name] = raw[name]
+            p.fields.append({'event': None, 'field': name, 'state': 'exact'})
         else:
             p.omit(name, 'invalid')
     for name in PUBLIC_COUNTERS:
@@ -305,6 +310,7 @@ def project_result(raw: Any, policy: Policy, stage='runner') -> dict:
     if type(timing) is dict and not (set(timing) - timing_keys) and all(
         v is None or (type(v) in (int, float) and math.isfinite(v)) for v in timing.values()):
         result['timing'] = dict(timing)
+        p.fields.append({'event': None, 'field': 'timing', 'state': 'exact'})
     else:
         p.omit('timing', 'unsupported_schema')
     # Actions have fixed structure but dynamic selector values. If any action
@@ -381,6 +387,7 @@ def project_result(raw: Any, policy: Policy, stage='runner') -> dict:
             rows.append(row)
         result['tool_result_evidence'] = {'schema': EVENTS, 'source': 'opencode.event-stream.full',
             'observed_events': count, 'omitted_events': count - len(rows), 'events': rows}
+        p.fields.append({'event': None, 'field': 'tool_result_evidence', 'state': 'exact'})
     else:
         p.omit('tool_result_evidence', 'upstream_clipped' if evidence else 'missing')
     result['evidence_safety'] = p.summary()
@@ -454,7 +461,7 @@ def validate_reply(raw: bytes | str, policy: Policy, run_id: str, revision: str,
     require(type(summary['fields']) is list and len(summary['fields']) <= 10_000)
     dispositions = {}
     counts = {r: 0 for r in REASONS}
-    top_names = DYNAMIC | OPAQUE | {'transport', 'reasoning_source', 'text', 'tools', 'actions', 'skills_loaded', 'timing', 'tool_result_evidence', 'runtime_state'}
+    top_names = TOP_LEVEL_REQUIRED | {'runtime_state'}
     event_names = {'event', 'tool', 'call_id', 'session_id', 'input', 'output', 'error', 'status', 'metadata'}
     for item in summary['fields']:
         require(type(item) is dict)
@@ -468,16 +475,26 @@ def validate_reply(raw: bytes | str, policy: Policy, run_id: str, revision: str,
             require(item['reason'] in REASONS and item['stage'] == 'runner')
             counts[item['reason']] += 1
             require(state != 'redacted' or item['reason'] == 'credential_match')
-        require(policy.complete or state == 'omitted' or (event is not None and name == 'status' and state == 'exact'))
+        require(
+            policy.complete or
+            state == 'omitted' or
+            (event is None and name in TOP_LEVEL_PROTOCOL and state == 'exact') or
+            (event is not None and name == 'status' and state == 'exact')
+        )
         dispositions[(event, name)] = item
     require(counts == summary['loss_counts'])
     require(summary['coverage_complete'] == (policy.complete and not any(counts.values())))
-    for name in top_names:
+    for name in TOP_LEVEL_REQUIRED:
         item = dispositions.get((None, name))
-        if name in reply and name not in {'transport', 'reasoning_source', 'timing', 'tool_result_evidence'}:
-            require(item is not None and item['state'] != 'omitted')
-        if item and item['state'] == 'omitted':
-            require(name not in reply)
+        require(item is not None)
+        require((name in reply) == (item['state'] != 'omitted'))
+        if name in TOP_LEVEL_PROTOCOL and name in reply:
+            require(item['state'] == 'exact')
+    runtime_item = dispositions.get((None, 'runtime_state'))
+    if 'runtime_state' in reply:
+        require(runtime_item is not None and runtime_item['state'] == 'exact')
+    if runtime_item is not None and runtime_item['state'] == 'omitted':
+        require('runtime_state' not in reply)
     for name in PUBLIC_COUNTERS:
         require(name not in reply or type(reply[name]) is int and abs(reply[name]) <= 2**53 - 1)
     for name in PUBLIC_FLAGS:
@@ -522,6 +539,22 @@ def validate_reply(raw: bytes | str, policy: Policy, run_id: str, revision: str,
                 require((event_id, 'output') in dispositions)
             if status == 'error':
                 require((event_id, 'error') in dispositions)
+        retained_ids = {event['sequence'] - 1 for event in evidence['events']}
+        omitted_ids = {
+            event for (event, name), item in dispositions.items()
+            if event is not None and name == 'event' and item['state'] == 'omitted'
+        }
+        require(len(omitted_ids) == evidence['omitted_events'])
+        require(all(0 <= event < evidence['observed_events'] for event in omitted_ids))
+        require(not (retained_ids & omitted_ids))
+        require(retained_ids | omitted_ids == set(range(evidence['observed_events'])))
+        for (event, name), item in dispositions.items():
+            if event is None:
+                continue
+            if name == 'event':
+                require(item['state'] == 'omitted' and event in omitted_ids)
+            else:
+                require(event in retained_ids)
     timing = reply.get('timing')
     if timing is not None:
         require(type(timing) is dict and not (set(timing) - {'run_seconds','export_seconds','export_exit_code','total_seconds'}))
@@ -562,6 +595,8 @@ def validate_reply(raw: bytes | str, policy: Policy, run_id: str, revision: str,
                     require(validated_runtime_state(val) == val)
                 elif name == 'status':
                     require(val in {'pending', 'running', 'completed', 'error'})
+                elif event is None and name in TOP_LEVEL_PROTOCOL:
+                    pass
                 else:
                     projected = check.field(name, val, role=role, limit=200_000 if name == 'text' else 6000)
                     require(projected is not MISSING and check.fields[0]['state'] == 'exact')
