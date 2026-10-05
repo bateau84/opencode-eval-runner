@@ -41,6 +41,18 @@ All registrations and outstanding requests belong to that generation.
 
 A restart creates a new generation and cannot inherit outstanding request authority.
 
+## Generation sealing and collector drain
+
+Request at-most-once rules do not by themselves prove completeness. The generation therefore needs a trusted two-phase close:
+
+1. stop admitting new case-required work at the reviewed runner/OpenCode boundary;
+2. let all already-admitted callback/tool requests and stock events settle or receive an explicit non-success classification;
+3. bridge assigns a monotonic collector sequence to every accepted evidence observation for the generation;
+4. only after its accepted observation queue is drained, bridge sends a trusted `seal(generation, finalSequence)`;
+5. collector may call the generation complete only after it has a contiguous sequence through `finalSequence` and no post-seal accepted observation/request exists.
+
+A late request/event after the seal is a protocol/completeness failure, not something silently ignored. A disposable OpenCode process exit may support the close boundary only after provider-free proof that relevant event and bridge queues are drained before the seal.
+
 ## Registration lifecycle
 
 ### Tool transform
@@ -139,26 +151,40 @@ The experiment may prove a runner-owned proxy/wrapping construction sufficient f
 
 Cancellation ownership remains stock OpenCode/Loom product semantics.
 
-The bridge owns only request-channel cancellation:
+The bridge owns only request-channel authority:
 
-- once a request is cancelled, late responses cannot mutate product state;
+- once trusted request authority is cancelled, a late response cannot mutate trusted OpenCode/bridge state or create eligible evidence;
+- rejecting that response does **not** prove that isolated Loom made no earlier side effect in its SQLite, workspace, subprocesses, or other product state;
+- where stock semantics expose interruption/cancellation, the bridge must propagate it and prove the selected callback/tool behavior;
 - cancelling transport request authority is not represented as Loom workflow cancellation;
 - a runner timeout is not represented as Loom cancellation;
-- a Loom cancellation decision remains produced by Loom code.
+- a Loom cancellation decision remains produced by Loom code;
+- if the timing or effect of a post-cancel remote side effect cannot be shown equivalent to stock behavior, the product result is unresolved and evidence completeness is false for that case.
+
+No cancellation path may retry product work implicitly.
 
 ## Channel loss
 
-### Before product terminal
+### Capability channel loss before product terminal
 
 - request becomes `transport-lost`;
+- generation stops admitting new capability work and the isolated generation is fenced/terminated according to the reviewed runner path;
 - product outcome is unresolved or follows the reviewed stock transport failure path;
+- remote side effects completed before the fence are product state and may be indeterminate;
 - evidence remains incomplete;
 - no automatic retry.
 
-### After product completion but before evidence terminal
+### Evidence channel loss
+
+- collector sequence can no longer be proven contiguous/sealed;
+- product completion cannot be rewritten or replayed to repair evidence;
+- evidence remains incomplete;
+- no reconnect/replay under the bounded experiment.
+
+### After product completion but before evidence seal
 
 - completed product result must remain completed;
-- collector loss cannot replace it;
+- collector/capability loss cannot replace it;
 - evidence may remain incomplete;
 - no replay/retry.
 
@@ -173,8 +199,9 @@ The bridge owns only request-channel cancellation:
 - permission mutation;
 - context/retry mutation;
 - duplicate/replayed/stale/late response rejection;
-- cancellation + late response;
-- channel loss before/after product completion;
+- cancellation + late response, including remote side-effect timing;
+- capability/evidence channel loss before/after product completion;
+- generation seal/drain, contiguous final sequence, and post-seal late request/event rejection;
 - same-parent and different-parent overlapping requests.
 
 Missing proof is `UNPROVEN`, not PASS or behavioral FAIL.
