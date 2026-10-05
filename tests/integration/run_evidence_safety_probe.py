@@ -23,6 +23,9 @@ from container import evidence_safety as S
 LONG='LONG-CREDENTIAL-'+'z'*9000
 ESCAPED='quoted-"line\nback\\slash-UNIQUE'
 ONLY_POLICY='PRIVATE-POLICY-ONLY-NOT-FOR-TARGET'
+DEEP_KEY=ESCAPED
+for _ in range(4):
+    DEEP_KEY=json.dumps(DEEP_KEY,ensure_ascii=False)[1:-1]
 VALUES=['0','1','text','low',LONG,ESCAPED,ONLY_POLICY,'fixture']
 OUTPUT='low text 0 1 | '+LONG+' | '+ESCAPED
 PLUGIN='''
@@ -37,12 +40,13 @@ export default { id: "capturersp", async setup(ctx) {
           throw Error("policy_leaked_to_child_environment");
         if (input.scenario === "timeout") await new Promise(resolve=>setTimeout(resolve,12000));
         if (input.scenario === "failure") throw Error(FAILURE);
+        if (input.scenario === "deep-key") return {content: Object.fromEntries([[DEEP_KEY, "public"]])};
         return {content: input.scenario === "oversize" ? "public ".repeat(1000) : SENTINEL};
       }
     });
   });
 }};
-'''.replace('SENTINEL',json.dumps(OUTPUT)).replace('FAILURE',json.dumps('FAILURE-'+ESCAPED))
+'''.replace('SENTINEL',json.dumps(OUTPUT)).replace('FAILURE',json.dumps('FAILURE-'+ESCAPED)).replace('DEEP_KEY',json.dumps(DEEP_KEY))
 
 
 def inventory(kind):
@@ -149,7 +153,7 @@ def check_safety(name,r,emitted,code,policy_kind):
     checks[name+':file_equals_print']=r==emitted and r.get('schema')==S.RESULT
     checks[name+':raw_streams_absent']='stdout' not in r and 'stderr' not in r
     checks[name+':explicit_safety']=r.get('evidence_safety',{}).get('schema')==S.SAFETY
-    checks[name+':private_inventory_absent']=all(x not in S.encode(r).decode() for x in (LONG,ESCAPED,ONLY_POLICY))
+    checks[name+':private_inventory_absent']=all(x not in S.encode(r).decode() for x in (LONG,ESCAPED,ONLY_POLICY,DEEP_KEY))
     checks[name+':host_validates_ack']=r.get('evidence_safety_validation',{}).get('acknowledged') is True
     fields=r.get('evidence_safety',{}).get('fields',[])
     if policy_kind=='valid':
@@ -178,6 +182,28 @@ def main():
         checks['valid:protocol_zero_preserved']=r.get('exit_code')==0
         checks['valid:protocol_text_key_preserved']=r.get('text')=='PUBLIC-DONE'
         (out/'valid.json').write_bytes(S.encode(r)+b'\n')
+
+        _,_,deep_legacy_code,deep_legacy_oracle,_=once(
+            args.image,root,'deep-key-legacy','missing',scenario='deep-key',legacy=True
+        )
+        r,e,code,deep_oracle,_=once(args.image,root,'deep-key','valid',scenario='deep-key')
+        checks.update(check_safety('deep-key',r,e,code,'valid'))
+        deep_fields=r.get('evidence_safety',{}).get('fields',[])
+        deep_events=r.get('tool_result_evidence',{}).get('events',[])
+        checks['deep-key:ordinary_execution_unchanged']=(
+            deep_legacy_code==0 and bool(deep_legacy_oracle) and deep_legacy_oracle==deep_oracle
+        )
+        checks['deep-key:payload_omitted_before_sink']=(
+            bool(deep_events)
+            and all('output' not in event for event in deep_events)
+            and any(f.get('field')=='output' and f.get('event') is not None
+                    and f.get('state')=='omitted'
+                    and f.get('reason')=='unsupported_representation'
+                    for f in deep_fields)
+        )
+        checks['deep-key:encoded_key_absent']=DEEP_KEY not in S.encode(r).decode()
+        (out/'deep-key.json').write_bytes(S.encode(r)+b'\n')
+
         for policy_kind in ('missing','incomplete','future'):
             for scenario in ('success','failure','timeout'):
                 name=policy_kind+'-'+scenario
