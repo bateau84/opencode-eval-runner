@@ -38,6 +38,7 @@ Consequences:
 
 | Requirement | Stock surface | Planning status |
 |---|---|---|
+| Public live event access | plugin Context `ctx.event.subscribe()` returns OpenCode event stream | SUPPORTED-SOURCE for access; ordering/drain/completeness remain UNPROVEN |
 | Session creation / ancestry | durable `session.created` with `parentID`; Session API | SUPPORTED-SOURCE |
 | Agent for a step | durable `session.step.started` binds assistant message to agent | SUPPORTED-SOURCE |
 | Native tool call ID/input | durable Session tool input/called events | SUPPORTED-SOURCE |
@@ -77,9 +78,11 @@ This is load-bearing for TRUST-001:
 
 ## Plugin loading escape
 
-Stock OpenCode discovers configured/local plugins and evaluates them in-process. The candidate must therefore establish, using only supported stock behavior and runner-controlled inputs, that the evaluated workspace cannot introduce another untrusted in-process plugin.
+Stock OpenCode derives plugin operations from configuration documents/directories, auto-discovers entries under `plugin/` and `plugins/`, resolves configured package/local targets, watches relevant config/source inputs, and evaluates admitted plugin modules in-process.
 
-If this cannot be guaranteed for the tested profile, TRUST-001 is unsupported for that profile.
+The candidate must therefore freeze the **effective plugin-source operation set and every input that can change it**, not merely make one bridge file read-only. The runner must enumerate those config roots/documents, discovery directories, configured targets, symlink/source identities, and watched inputs for the exact profile before activation and keep them outside evaluated write authority for the generation.
+
+Any post-activation change in the effective operation set or admitted source identity is a checkpoint stop/rejection. If this cannot be guaranteed using stock behavior without changing required Loom semantics, TRUST-001 is unsupported for that profile.
 
 ## Conclusion
 
