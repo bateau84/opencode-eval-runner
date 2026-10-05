@@ -225,8 +225,26 @@ def main() -> int:
             if proc.stdout is None or proc.stdin is None or isolated.stdout is None:
                 raise RuntimeError("preflight process pipes unavailable")
 
-            container_lines = wait_for_marker(proc.stdout, "TRUST001_CONTAINER_READY", 30)
-            isolated_lines = wait_for_marker(isolated.stdout, "TRUST001_READY", 30)
+            try:
+                container_lines = wait_for_marker(proc.stdout, "TRUST001_CONTAINER_READY", 30)
+                isolated_lines = wait_for_marker(isolated.stdout, "TRUST001_READY", 30)
+            except RuntimeError as exc:
+                container_code = proc.poll()
+                isolated_code = isolated.poll()
+                if proc.poll() is None:
+                    proc.terminate()
+                    proc.communicate(timeout=5)
+                if isolated.poll() is None:
+                    isolated.terminate()
+                isolated_out, _ = isolated.communicate(timeout=5)
+                stages = [
+                    line for line in isolated_out.splitlines()
+                    if line.startswith("TRUST001_")
+                ]
+                raise RuntimeError(
+                    f"provider-free readiness failed: container_exit={container_code} "
+                    f"isolated_exit={isolated_code} markers={stages!r}"
+                ) from exc
             close_request.set()
 
             channel_thread.join(15)
