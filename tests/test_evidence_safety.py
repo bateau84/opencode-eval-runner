@@ -181,6 +181,18 @@ class ProjectionTests(unittest.TestCase):
             self.assertEqual(disposition(r, 'output', 0)['state'], 'redacted')
             val = json.dumps(val)[1:-1]
 
+    def test_fourth_json_escape_layer_omits_values_and_mapping_keys(self):
+        secret = 'tok-"line\n\\ending'
+        deep = secret
+        for _ in range(4):
+            deep = json.dumps(deep)[1:-1]
+        for payload in (deep, {deep: 'public'}, {'nested': {deep: 'public'}}):
+            with self.subTest(kind=type(payload).__name__):
+                r = S.project_result(raw_result([tool(payload)]), S.Policy(inventory([secret])))
+                self.assertNotIn('output', r['tool_result_evidence']['events'][0])
+                self.assertEqual(disposition(r, 'output', 0)['reason'], 'unsupported_representation')
+                self.assertNotIn(deep, S.encode(r).decode())
+
     def test_bad_representations_and_unknown_schema_omit(self):
         cycle = {}; cycle['self'] = cycle
         for value in (cycle, float('nan'), {'a': float('inf')}, b'no'):
