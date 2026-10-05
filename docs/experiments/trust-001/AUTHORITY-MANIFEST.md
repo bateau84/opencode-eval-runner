@@ -29,7 +29,7 @@ The design requires **two distinct channels with different authority**:
 1. **evidence channel** — trusted runner bridge → host collector. This is the only channel allowed to introduce candidate runtime observations into evidence authority.
 2. **capability channel** — runner bridge ↔ isolated Loom. This transports product callbacks, requests, mutations, and results only. It is untrusted for evidence authority.
 
-The channels MUST NOT share an accepted descriptor, listener path, authentication material, or message type that the collector could interpret as evidence. Control of the capability channel may break product behavior, but it must not create an eligible evidence record.
+The channels MUST NOT share an accepted descriptor, listener path, authentication material, or message type that the collector could interpret as evidence. The capability channel has no direct evidence-write authority, but its transport admission/correlation must bind every accepted response to the admitted Loom generation. Loss of that authenticity/integrity makes affected evidence ineligible.
 
 The candidate should avoid a reusable credential in `process.env`, because stock shell inherits `process.env` when no Session-specific environment overrides it.
 
@@ -49,7 +49,7 @@ The candidate should avoid a reusable credential in `process.env`, because stock
 2. only the expected bridge side and isolated Loom generation may establish it;
 3. the listener is closed/unlinked after the expected peers are admitted;
 4. this channel has no collector credential, evidence framing authority, or evidence-write capability;
-5. compromise, duplication, or impersonation of this channel makes affected product work failed/unresolved and evidence incomplete; it never upgrades product data into evidence.
+5. duplication, impersonation, or integrity loss makes affected product work failed/unresolved and affected evidence ineligible; an unadmitted process may never be silently accepted as the Loom peer.
 
 Both bootstraps remain **UNPROVEN** until provider-free construction/preflight. They are specified here so Gate 1 reviews concrete authority separation rather than process topology alone.
 
@@ -98,14 +98,14 @@ If stock OpenCode cannot keep this source closure immutable without changing req
 ## Network authority
 
 - Collector endpoint is not a general network service.
-- Loom broker channel exposes only the reviewed typed capability protocol.
+- Loom capability channel exposes only the reviewed typed capability protocol.
 - Evaluated network access cannot provide an alternate route to collector, runner, container engine, or another trusted service.
-- Any network mode needed by Loom/provider behavior is reported separately from broker/collector reachability.
+- Any network mode needed by Loom/provider behavior is reported separately from capability/evidence-channel reachability.
 
 ## Credentials
 
 - Provider credentials are product inputs, not evidence authority.
-- Collector/broker authentication material, if ultimately required, is not carried in argv, process environment, workspace, project config, Loom state, or mounted readable files.
+- Evidence-channel/capability-channel admission material, if ultimately required, is not carried in argv, process environment, workspace, project config, Loom state, or mounted readable files.
 - A product credential can never authenticate evidence.
 
 ## Current verdict
