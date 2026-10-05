@@ -9,7 +9,7 @@ from typing import Any
 
 from .protocol import ProtocolError, require
 
-BRIDGE_ID = "trust001-bridge"
+BRIDGE_ID = "loom"
 
 
 def sha256(path: Path) -> str:
