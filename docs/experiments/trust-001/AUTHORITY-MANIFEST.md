@@ -19,22 +19,39 @@ Different processes/containers do not automatically create TRUST-001. Effective 
 | collector/evidence storage | read/write | **not mounted** | **not mounted** | evaluated code cannot modify evidence |
 | safety policy/inventory | host-private | delivered only to trusted bridge/collector through reviewed private path | no raw policy | no credential-policy disclosure |
 | container-engine socket | host runner only if required | none | none | never exposed |
-| broker socket directory | host-created private runtime dir | bridge endpoint only | Loom endpoint only | never under workspace |
+| evidence-channel bootstrap endpoint | host-created private runtime dir | bridge bootstrap only | **not mounted/reachable** | never under workspace; removed after admitted connection |
+| capability-channel bootstrap endpoint | host-created private runtime dir | bridge endpoint only | Loom endpoint only | separate from evidence channel; removed after admitted connection |
 
-## Channel bootstrap
+## Channel authority and bootstrap
+
+The design requires **two distinct channels with different authority**:
+
+1. **evidence channel** — trusted runner bridge → host collector. This is the only channel allowed to introduce candidate runtime observations into evidence authority.
+2. **capability channel** — runner bridge ↔ isolated Loom. This transports product callbacks, requests, mutations, and results only. It is untrusted for evidence authority.
+
+The channels MUST NOT share an accepted descriptor, listener path, authentication material, or message type that the collector could interpret as evidence. Control of the capability channel may break product behavior, but it must not create an eligible evidence record.
 
 The candidate should avoid a reusable credential in `process.env`, because stock shell inherits `process.env` when no Session-specific environment overrides it.
 
-Planning candidate:
+### Evidence-channel bootstrap
 
-1. runner creates private host-side Unix-domain endpoints outside the workspace;
-2. bridge and isolated Loom establish their required long-lived channel(s) during activation **before inference/tool execution**;
-3. host accepts only the expected bootstrap peer/container/process for the trusted bridge;
-4. listener path is removed/closed after the expected connection is established;
-5. established bridge descriptors must be close-on-exec and not inherited by stock shell subprocesses;
-6. reconnect is unsupported in the bounded experiment; channel loss yields incomplete/unresolved evidence and never retries product work.
+1. runner creates a private Unix-domain endpoint outside the workspace;
+2. only the stock OpenCode domain receives bootstrap reachability; the isolated Loom domain never receives the collector endpoint;
+3. the bridge connects during activation **before inference/tool execution**;
+4. host admits only the expected stock OpenCode process hosting the reviewed bridge, using runner-owned process/container identity plus kernel peer identity where available;
+5. the listener is closed/unlinked immediately after the expected connection is admitted;
+6. the established descriptor is close-on-exec and must not be inherited or duplicated by stock shell subprocesses;
+7. reconnect is unsupported in the bounded experiment.
 
-This mechanism remains **UNPROVEN** until provider-free construction/preflight. It is specified here so Gate 1 reviews an actual authority proposal rather than the phrase "separate process."
+### Capability-channel bootstrap
+
+1. runner creates a separate private endpoint outside the workspace;
+2. only the expected bridge side and isolated Loom generation may establish it;
+3. the listener is closed/unlinked after the expected peers are admitted;
+4. this channel has no collector credential, evidence framing authority, or evidence-write capability;
+5. compromise, duplication, or impersonation of this channel makes affected product work failed/unresolved and evidence incomplete; it never upgrades product data into evidence.
+
+Both bootstraps remain **UNPROVEN** until provider-free construction/preflight. They are specified here so Gate 1 reviews concrete authority separation rather than process topology alone.
 
 ## Process authority
 
@@ -63,17 +80,20 @@ Killing/suppressing trusted work is not by itself a false-evidence violation: it
 
 ## Plugin-loading authority
 
-Stock OpenCode discovers configured/local plugins in-process. The experiment profile MUST therefore:
+Stock OpenCode builds an effective plugin-source operation set from configuration documents, configuration roots, auto-discovered `plugin/` and `plugins/` entries, configured package/local targets, and watched source/config changes. Protecting only the final plugin file is therefore insufficient.
 
-1. preflight every project/global/config-root plugin source;
-2. admit only runner-owned trusted bridge code in-process;
-3. reject package/file plugin declarations not explicitly trusted;
-4. prevent runtime creation/replacement of auto-discovered plugin sources in evaluated-writable paths;
-5. preserve required non-plugin project inputs separately.
+Before activation the candidate MUST build a **plugin-source closure manifest** that:
 
-A practical runner-owned approach may use read-only submounts/overlays for project config/plugin-discovery paths while leaving the requested workspace mode unchanged elsewhere. Exact mounts are a Gate-1/Authorization-A item.
+1. records the exact effective plugin add/remove operation set;
+2. enumerates every configuration document/root, discovery directory, configured local source, package declaration, symlink target, and watched input that can change that operation set for the tested profile;
+3. admits only runner-owned trusted bridge code for in-process execution;
+4. makes every operation-set input runner-owned and read-only/unreachable to evaluated write authority for the generation;
+5. preserves required non-plugin project inputs separately;
+6. treats any post-activation operation-set change, newly discovered source, or changed admitted source identity as a checkpoint stop/rejection, not a hot reload.
 
-If the stock CLI cannot prevent an evaluated-writable path from becoming an in-process plugin source without changing required Loom behavior, the tested profile is **UNSUPPORTED**.
+A practical runner-owned approach may use read-only submounts/overlays for the exact source/config closure while leaving the requested workspace mode unchanged elsewhere. Authorization A must name the concrete paths and operation set for its checkpoint.
+
+If stock OpenCode cannot keep this source closure immutable without changing required Loom behavior, the tested profile is **UNSUPPORTED**.
 
 ## Network authority
 
