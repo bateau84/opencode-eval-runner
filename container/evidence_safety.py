@@ -168,6 +168,11 @@ class Policy:
             parts = [self.payload(v) for v in value]
             return [v for v, _ in parts], any(changed for _, changed in parts)
         if type(value) is dict:
+            # Mapping keys are payload data too, but rewriting them can change
+            # protocol meaning or collide. Unsupported deeper JSON-escape
+            # representations therefore omit the enclosing payload.
+            if self.too_deep and any(self.too_deep.search(k) for k in value):
+                raise Invalid('unsupported_representation')
             if any(sensitive_key(k) or self.matches(k) for k in value):
                 raise Invalid('sensitive_key')
             parts = {k: self.payload(v) for k, v in value.items()}
