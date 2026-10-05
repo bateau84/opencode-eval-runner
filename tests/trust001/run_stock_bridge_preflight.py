@@ -83,10 +83,19 @@ def main() -> int:
             encoding="utf-8",
         )
 
+        product_config = root / "product-config.json"
+        product_config.write_text(
+            json.dumps({
+                "$schema": "https://opencode.ai/config.json",
+                "model": "openai/preflight-no-inference",
+            }) + "\n",
+            encoding="utf-8",
+        )
         closure = root / "trusted-config"
         manifest = build_source_closure(
             destination=closure,
             bridge_source=ROOT / "trust001" / "bridge.mjs",
+            product_config=product_config,
         )
         verify_source_closure(closure, manifest)
 
