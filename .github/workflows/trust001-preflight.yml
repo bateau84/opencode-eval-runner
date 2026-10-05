@@ -62,6 +62,11 @@ jobs:
           test "$(docker image inspect trust001-stock-opencode:preflight --format '{{ index .Config.Labels "io.opencode-eval.stock-opencode-version" }}')" = "2.0.23"
           test "$(docker image inspect trust001-stock-opencode:preflight --format '{{ index .Config.Labels "io.opencode-eval.stock-opencode-package" }}')" = "@opencode/cli"
 
+      - name: Exercise stock bridge handshake without inference
+        run: |
+          python3 tests/trust001/run_stock_bridge_preflight.py \
+            --image trust001-stock-opencode:preflight
+
       - name: Exercise bounded remote context without inference
         run: |
           python3 tests/trust001/run_remote_context_preflight.py \
