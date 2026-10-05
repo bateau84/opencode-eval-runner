@@ -112,6 +112,7 @@ export default {
     const evidence = await connect(evidencePath)
     const capability = await connect(capabilityPath)
     const capabilityReader = new Reader(capability)
+    const evidenceReader = new Reader(evidence)
 
     send(evidence, {
       version: VERSION,
@@ -127,6 +128,7 @@ export default {
     })
 
     let sequence = 0
+    let closing = false
     let closed = false
     let capabilityFailure = null
     const eventController = new AbortController()
@@ -149,7 +151,7 @@ export default {
     }
 
     const callback = (operation, payload, signal) => {
-      requireValue(!closed && !capabilityFailure, "capability_unavailable")
+      requireValue(!closed && !closing && !capabilityFailure, "capability_unavailable")
       const id = requestID()
       return new Promise((resolve, reject) => {
         const abort = () => {
@@ -409,6 +411,11 @@ export default {
             continue
           }
           requireValue(message.kind === "capability.host.request", "capability_direction_violation")
+          if (closing) {
+            capabilityFailure = capabilityFailure ?? "post_close_request"
+            respondHost(message, false, undefined, "generation_closing")
+            continue
+          }
           const id = message.request_id
           requireValue(typeof id === "string" && /^[0-9a-f]{32}$/.test(id), "invalid_request_id")
           requireValue(!activeHostRequests.has(id) && !cancelledHostRequests.has(id), "duplicate_request")
@@ -450,21 +457,15 @@ export default {
       }
     })()
 
-    if (preflight) {
-      const response = await callback("trust001.preflight.ping", { value: "ping" })
-      requireValue(response?.value === "pong", "invalid_preflight_response")
-      observe({ type: "capability.preflight", result: "pong" })
-    }
-
-    return async () => {
-      if (closed) return
+    const closeGeneration = async () => {
+      if (closed || closing) return
+      closing = true
       eventController.abort()
       await eventTask.catch(() => undefined)
       const eligible =
         !capabilityFailure &&
         pendingCallbacks.size === 0 &&
         activeHostRequests.size === 0
-      closed = true
       if (eligible) {
         send(evidence, {
           version: VERSION,
@@ -472,10 +473,47 @@ export default {
           generation,
           final_sequence: sequence,
         })
+      } else {
+        capabilityFailure = capabilityFailure ?? "close_with_outstanding_work"
       }
+      closed = true
       capability.end()
       evidence.end()
+    }
+
+    const evidenceControlTask = (async () => {
+      try {
+        const message = await evidenceReader.next()
+        requireValue(message?.version === VERSION, "wrong_evidence_control_version")
+        requireValue(message?.generation === generation, "stale_evidence_control_generation")
+        requireValue(message?.kind === "evidence.close", "unexpected_evidence_control")
+        await closeGeneration()
+      } catch {
+        if (!closed) {
+          capabilityFailure = capabilityFailure ?? "evidence_control_failed"
+          closed = true
+          capability.destroy()
+          evidence.destroy()
+        }
+      }
+    })()
+
+    if (preflight) {
+      const response = await callback("trust001.preflight.ping", { value: "ping" })
+      requireValue(response?.value === "pong", "invalid_preflight_response")
+      observe({ type: "capability.preflight", result: "pong" })
+    }
+
+    return async () => {
+      if (!closed) {
+        eventController.abort()
+        await eventTask.catch(() => undefined)
+        closed = true
+        capability.end()
+        evidence.end()
+      }
       await capabilityLoop.catch(() => undefined)
+      await evidenceControlTask.catch(() => undefined)
     }
   },
 }
