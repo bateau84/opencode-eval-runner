@@ -54,6 +54,13 @@ host opencode-eval-runner
 
 The stock OpenCode domain is therefore a **mixed-authority OS domain**. Gate 1 must review whether the proposed channel and mount controls prevent its untrusted subprocesses from escalating into evidence authority.
 
+Two channels have different TCB meaning:
+
+- **evidence channel:** trusted bridge → host collector only; this is the sole candidate observation ingress with evidence authority;
+- **capability channel:** trusted bridge ↔ isolated Loom; this carries product callbacks/results and is explicitly untrusted for evidence authority.
+
+They must not share accepted descriptors, listener paths, authentication material, or collector-readable evidence framing.
+
 ## Evidence authority
 
 Only the trusted side may establish:
@@ -62,7 +69,7 @@ Only the trusted side may establish:
 - trusted collector sequence;
 - authoritative runtime Session/message/call facts obtained from stock OpenCode;
 - runner-owned proxy invocation identity when stock OpenCode lacks a unique inner identity;
-- scope membership and closure;
+- scope membership, generation admission close, trusted seal, and final collector sequence/drain;
 - evidence completeness/eligibility;
 - final evidence persistence.
 
@@ -91,12 +98,13 @@ The following are explicitly not trusted evidence authorities:
 - the historical PR #41 patched observer;
 - signatures/HMACs created by evaluated code.
 
-## Open questions before Gate 1 PASS
+## Open questions carried beyond Gate 1
 
-1. Can the runner establish a bridge/collector channel that shell subprocesses cannot inherit, duplicate, or impersonate?
-2. Can project/plugin discovery be bounded so evaluated workspace mutations cannot cause new untrusted code to load in-process?
-3. Can the runner prove the required Code Mode final-inner-result boundary using stock APIs/proxy wrapping?
-4. Does the tested callback surface preserve stock ordering and cancellation semantics?
-5. Can every first evidence sink be protected before persistence/clipping?
+1. Can the runner establish the evidence channel so shell subprocesses cannot inherit, duplicate, or impersonate it, while keeping the capability channel non-authoritative?
+2. Can the exact plugin-source closure manifest be kept immutable to evaluated authority for the tested stock profile?
+3. Can the runner prove generation admission close, queue drain, contiguous final sequence, and trusted seal under concurrency?
+4. Can the runner prove the required Code Mode final-inner-result boundary using stock APIs/proxy wrapping?
+5. Does the tested callback surface preserve stock ordering, cancellation, and remote side-effect semantics?
+6. Can every candidate-controlled first sink be protected before persistence/clipping/logging/export?
 
-These are review conditions, not permission to alter OpenCode.
+These are provider-free/source-review obligations for later gates, not permission to alter OpenCode and not reasons to claim the properties are already proven.
