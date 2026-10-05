@@ -12,6 +12,10 @@ on:
       - ".github/workflows/trust001-preflight.yml"
       - "docs/experiments/trust-001/checkpoints/**"
 
+concurrency:
+  group: trust001-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
