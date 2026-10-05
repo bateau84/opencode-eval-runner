@@ -2,6 +2,8 @@
 
 Status: **planning only**. No prototype construction, candidate execution, inference, merge, default-pin change, or OpenCode modification is authorized by this directory.
 
+Gate 1 status: **PASS** after independent whole-package architecture review and planning corrections. This does not grant Authorization A or authorize candidate construction/execution.
+
 ## Program goal
 
 The delivery goal remains full `opencode-eval-runner` compliance with Loom's consumer contract. This work addresses the producer-trust gap only and does not turn TRUST-001 feasibility into full consumer-contract acceptance.
@@ -37,4 +39,4 @@ The two images above demonstrate different historical profiles. Neither is a per
 - [EVIDENCE-SINKS.md](EVIDENCE-SINKS.md)
 - [GATE-1-REVIEW.md](GATE-1-REVIEW.md)
 
-Gate 1 remains `NOT RUN` until an independent reviewer evaluates the completed manifests.
+Gate 1 is `PASS`. The next possible step is a **separate owner Authorization A** naming the exact construction checkpoint and provider-free preflights; this planning PR does not grant it.
