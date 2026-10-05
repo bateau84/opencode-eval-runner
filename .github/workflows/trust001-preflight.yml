@@ -41,8 +41,11 @@ jobs:
       - name: Check dependency-free bridge scripts
         run: |
           node --check trust001/bridge.mjs
+          node --check trust001/isolated-host.mjs
           node --check trust001/synthetic-loom-peer.mjs
+          node --check trust001/synthetic-remote-plugin.mjs
           python3 -m py_compile tests/trust001/run_stock_bridge_preflight.py
+          python3 -m py_compile tests/trust001/run_remote_context_preflight.py
 
   stock-opencode:
     runs-on: ubuntu-latest
@@ -58,6 +61,11 @@ jobs:
           test "$(docker run --rm --entrypoint opencode trust001-stock-opencode:preflight --version)" = "opencode v2.0.23"
           test "$(docker image inspect trust001-stock-opencode:preflight --format '{{ index .Config.Labels "io.opencode-eval.stock-opencode-version" }}')" = "2.0.23"
           test "$(docker image inspect trust001-stock-opencode:preflight --format '{{ index .Config.Labels "io.opencode-eval.stock-opencode-package" }}')" = "@opencode/cli"
+
+      - name: Exercise bounded remote context without inference
+        run: |
+          python3 tests/trust001/run_remote_context_preflight.py \
+            --image trust001-stock-opencode:preflight
 
       - name: Record provider-free image identity
         run: |
