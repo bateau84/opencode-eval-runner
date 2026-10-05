@@ -29,6 +29,8 @@ LAST_MIGRATION = '20260923013825_project_time_active'
 POLICY_LIMIT = 128_000
 WIRE_LIMIT = 132_096
 RESULT_LIMIT = 1_000_000
+SUPPORTED_JSON_ESCAPE_LAYERS = 3
+MAX_JSON_ESCAPE_RECOVERY_LAYERS = 32
 SOURCE_NAMES = frozenset(('env', 'auth', 'config', 'models', 'credential_seed', 'config_root'))
 STAGES = ['container.before_clip', 'container.before_output']
 REASONS = ('credential_match', 'sensitive_key', 'inventory_incomplete', 'upstream_clipped',
@@ -105,6 +107,51 @@ def sensitive_key(key: str) -> bool:
                 ('secret', 'password', 'credential', 'authorization', 'cookie')))
 
 
+_JSON_ESCAPE_SIMPLE = {
+    '"': '"', '\\': '\\', '/': '/', 'b': '\b', 'f': '\f',
+    'n': '\n', 'r': '\r', 't': '\t',
+}
+
+
+def _json_unescape_layer(value: str) -> tuple[str, bool]:
+    """Decode one JSON-string escaping layer without requiring a whole JSON document."""
+    out: list[str] = []
+    changed = False
+    i = 0
+    while i < len(value):
+        if value[i] != '\\' or i + 1 >= len(value):
+            out.append(value[i])
+            i += 1
+            continue
+        kind = value[i + 1]
+        simple = _JSON_ESCAPE_SIMPLE.get(kind)
+        if simple is not None:
+            out.append(simple)
+            changed = True
+            i += 2
+            continue
+        if kind == 'u' and i + 6 <= len(value):
+            digits = value[i + 2:i + 6]
+            if re.fullmatch(r'[0-9a-fA-F]{4}', digits):
+                code = int(digits, 16)
+                consumed = 6
+                if 0xD800 <= code <= 0xDBFF and i + 12 <= len(value) and value[i + 6:i + 8] == '\\u':
+                    low_digits = value[i + 8:i + 12]
+                    if re.fullmatch(r'[0-9a-fA-F]{4}', low_digits):
+                        low = int(low_digits, 16)
+                        if 0xDC00 <= low <= 0xDFFF:
+                            code = 0x10000 + ((code - 0xD800) << 10) + (low - 0xDC00)
+                            consumed = 12
+                if not (0xD800 <= code <= 0xDFFF):
+                    out.append(chr(code))
+                    changed = True
+                    i += consumed
+                    continue
+        out.append(value[i])
+        i += 1
+    return ''.join(out), changed
+
+
 class Policy:
     def __init__(self, value=None):
         self.valid = False
@@ -112,7 +159,6 @@ class Policy:
         self.values: tuple[str, ...] = ()
         self.private = None
         self.matcher = None
-        self.too_deep = None
         try:
             require(type(value) is dict and set(value) == {'schema', 'policy_version', 'complete', 'sources', 'values'})
             require(value['schema'] == POLICY and value['policy_version'] == VERSION)
@@ -133,14 +179,11 @@ class Policy:
                 self.values = tuple(sorted(set(value['values']), key=lambda v: (-len(v), v)))
                 variants = set(self.values)
                 frontier = variants.copy()
-                for _ in range(3):
+                for _ in range(SUPPORTED_JSON_ESCAPE_LAYERS):
                     new = {json.dumps(v, ensure_ascii=ascii_only)[1:-1]
                            for v in frontier for ascii_only in (False, True)} - variants
                     variants.update(new)
                     frontier = new
-                deep = {json.dumps(v, ensure_ascii=a)[1:-1] for v in frontier for a in (False, True)} - variants
-                if deep:
-                    self.too_deep = re.compile('|'.join(re.escape(v) for v in sorted(deep, key=len, reverse=True)))
                 # One substitution pass: generated markers are never re-scanned.
                 if variants:
                     self.matcher = re.compile('|'.join(re.escape(v) for v in sorted(variants, key=lambda v: (-len(v), v))))
@@ -153,14 +196,31 @@ class Policy:
     def matches(self, value: str) -> bool:
         return self.matcher is not None and self.matcher.search(value) is not None
 
+    def unsupported_recoverable(self, value: str) -> bool:
+        """Detect recoverable JSON-escape representations beyond the supported profile."""
+        if self.matcher is None:
+            return False
+        current = value
+        for _ in range(MAX_JSON_ESCAPE_RECOVERY_LAYERS):
+            current, changed = _json_unescape_layer(current)
+            if not changed:
+                return False
+            if self.matches(current):
+                return True
+        # More than the bounded recovery profile is itself unsupported. Never
+        # retain a partially understood deeply escaped representation.
+        _, changed = _json_unescape_layer(current)
+        return changed
+
     def payload(self, value):
         if type(value) is str:
             # An opaque string is not a declared nested JSON boundary. Never
             # mask its syntax into invalid JSON; a typed json_string role must
             # explicitly opt in to parsing/re-encoding instead.
-            if value.lstrip().startswith(('{', '[')) and self.matches(value):
+            direct = self.matches(value)
+            if value.lstrip().startswith(('{', '[')) and direct:
                 raise Invalid('opaque_payload_unverified')
-            if self.too_deep and self.too_deep.search(value):
+            if not direct and self.unsupported_recoverable(value):
                 raise Invalid('unsupported_representation')
             safe = self.matcher.sub('***REDACTED***', value) if self.matcher else value
             return safe, safe != value
@@ -171,10 +231,10 @@ class Policy:
             # Mapping keys are payload data too, but rewriting them can change
             # protocol meaning or collide. Unsupported deeper JSON-escape
             # representations therefore omit the enclosing payload.
-            if self.too_deep and any(self.too_deep.search(k) for k in value):
-                raise Invalid('unsupported_representation')
             if any(sensitive_key(k) or self.matches(k) for k in value):
                 raise Invalid('sensitive_key')
+            if any(self.unsupported_recoverable(k) for k in value):
+                raise Invalid('unsupported_representation')
             parts = {k: self.payload(v) for k, v in value.items()}
             return {k: v for k, (v, _) in parts.items()}, any(changed for _, changed in parts.values())
         # Arbitrary scalar payloads are not protocol counters. Do not make an
@@ -210,11 +270,15 @@ class Projection:
                 require(value is None or type(value) is str, 'invalid')
                 if value is not None and self.policy.matches(value):
                     return self.omit(field, 'credential_match', event)
+                if value is not None and self.policy.unsupported_recoverable(value):
+                    return self.omit(field, 'unsupported_representation', event)
                 safe, changed = value, False
             elif role == 'identities':
                 require(type(value) is list and all(type(v) is str for v in value), 'invalid')
                 if any(self.policy.matches(v) for v in value):
                     return self.omit(field, 'credential_match', event)
+                if any(self.policy.unsupported_recoverable(v) for v in value):
+                    return self.omit(field, 'unsupported_representation', event)
                 safe, changed = value, False
             elif role == 'json_string':
                 require(type(value) is str, 'unsupported_representation')
@@ -329,6 +393,7 @@ def project_result(raw: Any, policy: Policy, stage='runner') -> dict:
             require(type(action) is dict and set(action) == {'tool', 'args'}, 'unsupported_schema')
             require(type(action['tool']) is str, 'invalid')
             require(not policy.matches(action['tool']), 'credential_match')
+            require(not policy.unsupported_recoverable(action['tool']), 'unsupported_representation')
             require(type(action['args']) is dict, 'invalid')
             args, changed = policy.payload(owned(action['args']))
             require(not changed, 'credential_match')
@@ -433,9 +498,10 @@ def assert_safe_preview(value, policy):
     """Validate sanitized payloads without rescanning generated display markers."""
     if type(value) is str:
         pieces = value.split('***REDACTED***')
-        require(all(not policy.matches(v) and not (policy.too_deep and policy.too_deep.search(v)) for v in pieces))
+        require(all(not policy.matches(v) and not policy.unsupported_recoverable(v) for v in pieces))
     elif type(value) is dict:
-        require(all(not sensitive_key(k) and not policy.matches(k) for k in value))
+        require(all(not sensitive_key(k) and not policy.matches(k) and
+                    not policy.unsupported_recoverable(k) for k in value))
         for v in value.values(): assert_safe_preview(v, policy)
     elif type(value) is list:
         for v in value: assert_safe_preview(v, policy)
@@ -591,7 +657,8 @@ def validate_reply(raw: bytes | str, policy: Policy, run_id: str, revision: str,
                     require(type(val) is list and len(val) <= 64)
                     for action in val:
                         require(type(action) is dict and set(action) == {'tool','args'})
-                        require(type(action['tool']) is str and not policy.matches(action['tool']))
+                        require(type(action['tool']) is str and not policy.matches(action['tool'])
+                                and not policy.unsupported_recoverable(action['tool']))
                         require(type(action['args']) is dict and policy.payload(action['args']) == (action['args'], False))
                 elif name == 'runtime_state':
                     # Runtime-state counters/discriminators are reviewed protocol
