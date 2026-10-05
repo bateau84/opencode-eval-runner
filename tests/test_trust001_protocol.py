@@ -38,7 +38,7 @@ class ProtocolTests(unittest.TestCase):
     def test_evidence_rejects_capability_frame(self):
         value = {
             "version": WIRE_VERSION,
-            "kind": "capability.response",
+            "kind": "capability.callback.response",
             "generation": GEN,
             "request_id": REQ,
             "ok": True,
@@ -70,10 +70,34 @@ class ProtocolTests(unittest.TestCase):
         with self.assertRaises(ProtocolError):
             FrameReader().feed(framed, channel="evidence")
 
+    def test_host_and_callback_operations_are_separate(self):
+        host = {
+            "version": WIRE_VERSION,
+            "kind": "capability.host.request",
+            "generation": GEN,
+            "request_id": REQ,
+            "operation": "storage.get",
+            "payload": {"key": "x"},
+        }
+        callback = {
+            "version": WIRE_VERSION,
+            "kind": "capability.callback.request",
+            "generation": GEN,
+            "request_id": REQ,
+            "operation": "tool.execute.before",
+            "payload": {},
+        }
+        self.assertEqual(validate_capability(host), host)
+        self.assertEqual(validate_capability(callback), callback)
+        with self.assertRaises(ProtocolError):
+            validate_capability({**host, "operation": "tool.execute.before"})
+        with self.assertRaises(ProtocolError):
+            validate_capability({**callback, "operation": "storage.get"})
+
     def test_capability_response_shape_is_strict(self):
         good = {
             "version": WIRE_VERSION,
-            "kind": "capability.response",
+            "kind": "capability.callback.response",
             "generation": GEN,
             "request_id": REQ,
             "ok": True,
