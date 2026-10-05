@@ -18,7 +18,7 @@ class SourceClosureTests(unittest.TestCase):
             destination = root / "config"
             manifest = build_source_closure(destination=destination, bridge_source=bridge)
             verify_source_closure(destination, manifest)
-            self.assertEqual(manifest["expected_external_plugin_ids"], ["trust001-bridge"])
+            self.assertEqual(manifest["expected_external_plugin_ids"], ["loom"])
             self.assertTrue(manifest["project_config_disabled"])
 
     def test_product_config_cannot_declare_external_plugins(self):
@@ -54,7 +54,7 @@ class SourceClosureTests(unittest.TestCase):
             bridge.write_text("export default {}\n")
             destination = root / "config"
             manifest = build_source_closure(destination=destination, bridge_source=bridge)
-            plugin = destination / "plugins" / "trust001-bridge.mjs"
+            plugin = destination / "plugins" / "loom.mjs"
             plugin.chmod(0o644)
             plugin.write_text("export default { id: 'replacement' }\n")
             with self.assertRaises(ProtocolError):
