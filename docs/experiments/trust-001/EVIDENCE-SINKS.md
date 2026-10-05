@@ -18,7 +18,7 @@ Normal stock OpenCode and Loom product stores are separate product semantics. Th
 |---|---|---:|---|---|
 | bridge callback/event objects in process memory | transient trusted memory | yes, bounded | no persistence/logging before handoff; bounded input validation | design |
 | bridge → host collector evidence socket | transient trusted IPC | yes, bounded | distinct collector-only endpoint/protocol; no disk/log clipping; bounded frames; trusted peer/channel authority | design |
-| bridge ↔ isolated Loom capability socket | transient product IPC | yes, bounded | separate endpoint/protocol; no raw transcript; **never** accepted as evidence authority | design |
+| bridge ↔ isolated Loom capability socket | transient product IPC | yes, bounded | separate endpoint/protocol; no raw transcript; no direct collector ingress; peer identity/correlation protected and integrity loss makes affected evidence ineligible | design |
 | host collector in-memory correlation table | trusted memory | yes, bounded | safety projection before any persistence/preview | design |
 | collector temporary/intermediate evidence file | evidence persistence | **no** | only projected safe representation may be written | required |
 | runner final result file | evidence persistence | no | existing safe atomic writer/admission pattern | existing design to reuse |
@@ -63,7 +63,7 @@ Requirements:
 - no debug payload logging;
 - bounded frame size before allocation growth;
 - oversize/malformed requests rejected with fixed diagnostics;
-- compromise or replay on the capability channel can only fail/unresolve product work and completeness;
+- an unadmitted process must not impersonate the Loom capability peer; replay/identity/integrity loss makes affected product work unresolved and affected evidence ineligible;
 - trusted collector records only observations received through the admitted evidence channel and its own correlated/safe projection.
 
 ## Clipping
