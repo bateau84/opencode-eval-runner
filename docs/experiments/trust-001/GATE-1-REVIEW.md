@@ -37,7 +37,7 @@ No OpenCode patch/fork/upstream PR is allowed.
 
 1. Does the proposed channel/mount/process model prevent isolated Loom and stock shell subprocesses from manufacturing eligible evidence?
 2. Can either evaluated domain duplicate/inherit/impersonate the evidence connection?
-3. Is the capability channel distinct from the evidence channel so capability compromise cannot manufacture eligible evidence?
+3. Is the capability channel distinct from the evidence channel, and does its transport bind responses to the admitted Loom generation so impersonation/integrity loss cannot remain eligible evidence?
 4. Are evidence storage and runner control endpoints absent from evaluated authority?
 5. Does suppression/crash remain incomplete rather than false-complete?
 
