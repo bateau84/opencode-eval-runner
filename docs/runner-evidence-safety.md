@@ -256,3 +256,26 @@ The disposable profile is opt-in. It does not change ordinary `invoke` defaults.
 In RSP mode its `opencode-eval-runner/runtime-state/v1` attestation is carried as
 an exact protocol field and must be understood by the Loom consumer before that
 composition can be admitted.
+
+
+## Docker and Podman image-ID compatibility
+
+The host preflight accepts both valid engine renderings of a local image config
+ID:
+
+- Docker: `sha256:<64 lowercase hex>`
+- Podman: `<64 lowercase hex>` (some Podman versions may also render the
+  Docker-style prefix)
+
+`evidence_load.image_config` is always canonicalized to
+`sha256:<64 lowercase hex>`.
+
+Execution remains content-addressed: after immutable RepoDigest/label/source
+validation, the runner replaces the requested image reference with the exact
+config ID representation returned by that engine. It never falls back to a
+mutable tag. Malformed, uppercase, truncated, overlong, or non-SHA256 IDs are
+rejected.
+
+The evidence-safety workflow includes unit regressions for both representations
+and an actual Podman preflight against the published immutable safety image.
+No provider inference is used by that preflight.

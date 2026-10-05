@@ -90,6 +90,16 @@ def audit_selected_inputs(policy, command, host_env, explicit_sources=None, stat
     return policy
 
 
+def canonical_image_config_id(value):
+    """Accept Docker/Podman config-ID renderings and return canonical + engine ref."""
+    s.require(type(value) is str)
+    if re.fullmatch(r'sha256:[0-9a-f]{64}', value):
+        return value, value
+    if re.fullmatch(r'[0-9a-f]{64}', value):
+        return 'sha256:' + value, value
+    raise s.Invalid('invalid')
+
+
 def resolved_image(command):
     reference = command[-1]
     s.require(type(reference) is str and re.fullmatch(r'[A-Za-z0-9._:/-]+@sha256:[0-9a-f]{64}', reference) is not None)
@@ -113,13 +123,14 @@ def resolved_image(command):
     s.require(labels.get('io.opencode-eval.evidence-safety-invoke') == invoke_sha)
     revision = labels.get('org.opencontainers.image.revision')
     s.require(type(revision) is str and re.fullmatch('[0-9a-f]{40}', revision) is not None)
-    config_id = info.get('Id')
-    s.require(type(config_id) is str and re.fullmatch('sha256:[0-9a-f]{64}', config_id) is not None)
-    # Execute that exact local content-addressed config, not a mutable tag.
-    command[-1] = config_id
+    canonical_config_id, engine_config_ref = canonical_image_config_id(info.get('Id'))
+    # Execute the exact inspected local config object. Docker renders this as
+    # sha256:<64>; Podman may render the same content ID as bare <64>.
+    # Never fall back to the mutable tag/digest text after inspection.
+    command[-1] = engine_config_ref
     return {
         'image': reference,
-        'image_config': config_id,
+        'image_config': canonical_config_id,
         'image_source_revision': revision,
         'image_package_init_sha256': init_sha,
         'image_policy_module_sha256': s.module_sha(),

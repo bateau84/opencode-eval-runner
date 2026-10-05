@@ -10,6 +10,7 @@ on:
       - evidence-safety/**
       - tests/test_evidence_safety*.py
       - tests/integration/run_evidence_safety_probe.py
+      - tests/integration/run_podman_preflight_probe.py
       - .github/workflows/evidence-safety.yml
 
 permissions:
@@ -35,7 +36,7 @@ jobs:
         run: |
           mkdir evidence-safety-results
           python3 -m unittest discover -s tests -p 'test_*.py' 2>&1 | tee evidence-safety-results/tests.txt
-          python3 -m py_compile container/*.py runner/*.py tests/integration/run_evidence_safety_probe.py
+          python3 -m py_compile container/*.py runner/*.py tests/integration/run_evidence_safety_probe.py tests/integration/run_podman_preflight_probe.py
           git rev-parse HEAD > evidence-safety-results/source-commit.txt
           sha256sum container/__init__.py container/evidence_safety.py container/invoke.py runner/safe_invoke.py runner/cli.py bin/opencode-eval-runner > evidence-safety-results/code.sha256
           docker build -f evidence-safety/Containerfile \
@@ -118,6 +119,8 @@ jobs:
         run: |
           docker pull "$IMAGE"
           python3 tests/integration/run_evidence_safety_probe.py --image "$IMAGE" --output evidence-safety-results
+          podman --version
+          python3 tests/integration/run_podman_preflight_probe.py --image "$IMAGE" --output evidence-safety-results
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:

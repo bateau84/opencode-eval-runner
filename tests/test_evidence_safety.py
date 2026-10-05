@@ -450,35 +450,47 @@ class HostBoundaryTests(unittest.TestCase):
         root = Path(safe_invoke.__file__).resolve().parents[1]
         init_sha = __import__('hashlib').sha256((root/'container/__init__.py').read_bytes()).hexdigest()
         invoke_sha = __import__('hashlib').sha256((root/'container/invoke.py').read_bytes()).hexdigest()
-        config_id = 'sha256:' + 'c' * 64
-        info = [{
-            'RepoDigests': [IMAGE],
-            'Id': config_id,
-            'Config': {'Labels': {
-                'io.opencode-eval.evidence-safety': S.CONSUMER,
-                'io.opencode-eval.evidence-safety-init': init_sha,
-                'io.opencode-eval.evidence-safety-module': S.module_sha(),
-                'io.opencode-eval.evidence-safety-invoke': invoke_sha,
-                'org.opencontainers.image.revision': REV,
-            }},
-        }]
-        command = ['docker', 'run', IMAGE]
-        with patch.object(
-            safe_invoke.subprocess, 'run',
-            return_value=subprocess.CompletedProcess([], 0, json.dumps(info).encode(), b''),
-        ):
-            loaded = safe_invoke.resolved_image(command)
-        self.assertEqual(command[-1], config_id)
-        self.assertEqual(loaded['image_package_init_sha256'], init_sha)
-        self.assertEqual(loaded['image_policy_module_sha256'], S.module_sha())
-        self.assertEqual(loaded['image_invoke_sha256'], invoke_sha)
+        canonical = 'sha256:' + 'c' * 64
+        labels = {
+            'io.opencode-eval.evidence-safety': S.CONSUMER,
+            'io.opencode-eval.evidence-safety-init': init_sha,
+            'io.opencode-eval.evidence-safety-module': S.module_sha(),
+            'io.opencode-eval.evidence-safety-invoke': invoke_sha,
+            'org.opencontainers.image.revision': REV,
+        }
+        for engine, raw_id in (('docker', canonical), ('podman', 'c' * 64)):
+            with self.subTest(engine=engine):
+                info = [{'RepoDigests':[IMAGE], 'Id':raw_id, 'Config':{'Labels':dict(labels)}}]
+                command = [engine, 'run', IMAGE]
+                with patch.object(
+                    safe_invoke.subprocess, 'run',
+                    return_value=subprocess.CompletedProcess([], 0, json.dumps(info).encode(), b''),
+                ):
+                    loaded = safe_invoke.resolved_image(command)
+                self.assertEqual(loaded['image_config'], canonical)
+                self.assertEqual(command[-1], raw_id)
+                self.assertEqual(loaded['image_package_init_sha256'], init_sha)
+                self.assertEqual(loaded['image_policy_module_sha256'], S.module_sha())
+                self.assertEqual(loaded['image_invoke_sha256'], invoke_sha)
 
-        info[0]['Config']['Labels']['io.opencode-eval.evidence-safety-init'] = '0' * 64
+        for bad in ('', 'c'*63, 'c'*65, 'SHA256:'+'c'*64, 'sha256:'+'C'*64, 'md5:'+'c'*64):
+            with self.subTest(bad=bad[:20]):
+                info = [{'RepoDigests':[IMAGE], 'Id':bad, 'Config':{'Labels':dict(labels)}}]
+                with patch.object(
+                    safe_invoke.subprocess, 'run',
+                    return_value=subprocess.CompletedProcess([], 0, json.dumps(info).encode(), b''),
+                ), self.assertRaises(ValueError):
+                    safe_invoke.resolved_image(['podman', 'run', IMAGE])
+
+        bad_labels = dict(labels)
+        bad_labels['io.opencode-eval.evidence-safety-init'] = '0' * 64
+        info = [{'RepoDigests':[IMAGE], 'Id':canonical, 'Config':{'Labels':bad_labels}}]
         with patch.object(
             safe_invoke.subprocess, 'run',
             return_value=subprocess.CompletedProcess([], 0, json.dumps(info).encode(), b''),
         ), self.assertRaises(ValueError):
             safe_invoke.resolved_image(['docker', 'run', IMAGE])
+
 
     def test_unacknowledged_or_timeout_transport_never_writes_raw_details(self):
         with tempfile.TemporaryDirectory() as tmp:
