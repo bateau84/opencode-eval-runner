@@ -78,7 +78,7 @@ function send(socket, value) {
 }
 
 export default {
-  id: "trust001-bridge",
+  id: "loom",
 
   async setup(ctx) {
     const evidence = await connect(evidencePath)
@@ -115,8 +115,8 @@ export default {
     }
 
     observe({
-      type: "bridge.activated",
-      plugin: "trust001-bridge",
+      type: "bridge.activated", implementation: "trust001-bridge",
+      plugin: "loom",
       opencode: ctx.app?.version ?? null,
       location: {
         directory: ctx.location?.directory ?? null,
