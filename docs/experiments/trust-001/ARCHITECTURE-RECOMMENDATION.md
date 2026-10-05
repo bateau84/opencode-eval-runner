@@ -24,7 +24,7 @@ The trust design must separately address:
 
 - stock shell subprocesses executing under the OpenCode runtime's OS authority;
 - project/config plugin-loading escape paths;
-- broker/collector channel authority;
+- capability/evidence channel authority;
 - synchronous transform fidelity;
 - Code Mode inner finality.
 
@@ -70,7 +70,7 @@ However the plugin loader, plugin hooks, Tool execution path, Tool runtime, and 
 ## Candidate strengths
 
 - pinned Loom needs only a bounded subset of PluginHost;
-- Loom moves most normal state to its own SQLite after setup, reducing broker state surface, while bounded stock plugin-storage `get/set/scan` remains available for pinned Loom's lazy legacy-compatibility path;
+- Loom moves most normal state to its own SQLite after setup, reducing capability-broker state surface, while bounded stock plugin-storage `get/set/scan` remains available for pinned Loom's lazy legacy-compatibility path;
 - stock live Session events provide strong native ancestry/called/terminal facts;
 - runner proxy Loom tools can allocate trustworthy child correlation without changing tool inputs;
 - Loom semantics remain executed by Loom.
@@ -82,7 +82,7 @@ However the plugin loader, plugin hooks, Tool execution path, Tool runtime, and 
 3. **Plugin loading** — evaluated paths must not cause new in-process plugin imports.
 4. **Synchronous transforms** — stock transform callbacks are synchronous/replayable.
 5. **Callback/cancellation fidelity** — RPC separation must preserve shared mutable event behavior and late-response rules.
-6. **First-sink confidentiality** — new broker/collector paths must not persist secrets before projection.
+6. **First-sink confidentiality** — new bridge/capability/collector paths must not persist secrets before projection.
 7. **Scope sealing** — apparent quiescence is not complete evidence until trusted admission is closed and the collector has drained a generation-scoped final sequence.
 
 ## Recommendation status
