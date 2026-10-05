@@ -130,6 +130,13 @@ def main() -> int:
                     )
                     admitted.capability.relay_bridge_once()
                     admitted.capability.relay_loom_once()
+                    saw_preflight = False
+                    while not saw_preflight:
+                        message = admitted.evidence.receive_once()
+                        payload = message.get("payload") if isinstance(message, dict) else None
+                        if isinstance(payload, dict) and payload.get("type") == "capability.preflight":
+                            saw_preflight = True
+                    admitted.evidence.request_close()
                     while not admitted.evidence.ledger.sealed:
                         admitted.evidence.receive_once()
                     result_box.put({
