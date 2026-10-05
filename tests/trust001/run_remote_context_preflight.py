@@ -193,19 +193,31 @@ def main() -> int:
                 check=False,
             )
 
-            isolated_out, isolated_err = isolated.communicate(timeout=10)
             channel_thread.join(10)
             if channel_thread.is_alive():
+                isolated.terminate()
+                isolated.communicate(timeout=5)
                 raise RuntimeError("channel service did not terminate")
             outcome = result_box.get_nowait()
             if isinstance(outcome, BaseException):
+                isolated.terminate()
+                isolated.communicate(timeout=5)
                 raise outcome
+
+            fenced = False
+            try:
+                isolated_out, isolated_err = isolated.communicate(timeout=2)
+            except subprocess.TimeoutExpired:
+                fenced = True
+                isolated.terminate()
+                isolated_out, isolated_err = isolated.communicate(timeout=5)
+
             if proc.returncode != 0:
                 raise RuntimeError(
                     f"remote-context OpenCode preflight failed: exit={proc.returncode} "
                     f"stdout={proc.stdout!r} stderr={proc.stderr!r}"
                 )
-            if isolated.returncode != 0:
+            if isolated.returncode not in (0, -15):
                 raise RuntimeError("isolated remote context failed")
             if "TRUST001_READY" not in isolated_out:
                 raise RuntimeError("isolated remote context did not become ready")
@@ -234,6 +246,7 @@ def main() -> int:
                 "generation": generation,
                 "plugin_ids": sorted(str(x) for x in ids if x),
                 "isolated_ready": True,
+                "isolated_fenced_after_seal": fenced,
                 "evidence_complete": True,
                 "router_failed": False,
                 "project_config_disabled": manifest["project_config_disabled"],
