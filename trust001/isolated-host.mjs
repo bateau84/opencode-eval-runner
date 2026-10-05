@@ -225,6 +225,10 @@ async function main() {
         )
       }
     } catch (error) {
+      if (!closed && error instanceof Error && error.message === "channel_closed" && pendingHost.size === 0) {
+        closed = true
+        return
+      }
       if (!closed) {
         loopFailure = fixedError(error)
         for (const pending of pendingHost.values()) pending.reject(new Error("capability_channel_failed"))
