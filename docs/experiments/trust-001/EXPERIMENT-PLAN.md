@@ -116,7 +116,7 @@ Must prove at least:
 
 - no raw secret at any candidate-controlled first sink, including diagnostics/logging;
 - no evidence-channel FD/listener inheritance, duplication, or impersonation by evaluated subprocesses;
-- capability-channel compromise cannot create eligible evidence;
+- an unadmitted process cannot impersonate the capability peer; replay/identity/integrity loss makes affected evidence ineligible;
 - no plugin-source operation-set change or loading escape;
 - duplicate/replay/stale/late response rejection;
 - generation close/seal, contiguous final sequence, and post-seal late request/event rejection;
