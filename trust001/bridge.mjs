@@ -135,7 +135,7 @@ export default {
     const pendingCallbacks = new Map()
     const activeHostRequests = new Set()
     const cancelledHostRequests = new Set()
-    const proxyHandlerIDs = new WeakMap()
+    const remoteToolHandlers = new Map()
     const registrations = []
 
     const observe = (payload) => {
@@ -204,6 +204,12 @@ export default {
       return { registered: true }
     }
 
+    const effectiveToolID = (definition) => {
+      const name = definition.name.replace(/[^a-zA-Z0-9_-]/g, "_")
+      const namespace = definition.options?.namespace
+      return namespace === undefined ? name : namespace.replaceAll(".", "_") + "_" + name
+    }
+
     const registerToolTransform = async (payload) => {
       const namespaces = payload?.namespaces ?? []
       const tools = payload?.tools ?? []
@@ -237,7 +243,9 @@ export default {
             requireValue(result && typeof result === "object", "invalid_remote_tool_result")
             return result
           }
-          proxyHandlerIDs.set(execute, remoteHandler)
+          const effectiveID = effectiveToolID(definition)
+          requireValue(!remoteToolHandlers.has(effectiveID), "duplicate_remote_tool_id")
+          remoteToolHandlers.set(effectiveID, remoteHandler)
           editor.add({ ...definition, execute })
         }
       })
@@ -247,11 +255,11 @@ export default {
 
     const listRemoteTools = async () => {
       const tools = await ctx.tool.list()
+      const actual = new Set(tools.map((tool) => tool.id))
       return {
-        tools: tools.flatMap((tool) => {
-          const remoteHandler = proxyHandlerIDs.get(tool.execute)
-          return remoteHandler ? [{ id: tool.id, handler_id: remoteHandler }] : []
-        }),
+        tools: Array.from(remoteToolHandlers.entries()).flatMap(([id, remoteHandler]) =>
+          actual.has(id) ? [{ id, handler_id: remoteHandler }] : []
+        ),
       }
     }
 
