@@ -52,7 +52,7 @@ def build_source_closure(
         json.dumps(config, ensure_ascii=False, allow_nan=False, separators=(",", ":")) + "\n",
         encoding="utf-8",
     )
-    bridge_path = plugins / f"{BRIDGE_ID}.mjs"
+    bridge_path = plugins / f"{BRIDGE_ID}.js"
     shutil.copyfile(bridge_source, bridge_path)
 
     for path in (config_path, bridge_path):
@@ -70,7 +70,7 @@ def build_source_closure(
         },
         "plugins": [{
             "id": BRIDGE_ID,
-            "relative_path": f"plugins/{BRIDGE_ID}.mjs",
+            "relative_path": f"plugins/{BRIDGE_ID}.js",
             "sha256": sha256(bridge_path),
         }],
         "expected_external_plugin_ids": [BRIDGE_ID],
