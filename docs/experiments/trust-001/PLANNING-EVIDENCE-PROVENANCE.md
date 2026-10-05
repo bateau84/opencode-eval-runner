@@ -20,11 +20,10 @@ This ledger prevents reported, source-verified, and future experiment claims fro
 | v2.0.23 durable Session events expose canonical native tool called/success/failed records | VERIFIED-SOURCE | `packages/schema/src/session-event.ts`. |
 | v2.0.23 Code Mode public metadata records inner tool name/status/input but not per-inner returned value/error | VERIFIED-SOURCE | `packages/core/src/codemode/tool.ts`. |
 | v2.0.23 PluginHost adds parent Session creation, remove, compact, and metadata update since v2.0.18 | VERIFIED-SOURCE | Exact upstream commits inspected. |
-| OpenCode v2.0.23 provides plugin isolation from arbitrary in-process plugins | VERIFIED-SOURCE | Source inspection shows **no** such boundary; configured module/hook execution remains in-process. |
+| OpenCode v2.0.23 does **not** provide plugin isolation from arbitrary in-process plugins | VERIFIED-SOURCE | Configured module/hook execution remains in-process. |
 | Stock v2.0.23 public plugin Context exposes `event.subscribe()` over OpenCode events | VERIFIED-SOURCE | This proves an access surface, not ordering/drain/completeness. |
 | Stock v2.0.23 plugin-source discovery derives operations from config documents/roots and discovered/configured sources and watches changes | VERIFIED-SOURCE | Plugin-loading closure must freeze every input that can change the effective operation set. |
 | Pinned Loom `149406d` retains `legacyStorage` after proxying normal `ctx.storage` and can access it later for lazy compatibility/migration | VERIFIED-SOURCE | Stock plugin storage cannot be classified as setup-only. |
-
 | Safety image `8d7c…` passed the reported Loom provider-free composition at `149406d` | REPORTED | Do not promote to independently rerun evidence in this branch. |
 | Normal-observation image `df50…` demonstrated patched-runtime semantics | REPORTED | Research/reference only; patched OpenCode is out of scope. |
 | Safety image `8d7c…` bytes exactly correspond to current planning sources | UNVERIFIED-IMAGE | Must be re-established if ever used for a future authorized baseline. |
