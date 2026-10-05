@@ -5,10 +5,12 @@ import argparse
 import json
 import os
 import queue
+import selectors
 import subprocess
 import sys
 import tempfile
 import threading
+import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -62,10 +64,33 @@ try:
         timeout=10,
         authorization=auth,
     )
-    print(json.dumps({"plugins": plugins, "tools": tools}, separators=(",", ":")))
+    print(json.dumps({"plugins": plugins, "tools": tools}, separators=(",", ":")), flush=True)
+    print("TRUST001_CONTAINER_READY", flush=True)
+    sys.stdin.readline()
 finally:
     _stop_preflight_server(server)
 """
+
+
+def wait_for_marker(stream, marker: str, timeout: float) -> list[str]:
+    selector = selectors.DefaultSelector()
+    selector.register(stream, selectors.EVENT_READ)
+    deadline = time.monotonic() + timeout
+    lines: list[str] = []
+    try:
+        while time.monotonic() < deadline:
+            events = selector.select(max(0.1, deadline - time.monotonic()))
+            if not events:
+                continue
+            line = stream.readline()
+            if line == "":
+                raise RuntimeError(f"{marker} stream closed before readiness")
+            lines.append(line.rstrip("\n"))
+            if marker in line:
+                return lines
+    finally:
+        selector.close()
+    raise RuntimeError(f"{marker} readiness timeout")
 
 
 def main() -> int:
@@ -122,6 +147,7 @@ def main() -> int:
             )
 
             result_box: queue.Queue[object] = queue.Queue()
+            close_request = threading.Event()
 
             def run_channels() -> None:
                 try:
@@ -133,6 +159,9 @@ def main() -> int:
                         timeout=30,
                     )
                     stop, errors, threads = admitted.capability.serve()
+                    if not close_request.wait(30):
+                        raise RuntimeError("trusted close was not requested")
+                    admitted.evidence.request_close()
                     while not admitted.evidence.ledger.sealed:
                         admitted.evidence.receive_once()
                     stop.wait(10)
@@ -157,7 +186,7 @@ def main() -> int:
             uid = str(os.getuid())
             gid = str(os.getgid())
             command = [
-                "docker", "run", "--rm",
+                "docker", "run", "--rm", "-i",
                 "--network", "none",
                 "--read-only",
                 "--tmpfs", "/tmp:rw,exec,nosuid,nodev,size=256m",
@@ -184,45 +213,62 @@ def main() -> int:
                 args.image,
                 "-c", container_script(),
             ]
-            proc = subprocess.run(
+            proc = subprocess.Popen(
                 command,
                 cwd=ROOT,
-                capture_output=True,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
                 text=True,
-                timeout=60,
-                check=False,
+                bufsize=1,
             )
+            if proc.stdout is None or proc.stdin is None or isolated.stdout is None:
+                raise RuntimeError("preflight process pipes unavailable")
 
-            channel_thread.join(10)
+            container_lines = wait_for_marker(proc.stdout, "TRUST001_CONTAINER_READY", 30)
+            isolated_lines = wait_for_marker(isolated.stdout, "TRUST001_READY", 30)
+            close_request.set()
+
+            channel_thread.join(15)
             if channel_thread.is_alive():
                 isolated.terminate()
                 isolated.communicate(timeout=5)
+                proc.terminate()
+                proc.communicate(timeout=5)
                 raise RuntimeError("channel service did not terminate")
             outcome = result_box.get_nowait()
             if isinstance(outcome, BaseException):
                 isolated.terminate()
                 isolated.communicate(timeout=5)
+                proc.terminate()
+                proc.communicate(timeout=5)
                 raise outcome
+
+            proc.stdin.write("\n")
+            proc.stdin.flush()
+            remaining_out, remaining_err = proc.communicate(timeout=10)
+            container_output = "\n".join(container_lines) + "\n" + remaining_out
 
             fenced = False
             try:
-                isolated_out, isolated_err = isolated.communicate(timeout=2)
+                remaining_isolated_out, isolated_err = isolated.communicate(timeout=2)
             except subprocess.TimeoutExpired:
                 fenced = True
                 isolated.terminate()
-                isolated_out, isolated_err = isolated.communicate(timeout=5)
+                remaining_isolated_out, isolated_err = isolated.communicate(timeout=5)
+            isolated_out = "\n".join(isolated_lines) + "\n" + remaining_isolated_out
 
             if proc.returncode != 0:
-                raise RuntimeError(
-                    f"remote-context OpenCode preflight failed: exit={proc.returncode} "
-                    f"stdout={proc.stdout!r} stderr={proc.stderr!r}"
-                )
+                raise RuntimeError(f"remote-context OpenCode preflight failed: exit={proc.returncode}")
             if isolated.returncode not in (0, -15):
                 raise RuntimeError("isolated remote context failed")
             if "TRUST001_READY" not in isolated_out:
                 raise RuntimeError("isolated remote context did not become ready")
 
-            payload = json.loads(proc.stdout.strip().splitlines()[-1])
+            json_line = next((line for line in container_lines if line.startswith("{")), None)
+            if json_line is None:
+                raise RuntimeError("container preflight payload missing")
+            payload = json.loads(json_line)
             plugins = payload["plugins"]
             ids = {item.get("id") for item in plugins if isinstance(item, dict)}
             if "loom" not in ids or "hostile" in ids:
