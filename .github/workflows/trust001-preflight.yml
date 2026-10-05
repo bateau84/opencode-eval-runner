@@ -51,7 +51,7 @@ jobs:
 
       - name: Verify exact stock version and labels
         run: |
-          test "$(docker run --rm --entrypoint opencode trust001-stock-opencode:preflight --version)" = "2.0.23"
+          test "$(docker run --rm --entrypoint opencode trust001-stock-opencode:preflight --version)" = "opencode v2.0.23"
           test "$(docker image inspect trust001-stock-opencode:preflight --format '{{ index .Config.Labels "io.opencode-eval.stock-opencode-version" }}')" = "2.0.23"
           test "$(docker image inspect trust001-stock-opencode:preflight --format '{{ index .Config.Labels "io.opencode-eval.stock-opencode-package" }}')" = "@opencode/cli"
 
