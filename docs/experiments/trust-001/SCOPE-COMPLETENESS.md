@@ -82,7 +82,7 @@ Completeness is a two-phase property: **quiescence, then trusted seal**. Observi
 For the bounded experiment:
 
 1. a reviewed runner/OpenCode boundary closes admission for new case-required work for the generation;
-2. every already-admitted Session/tool/proxy/broker member settles or receives an explicit non-success classification;
+2. every already-admitted Session/tool/proxy/capability member settles or receives an explicit non-success classification;
 3. the trusted bridge assigns a monotonic collector sequence to every accepted observation for that generation;
 4. after all accepted observations are emitted, the bridge sends `seal(generation, finalSequence)`;
 5. the collector accepts completeness only if it has a contiguous sequence through `finalSequence`, all required members satisfy the closure predicate, and no accepted post-seal work/event exists.
@@ -102,7 +102,7 @@ The bounded experiment scope can close as complete only when all are true:
 5. every in-scope descendant required by the scope has reached its required lifecycle boundary;
 6. every in-scope required tool/proxy invocation has one trusted terminal;
 7. there are no unresolved outstanding capability requests;
-8. bridge/collector channel did not lose an unaccounted interval;
+8. evidence channel did not lose an unaccounted interval;
 9. collector has the trusted generation seal and a contiguous sequence through its `finalSequence`;
 10. no required request/event was accepted after that seal;
 11. no required operation is classified unsupported;
