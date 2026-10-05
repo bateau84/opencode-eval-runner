@@ -65,7 +65,7 @@ Verdicts:
 - UNPROVEN;
 - NOT RUN.
 
-Current state: **NOT RUN**.
+Current state: **PASS**.
 
 ## Authorization A — construction
 
@@ -76,8 +76,12 @@ Must identify:
 - exact candidate source branch/checkpoint;
 - stock OpenCode image/version;
 - exact TCB;
-- reviewed capability surface;
+- reviewed capability surface, including generation-lifetime legacy storage bounds;
+- plugin-source closure manifest: effective add/remove operation set plus every config/source input that can change it;
+- distinct evidence-channel and capability-channel endpoints, peer admission, descriptor policy, and no-reconnect rule;
+- generation close/seal and contiguous collector-sequence protocol;
 - mount/process/network policy;
+- candidate-controlled diagnostic/first-sink policy;
 - candidate files allowed to change;
 - named provider-free local preflights;
 - reviewers.
@@ -94,9 +98,11 @@ If authorized:
 4. at-most-once request correlation;
 5. trusted live event collector;
 6. trusted scope accounting;
-7. evidence safety before first sink;
-8. plugin-loading fences;
-9. no OpenCode patch.
+7. evidence safety before first candidate-controlled sink;
+8. immutable plugin-source closure fences;
+9. generation admission close + trusted final-sequence seal/drain;
+10. distinct capability and evidence channels;
+11. no OpenCode patch.
 
 ### Gate 2
 
@@ -108,11 +114,14 @@ Provider-free confidentiality/transport preflight.
 
 Must prove at least:
 
-- no raw secret at any first sink;
-- no bridge FD/channel inheritance by evaluated subprocesses;
-- no plugin-loading escape;
+- no raw secret at any candidate-controlled first sink, including diagnostics/logging;
+- no evidence-channel FD/listener inheritance, duplication, or impersonation by evaluated subprocesses;
+- capability-channel compromise cannot create eligible evidence;
+- no plugin-source operation-set change or loading escape;
 - duplicate/replay/stale/late response rejection;
-- channel loss before/after product completion;
+- generation close/seal, contiguous final sequence, and post-seal late request/event rejection;
+- cancellation/late-response behavior does not overclaim remote side-effect rollback;
+- capability/evidence channel loss before/after product completion;
 - no automatic product retry.
 
 FAIL rejects the exact checkpoint.
@@ -167,7 +176,8 @@ Test:
 - evidence deletion/reordering;
 - fake terminal/completeness;
 - crash/hang/channel loss;
-- cancellation + late response.
+- cancellation + late response and remote side-effect timing;
+- post-seal late request/event and sequence-gap attempts.
 
 ## Wave 5 — confidentiality
 
