@@ -1,5 +1,5 @@
 FROM node:24-bookworm-slim@sha256:0e0ff40c39bc087845bfb27465a0df4ea419520094bc35842ff83dd8cbe6f9b6 AS opencode-builder
-ARG OPENCODE_VERSION=2.0.18
+ARG OPENCODE_VERSION=2.0.23
 RUN npm install --global "@opencode/cli@${OPENCODE_VERSION}" \
     && resolved="$(readlink -f "$(command -v opencode)")" \
     && test -x "$resolved" \
@@ -53,8 +53,11 @@ ENTRYPOINT ["python3", "/opt/opencode-eval-runner/container/invoke.py"]
 USER 1000:1000
 
 FROM runtime-base AS opencode
+ARG OPENCODE_VERSION=2.0.23
+LABEL io.opencode-eval.stock-opencode-version="${OPENCODE_VERSION}" \
+      io.opencode-eval.stock-opencode-package="@opencode/cli"
 COPY --from=opencode-builder /opencode /usr/local/bin/opencode
-RUN opencode --version
+RUN test "$(opencode --version)" = "${OPENCODE_VERSION}"
 
 FROM runtime-base AS copilot
 COPY --from=copilot-builder /opt/copilot/bin/copilot /usr/local/bin/copilot
