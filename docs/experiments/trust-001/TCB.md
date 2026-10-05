@@ -1,6 +1,6 @@
 # Provisional trusted computing boundary
 
-Status: **Wave-1 planning artifact. Gate 1 NOT RUN.**
+Status: **Wave-1 planning artifact. Gate 1 PASS; runtime properties remain unproven.**
 
 This TCB is the candidate boundary to review. It is not a claim that the boundary is already effective.
 
@@ -52,12 +52,12 @@ host opencode-eval-runner
        └─ Loom-spawned children
 ```
 
-The stock OpenCode domain is therefore a **mixed-authority OS domain**. Gate 1 must review whether the proposed channel and mount controls prevent its untrusted subprocesses from escalating into evidence authority.
+The stock OpenCode domain is therefore a **mixed-authority OS domain**. The Gate 1 review requires later proof that the proposed channel and mount controls prevent its untrusted subprocesses from escalating into evidence authority.
 
 Two channels have different TCB meaning:
 
 - **evidence channel:** trusted bridge → host collector only; this is the sole candidate observation ingress with evidence authority;
-- **capability channel:** trusted bridge ↔ isolated Loom; this carries product callbacks/results and is explicitly untrusted for evidence authority.
+- **capability channel:** trusted bridge ↔ isolated Loom; payloads are untrusted product data and have no direct evidence-write authority, while trusted transport admission/correlation must bind them to the admitted Loom generation.
 
 They must not share accepted descriptors, listener paths, authentication material, or collector-readable evidence framing.
 
