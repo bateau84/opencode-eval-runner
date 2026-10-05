@@ -9,6 +9,7 @@ Coverage is relative to the case-required observation scope. Loom defines what m
 For the initial experiment, use a deliberately strong but finite scope:
 
 ```text
+generation = one admitted bridge/Loom generation for this runner invocation
 root = actual target Session for this runner invocation
 include = root +
           all actual descendant Sessions created from root during the case +
@@ -74,25 +75,44 @@ Each required member is represented as one of:
 
 No unknown state is silently counted as zero/missing-free.
 
+## Trusted closure seal
+
+Completeness is a two-phase property: **quiescence, then trusted seal**. Observing that all currently known members look terminal is not enough because a late admitted callback, descendant, or live event could otherwise arrive after the collector declares success.
+
+For the bounded experiment:
+
+1. a reviewed runner/OpenCode boundary closes admission for new case-required work for the generation;
+2. every already-admitted Session/tool/proxy/broker member settles or receives an explicit non-success classification;
+3. the trusted bridge assigns a monotonic collector sequence to every accepted observation for that generation;
+4. after all accepted observations are emitted, the bridge sends `seal(generation, finalSequence)`;
+5. the collector accepts completeness only if it has a contiguous sequence through `finalSequence`, all required members satisfy the closure predicate, and no accepted post-seal work/event exists.
+
+A late required request/event after seal is a protocol/completeness failure. It is never silently ignored.
+
+A disposable OpenCode process exit may be used as part of the trusted close boundary only after provider-free proof that the relevant stock-event and bridge queues are drained before the seal. Process exit by itself is not completeness.
+
 ## Closure predicate
 
 The bounded experiment scope can close as complete only when all are true:
 
 1. root identity is admitted;
 2. no required Session membership is ambiguous;
-3. root reaches the required lifecycle boundary;
-4. every in-scope descendant required by the scope has reached its required lifecycle boundary;
-5. every in-scope required tool/proxy invocation has one trusted terminal;
-6. there are no unresolved outstanding broker requests;
-7. collector/bridge channel did not lose an unaccounted interval;
-8. no required operation is classified unsupported;
-9. no evidence-safety loss required by the case prevents the deterministic assertion.
+3. trusted generation admission is closed for new case-required work;
+4. root reaches the required lifecycle boundary;
+5. every in-scope descendant required by the scope has reached its required lifecycle boundary;
+6. every in-scope required tool/proxy invocation has one trusted terminal;
+7. there are no unresolved outstanding capability requests;
+8. bridge/collector channel did not lose an unaccounted interval;
+9. collector has the trusted generation seal and a contiguous sequence through its `finalSequence`;
+10. no required request/event was accepted after that seal;
+11. no required operation is classified unsupported;
+12. no evidence-safety loss required by the case prevents the deterministic assertion.
 
 If any condition is false, completeness is false/unknown as appropriate.
 
 ## Forbidden absence
 
-A forbidden-absence assertion is eligible only if every in-scope path on which the forbidden behavior could occur is completely covered.
+A forbidden-absence assertion is eligible only after the trusted generation seal and only if every in-scope path on which the forbidden behavior could occur is completely covered.
 
 Examples:
 
