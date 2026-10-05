@@ -164,6 +164,13 @@ class EvidenceCollector:
             ledger=EvidenceLedger(generation),
         )
 
+    def request_close(self) -> None:
+        self.channel.send({
+            "version": "opencode-eval-runner/trust001-wire/v1",
+            "kind": "evidence.close",
+            "generation": self.generation,
+        })
+
     def receive_once(self) -> dict[str, Any]:
         message = validate_evidence(self.channel.recv())
         require(message["generation"] == self.generation, "stale_generation")
@@ -172,5 +179,5 @@ class EvidenceCollector:
         elif message["kind"] == "evidence.seal":
             self.ledger.seal(message["final_sequence"])
         else:
-            raise ProtocolError("unexpected_evidence_hello")
+            raise ProtocolError("unexpected_evidence_control")
         return message
