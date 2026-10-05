@@ -54,7 +54,7 @@ class SourceClosureTests(unittest.TestCase):
             bridge.write_text("export default {}\n")
             destination = root / "config"
             manifest = build_source_closure(destination=destination, bridge_source=bridge)
-            plugin = destination / "plugins" / "trust001-bridge.ts"
+            plugin = destination / "plugins" / "trust001-bridge.mjs"
             plugin.chmod(0o644)
             plugin.write_text("export default { id: 'replacement' }\n")
             with self.assertRaises(ProtocolError):
