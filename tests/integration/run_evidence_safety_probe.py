@@ -33,20 +33,19 @@ export default { id: "capturersp", async setup(ctx) {
   await ctx.tool.transform(editor => {
     editor.namespace({name:"capturersp", description:"Synthetic RSP fixture"});
     editor.add({name:"emit", description:"Return an independently known value", 
-      input:{type:"object",properties:{scenario:{type:"string"}},required:["scenario"],additionalProperties:false},
+      input:{type:"object",properties:{scenario:{type:"string"},payload:{type:"object",additionalProperties:true}},required:["scenario"],additionalProperties:false},
       options:{namespace:"capturersp",codemode:false},
       execute: async input => {
         if (Object.values(process.env).some(v => String(v).includes("PRIVATE-POLICY-ONLY-NOT-FOR-TARGET")))
           throw Error("policy_leaked_to_child_environment");
         if (input.scenario === "timeout") await new Promise(resolve=>setTimeout(resolve,12000));
         if (input.scenario === "failure") throw Error(FAILURE);
-        if (input.scenario === "deep-key") return {content: Object.fromEntries([[DEEP_KEY, "public"]])};
         return {content: input.scenario === "oversize" ? "public ".repeat(1000) : SENTINEL};
       }
     });
   });
 }};
-'''.replace('SENTINEL',json.dumps(OUTPUT)).replace('FAILURE',json.dumps('FAILURE-'+ESCAPED)).replace('DEEP_KEY',json.dumps(DEEP_KEY))
+'''.replace('SENTINEL',json.dumps(OUTPUT)).replace('FAILURE',json.dumps('FAILURE-'+ESCAPED))
 
 
 def inventory(kind):
@@ -73,8 +72,11 @@ def once(image, root, name, policy_kind, scenario='success', legacy=False, dispo
                 names=[x['function']['name'] for x in body.get('tools',[])]
                 actual=next((n for n in names if n.endswith('capturersp_emit')),None)
                 if not actual: self.send_error(400);return
+                call_args={'scenario':scenario}
+                if scenario=='deep-key':
+                    call_args['payload']={DEEP_KEY:'public'}
                 delta={'role':'assistant','tool_calls':[{'index':0,'id':'rsp-tool-call','type':'function',
-                    'function':{'name':actual,'arguments':json.dumps({'scenario':scenario})}}]}
+                    'function':{'name':actual,'arguments':json.dumps(call_args)}}]}
                 finish='tool_calls'
             else:
                 delta={'role':'assistant','content':'PUBLIC-DONE'};finish='stop'
@@ -195,8 +197,8 @@ def main():
         )
         checks['deep-key:payload_omitted_before_sink']=(
             bool(deep_events)
-            and all('output' not in event for event in deep_events)
-            and any(f.get('field')=='output' and f.get('event') is not None
+            and all('input' not in event for event in deep_events)
+            and any(f.get('field')=='input' and f.get('event') is not None
                     and f.get('state')=='omitted'
                     and f.get('reason')=='unsupported_representation'
                     for f in deep_fields)
