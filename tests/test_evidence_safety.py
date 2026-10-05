@@ -193,6 +193,39 @@ class ProjectionTests(unittest.TestCase):
                 self.assertEqual(disposition(r, 'output', 0)['reason'], 'unsupported_representation')
                 self.assertNotIn(deep, S.encode(r).decode())
 
+    def test_representation_changing_echoes_omit_instead_of_chasing_depth(self):
+        secret = 'tok-"line\n\\ending'
+        deep = secret
+        for _ in range(S.SUPPORTED_JSON_ESCAPE_LAYERS + 1):
+            deep = json.dumps(deep, ensure_ascii=False)[1:-1]
+
+        payload = {deep: 'public'}
+        echo = json.dumps(payload, ensure_ascii=False, separators=(',', ':'))
+        for layer in range(4):
+            with self.subTest(layer=layer):
+                r = S.project_result(
+                    raw_result([tool(echo, args=payload)]),
+                    S.Policy(inventory([secret])),
+                )
+                event = r['tool_result_evidence']['events'][0]
+                self.assertNotIn('input', event)
+                self.assertNotIn('output', event)
+                self.assertEqual(disposition(r, 'input', 0)['reason'], 'unsupported_representation')
+                self.assertEqual(disposition(r, 'output', 0)['reason'], 'unsupported_representation')
+                blob = S.encode(r).decode()
+                self.assertNotIn(deep, blob)
+                self.assertNotIn(echo, blob)
+                self.assertFalse(S.Policy(inventory([secret])).unsupported_recoverable(blob))
+            echo = json.dumps(echo, ensure_ascii=False)
+
+    def test_deep_recoverable_identity_is_omitted(self):
+        secret = 'identity-"line\n\\ending'
+        deep = secret
+        for _ in range(S.SUPPORTED_JSON_ESCAPE_LAYERS + 2):
+            deep = json.dumps(deep, ensure_ascii=False)[1:-1]
+        p = S.Projection(S.Policy(inventory([secret])))
+        self.assertIs(p.field('session_id', deep, role='identity'), S.MISSING)
+        self.assertEqual(p.fields[0]['reason'], 'unsupported_representation')
     def test_bad_representations_and_unknown_schema_omit(self):
         cycle = {}; cycle['self'] = cycle
         for value in (cycle, float('nan'), {'a': float('inf')}, b'no'):
@@ -440,6 +473,22 @@ class HostBoundaryTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             S.validate_reply(S.encode(bad), policy, run_id, revision, binding)
 
+    def test_host_rejects_forged_exact_representation_changing_echo(self):
+        secret = 'host-"line\n\\ending'
+        deep = secret
+        for _ in range(S.SUPPORTED_JSON_ESCAPE_LAYERS + 1):
+            deep = json.dumps(deep, ensure_ascii=False)[1:-1]
+        echo = json.dumps({deep: 'public'}, ensure_ascii=False, separators=(',', ':'))
+
+        policy = S.Policy(inventory([secret]))
+        run_id = 'c' * 64
+        binding = b'd' * 32
+        result = S.project_result(raw_result([tool('public-output')]), policy)
+        result['tool_result_evidence']['events'][0]['output'] = echo
+        result['evidence_safety_ack'] = S.receipt(policy, run_id, REV, binding)
+
+        with self.assertRaises(ValueError):
+            S.validate_reply(S.encode(result), policy, run_id, REV, binding)
     def test_omitted_value_smuggling_and_duplicate_disposition_rejected(self):
         p, r = self.reply()
         bad = copy.deepcopy(r); bad['stdout'] = 'secret'

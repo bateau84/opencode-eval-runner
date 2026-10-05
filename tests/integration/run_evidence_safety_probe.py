@@ -24,8 +24,10 @@ LONG='LONG-CREDENTIAL-'+'z'*9000
 ESCAPED='quoted-"line\nback\\slash-UNIQUE'
 ONLY_POLICY='PRIVATE-POLICY-ONLY-NOT-FOR-TARGET'
 DEEP_KEY=ESCAPED
-for _ in range(4):
+for _ in range(S.SUPPORTED_JSON_ESCAPE_LAYERS + 1):
     DEEP_KEY=json.dumps(DEEP_KEY,ensure_ascii=False)[1:-1]
+DEEP_ECHO=json.dumps({DEEP_KEY:'public'},ensure_ascii=False,separators=(',',':'))
+DEEP_ECHO_FILE=json.dumps(DEEP_ECHO,ensure_ascii=False)[1:-1]
 VALUES=['0','1','text','low',LONG,ESCAPED,ONLY_POLICY,'fixture']
 OUTPUT='low text 0 1 | '+LONG+' | '+ESCAPED
 PLUGIN='''
@@ -40,6 +42,7 @@ export default { id: "capturersp", async setup(ctx) {
           throw Error("policy_leaked_to_child_environment");
         if (input.scenario === "timeout") await new Promise(resolve=>setTimeout(resolve,12000));
         if (input.scenario === "failure") throw Error(FAILURE);
+        if (input.scenario === "deep-key") return {content: JSON.stringify(input.payload)};
         return {content: input.scenario === "oversize" ? "public ".repeat(1000) : SENTINEL};
       }
     });
@@ -155,7 +158,10 @@ def check_safety(name,r,emitted,code,policy_kind):
     checks[name+':file_equals_print']=r==emitted and r.get('schema')==S.RESULT
     checks[name+':raw_streams_absent']='stdout' not in r and 'stderr' not in r
     checks[name+':explicit_safety']=r.get('evidence_safety',{}).get('schema')==S.SAFETY
-    checks[name+':private_inventory_absent']=all(x not in S.encode(r).decode() for x in (LONG,ESCAPED,ONLY_POLICY,DEEP_KEY))
+    checks[name+':private_inventory_absent']=all(
+        x not in S.encode(r).decode()
+        for x in (LONG,ESCAPED,ONLY_POLICY,DEEP_KEY,DEEP_ECHO,DEEP_ECHO_FILE)
+    )
     checks[name+':host_validates_ack']=r.get('evidence_safety_validation',{}).get('acknowledged') is True
     fields=r.get('evidence_safety',{}).get('fields',[])
     if policy_kind=='valid':
@@ -194,8 +200,9 @@ def main():
         deep_events=r.get('tool_result_evidence',{}).get('events',[])
         checks['deep-key:ordinary_execution_unchanged']=(
             deep_legacy_code==0 and bool(deep_legacy_oracle) and deep_legacy_oracle==deep_oracle
+            and any(DEEP_ECHO in str(value) for value in deep_oracle)
         )
-        checks['deep-key:payload_omitted_before_sink']=(
+        checks['deep-key:input_omitted_before_sink']=(
             bool(deep_events)
             and all('input' not in event for event in deep_events)
             and any(f.get('field')=='input' and f.get('event') is not None
@@ -203,7 +210,22 @@ def main():
                     and f.get('reason')=='unsupported_representation'
                     for f in deep_fields)
         )
-        checks['deep-key:encoded_key_absent']=DEEP_KEY not in S.encode(r).decode()
+        checks['deep-key:output_omitted_before_sink']=(
+            bool(deep_events)
+            and all('output' not in event for event in deep_events)
+            and any(f.get('field')=='output' and f.get('event') is not None
+                    and f.get('state')=='omitted'
+                    and f.get('reason')=='unsupported_representation'
+                    for f in deep_fields)
+        )
+        sink=S.encode(r).decode()
+        checks['deep-key:encoded_key_absent']=DEEP_KEY not in sink
+        checks['deep-key:serialized_echo_absent']=DEEP_ECHO not in sink and DEEP_ECHO_FILE not in sink
+        safety_policy=S.Policy(inventory('valid'))
+        checks['deep-key:no_recoverable_representation_in_sink']=(
+            not safety_policy.matches(sink)
+            and not safety_policy.unsupported_recoverable(sink)
+        )
         (out/'deep-key.json').write_bytes(S.encode(r)+b'\n')
 
         for policy_kind in ('missing','incomplete','future'):
