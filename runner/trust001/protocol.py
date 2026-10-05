@@ -41,7 +41,8 @@ CAPABILITY_KINDS = frozenset({
     "capability.host.response",
     "capability.callback.request",
     "capability.callback.response",
-    "capability.cancel",
+    "capability.host.cancel",
+    "capability.callback.cancel",
 })
 EVIDENCE_KINDS = frozenset({
     "evidence.hello",
@@ -172,6 +173,7 @@ def validate_capability(value: dict[str, Any]) -> dict[str, Any]:
             _bounded_json(value["payload"])
         return value
 
+    require(kind in {"capability.host.cancel", "capability.callback.cancel"}, "wrong_channel_kind")
     _exact(value, {"version", "kind", "generation", "request_id", "reason"})
     require(type(value["request_id"]) is str and REQUEST_RE.fullmatch(value["request_id"]) is not None,
             "invalid_request_id")
