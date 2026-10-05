@@ -57,7 +57,7 @@ ARG OPENCODE_VERSION=2.0.23
 LABEL io.opencode-eval.stock-opencode-version="${OPENCODE_VERSION}" \
       io.opencode-eval.stock-opencode-package="@opencode/cli"
 COPY --from=opencode-builder /opencode /usr/local/bin/opencode
-RUN test "$(opencode --version)" = "${OPENCODE_VERSION}"
+RUN test "$(opencode --version)" = "opencode v${OPENCODE_VERSION}"
 
 FROM runtime-base AS copilot
 COPY --from=copilot-builder /opt/copilot/bin/copilot /usr/local/bin/copilot
