@@ -1,10 +1,10 @@
 # Architect recommendation — stock OpenCode TRUST-001 candidate
 
-Status: **recommended experiment candidate; not selected architecture**.
+Status: **Gate 1 PASS; recommended experiment candidate, not selected architecture**.
 
 ## Recommendation
 
-Subject to independent Gate-1 review, investigate:
+Following independent Gate-1 review, the owner may consider a separate Authorization A to investigate:
 
 > A runner-owned trusted bridge plugin loaded by **stock OpenCode v2.0.23**, proxying the bounded Loom plugin API to an isolated Loom execution domain, while host-side runner code owns evidence collection, safety, scope accounting, and persistence.
 
@@ -70,7 +70,7 @@ However the plugin loader, plugin hooks, Tool execution path, Tool runtime, and 
 ## Candidate strengths
 
 - pinned Loom needs only a bounded subset of PluginHost;
-- Loom moves normal state to its own SQLite after setup, reducing broker state surface;
+- Loom moves most normal state to its own SQLite after setup, reducing broker state surface, while bounded stock plugin-storage `get/set/scan` remains available for pinned Loom's lazy legacy-compatibility path;
 - stock live Session events provide strong native ancestry/called/terminal facts;
 - runner proxy Loom tools can allocate trustworthy child correlation without changing tool inputs;
 - Loom semantics remain executed by Loom.
@@ -83,9 +83,10 @@ However the plugin loader, plugin hooks, Tool execution path, Tool runtime, and 
 4. **Synchronous transforms** — stock transform callbacks are synchronous/replayable.
 5. **Callback/cancellation fidelity** — RPC separation must preserve shared mutable event behavior and late-response rules.
 6. **First-sink confidentiality** — new broker/collector paths must not persist secrets before projection.
+7. **Scope sealing** — apparent quiescence is not complete evidence until trusted admission is closed and the collector has drained a generation-scoped final sequence.
 
 ## Recommendation status
 
-Proceed only to **independent Gate-1 review** of the planning artifacts.
+**Gate 1: PASS.** The corrected planning package is coherent and bounded enough for the owner to consider a separate Authorization A for construction and explicitly named provider-free preflights.
 
-A Gate-1 PASS would permit the owner to consider Authorization A for construction and explicitly named provider-free preflights. It would not prove feasibility or authorize semantic/adversarial/model-backed execution.
+This review does not grant Authorization A, prove feasibility, or authorize semantic/adversarial/model-backed execution.
