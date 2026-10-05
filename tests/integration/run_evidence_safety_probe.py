@@ -221,10 +221,12 @@ def main():
         sink=S.encode(r).decode()
         checks['deep-key:encoded_key_absent']=DEEP_KEY not in sink
         checks['deep-key:serialized_echo_absent']=DEEP_ECHO not in sink and DEEP_ECHO_FILE not in sink
-        safety_policy=S.Policy(inventory('valid'))
+        representation_inventory=inventory('valid')
+        representation_inventory['values']=[ESCAPED]
+        representation_policy=S.Policy(representation_inventory)
         checks['deep-key:no_recoverable_representation_in_sink']=(
-            not safety_policy.matches(sink)
-            and not safety_policy.unsupported_recoverable(sink)
+            not representation_policy.matches(sink)
+            and not representation_policy.unsupported_recoverable(sink)
         )
         (out/'deep-key.json').write_bytes(S.encode(r)+b'\n')
 
