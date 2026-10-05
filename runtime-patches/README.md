@@ -94,7 +94,7 @@ The `Normal-invoke runtime observation seam` workflow:
 
 1. applies only `apply.py` — **not** the restricted `apply-protected.py`;
 2. runs source tests against the real core/interpreter;
-3. builds `OpenCode 2.0.18-eval.4`;
+3. builds `OpenCode 2.0.18-eval.5`;
 4. publishes a commit/run-scoped immutable image in a separate credentialed job;
 5. probes the runtime with a deterministic local provider;
 6. runs `run_eval_live_compat_probe.py` through the public

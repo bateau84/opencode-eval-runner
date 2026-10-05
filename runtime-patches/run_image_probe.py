@@ -92,15 +92,24 @@ def run(image: str, output: Path):
         return [item["record"]["event"] for item in reports[name].get("hooks", [])
                 if item.get("record", {}).get("phase") == "runtime-native-observed"]
 
+    off_native_starts = [
+        event for event in native_observations("off")
+        if event.get("kind") == "call_start"
+    ]
     checks = {
         "all_scripts_completed": all(probe.scenario_completed(r) for r in reports.values()),
         "product_outcomes_unchanged": bool(reports["off"].get("oracle")) and all(
             probe.oracle_signature(r) == probe.oracle_signature(reports["off"]) for r in reports.values()),
         "native_observation_image_owned": bool(native_observations("off")) and bool(native_observations("on")),
         "inner_observation_test_toggle": not observations("off") and bool(observations("on")),
+        "disabled_inner_observer_does_not_create_native_inner_calls": (
+            len(off_native_starts) == 2
+            and {event.get("tool") for event in off_native_starts} == {"captureprobe_native", "execute"}
+            and all(event.get("mode") == "native" for event in off_native_starts)
+        ),
         "observer_failure_does_not_change_results": probe.scenario_completed(reports["observer-fails"]),
         "normal_invoke_runtime_version": all(
-            "2.0.18-eval.4" in str(r.get("opencode_version") or "") for r in reports.values()
+            "2.0.18-eval.5" in str(r.get("opencode_version") or "") for r in reports.values()
         ),
         "forged_sidecar_rejected": reports["forged"]["observed_execution"]["issues"] == ["authentication_failed"],
         "no_false_capture_acceptance": all(r["observed_execution"]["evidence_eligible"] is False for r in reports.values()),
