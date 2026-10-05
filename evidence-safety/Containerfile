@@ -1,5 +1,5 @@
-# Reuse the already-tested eval.4 OpenCode binary. Only runner adapters change.
-FROM ghcr.io/bateau84/opencode-eval-runner@sha256:590d5dd61faa6bbdad5d0cd8af3282b783c901ec7aaec84e79fc0057d8731be8
+# Reuse the already-tested eval.5 OpenCode binary. Only runner adapters change.
+FROM ghcr.io/bateau84/opencode-eval-runner@sha256:9e5af1397c385eabff32daa8e3b4a295713c38515d231af6c5759ddd320bdb40
 ARG RUNNER_REVISION
 ARG PACKAGE_INIT_SHA256
 ARG SAFETY_MODULE_SHA256
