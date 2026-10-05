@@ -6,16 +6,18 @@ The capability surface is derived from pinned Loom `149406dfa0a01f94491d17054e50
 
 ## Key reduction
 
-Loom setup initially receives OpenCode plugin storage as `legacyStorage`, but then creates its own `execution-state.sqlite` and proxies `ctx.storage` to that Loom-local transactional store.
+Loom setup initially receives OpenCode plugin storage as `legacyStorage`, then creates its own `execution-state.sqlite` and proxies `ctx.storage` to that Loom-local transactional store.
 
-Therefore the normal steady-state Loom control plane does **not** require every storage operation to cross the broker. Stock storage is required only for the bounded setup/legacy-import surface.
+Most steady-state Loom state therefore stays local to Loom. However pinned Loom retains `legacyStorage`: fresh-session cancellation admission can still perform a legacy `get`, and resumed pre-epoch sessions can invoke lazy migration that reads/scans legacy state and may write migration-refusal records.
+
+Therefore stock plugin storage is **not setup-only**. The bounded broker must keep Loom-plugin-namespace `get/set/scan` available for the generation, with structural/size bounds and no evidence authority. These values remain product state.
 
 ## Required capabilities
 
 | Capability | Direction | Why pinned Loom needs it | Trusted identity owner | Authority / notes | Planning status |
 |---|---|---|---|---|---|
 | immutable `location` facts | core → Loom | runtime/project identity, workspace paths | core/runner | value only; Loom cannot redefine trusted Location | SUPPORTED-DESIGN |
-| legacy storage `get/set/scan` | Loom → core | setup identity + legacy import | core storage namespace | setup-only; later Loom storage is local | SUPPORTED-DESIGN |
+| legacy storage `get/set/scan` | Loom → core | activation import + lazy runtime compatibility/migration | core Loom-plugin storage namespace | generation-lifetime bounded product access; fresh-session compatibility can `get`, resumed legacy migration can `get/set/scan`; never evidence authority | SUPPORTED-DESIGN |
 | `rpc.register` | Loom → core registration; calls core → Loom | sidebar RPC | core owns effective registration | async proxy handler | SUPPORTED-DESIGN |
 | `agent.transform` | Loom registration → core | set General as default when present | core owns active registry | synchronous stock transform is a fidelity challenge; bounded experiment may support initial generation only | **UNPROVEN** |
 | `agent.list` | Loom → core | roster tool | core | normal request/response | SUPPORTED-DESIGN |
@@ -31,6 +33,22 @@ Therefore the normal steady-state Loom control plane does **not** require every 
 | `tool.hook("execute.after")` | core → Loom → core | question decisions, mutation/evidence bookkeeping | core owns call context | mutable result/error; stock finality occurs later | SUPPORTED-DESIGN |
 | remote Loom tool execute handler | core → Loom → core | all Loom native/Code Mode tools | bridge allocates proxy request; stock core owns outer context | Loom returns legitimate product result/error only | SUPPORTED-DESIGN |
 | trusted event subscription (runner bridge only) | core → host collector | Session ancestry, native called/terminal records, scope accounting | stock core + host collector | not exposed to Loom as evidence authority | SUPPORTED-SOURCE |
+
+## Source-derived host-use closure
+
+Static inspection of pinned Loom `149406dfa0a01f94491d17054e50a1bc84bb97be` found direct host use limited to:
+
+- immutable `location` facts;
+- storage `get/set/scan`;
+- `rpc.register`;
+- `agent.transform` and `agent.list`;
+- `tool.transform`, `tool.list`, and tool hooks;
+- permission hook;
+- Session `get`, `context`, `synthetic`, and Session hooks.
+
+The runner bridge's trusted `event.subscribe()` use is an observation surface, not a Loom-requested capability and is not exposed to isolated Loom.
+
+Any newly discovered pinned-Loom host call or later Loom revision adds capability surface and creates a new candidate checkpoint with affected authority review.
 
 ## Not required by pinned Loom selected surface
 
