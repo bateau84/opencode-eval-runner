@@ -13,6 +13,7 @@ This decision authorizes Wave-2 construction under the Gate-1 PASS recorded in P
 ## 1. Immutable external constraints
 
 - OpenCode v2.0.23 remains stock and unmodified.
+- The repository's normal OpenCode default pin is authorized to move from 2.0.18 to stock 2.0.23 as part of this candidate branch.
 - No OpenCode source patch, fork, custom binary, or upstream PR is permitted.
 - Loom production semantics remain unchanged.
 - Loom source used by the candidate must be the pinned generation `149406dfa0a01f94491d17054e50a1bc84bb97be`.
@@ -343,7 +344,7 @@ Authorization A does not permit:
 - OpenCode modification;
 - Loom modification;
 - merge to main;
-- release/default image pin changes;
+- release/publish changes beyond CI-local candidate images;
 - production adoption.
 
 ## 14. Review boundary
