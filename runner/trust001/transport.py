@@ -107,7 +107,14 @@ class CapabilityRelay:
                     relay()
                 except BaseException as exc:
                     if not stop.is_set():
-                        errors.put(exc)
+                        clean_close = (
+                            isinstance(exc, ProtocolError)
+                            and str(exc) == "channel_closed"
+                            and not self.router.host_calls.outstanding
+                            and not self.router.callbacks.outstanding
+                        )
+                        if not clean_close:
+                            errors.put(exc)
                         stop.set()
                         self.close()
                     return
