@@ -16,6 +16,7 @@ GENERATION_RE = re.compile(r"[0-9a-f]{64}\Z")
 REQUEST_RE = re.compile(r"[0-9a-f]{32}\Z")
 
 HOST_OPERATIONS = frozenset({
+    "location.get",
     "storage.get", "storage.set", "storage.scan",
     "rpc.register",
     "agent.transform.register", "agent.list",
