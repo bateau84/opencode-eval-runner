@@ -2,7 +2,7 @@
 
 Status: **Wave-1 planning artifact. Gate 1 PASS; runtime properties remain unproven.**
 
-This TCB is the candidate boundary to review. It is not a claim that the boundary is already effective.
+This TCB is the candidate boundary accepted for Gate-1 design readiness. It is not a claim that the boundary is already effective.
 
 ## Trusted components
 
