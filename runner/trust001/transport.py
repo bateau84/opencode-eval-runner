@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import socket
-from dataclasses import dataclass
+import threading
+from dataclasses import dataclass, field
+from queue import Queue
 from typing import Any
 
 from .broker import CapabilityRouter
@@ -39,6 +41,7 @@ class CapabilityRelay:
     bridge: FramedSocket
     loom: FramedSocket
     router: CapabilityRouter
+    _lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
 
     @classmethod
     def admit(
@@ -78,17 +81,55 @@ class CapabilityRelay:
 
     def relay_bridge_once(self) -> dict[str, Any]:
         message = self.bridge.recv()
-        target, routed = self.router.route("bridge", message)
+        with self._lock:
+            target, routed = self.router.route("bridge", message)
         require(target == "loom", "invalid_route")
         self.loom.send(routed)
         return routed
 
     def relay_loom_once(self) -> dict[str, Any]:
         message = self.loom.recv()
-        target, routed = self.router.route("loom", message)
+        with self._lock:
+            target, routed = self.router.route("loom", message)
         require(target == "bridge", "invalid_route")
         self.bridge.send(routed)
         return routed
+
+    def serve(self) -> tuple[threading.Event, Queue[BaseException], list[threading.Thread]]:
+        """Run both capability directions concurrently until stopped or failed."""
+        stop = threading.Event()
+        errors: Queue[BaseException] = Queue()
+
+        def worker(direction: str) -> None:
+            relay = self.relay_bridge_once if direction == "bridge" else self.relay_loom_once
+            while not stop.is_set():
+                try:
+                    relay()
+                except BaseException as exc:
+                    if not stop.is_set():
+                        errors.put(exc)
+                        stop.set()
+                        self.close()
+                    return
+
+        threads = [
+            threading.Thread(target=worker, args=("bridge",), daemon=True),
+            threading.Thread(target=worker, args=("loom",), daemon=True),
+        ]
+        for thread in threads:
+            thread.start()
+        return stop, errors, threads
+
+    def close(self) -> None:
+        for channel in (self.bridge, self.loom):
+            try:
+                channel.sock.shutdown(socket.SHUT_RDWR)
+            except OSError:
+                pass
+            try:
+                channel.sock.close()
+            except OSError:
+                pass
 
 
 @dataclass
