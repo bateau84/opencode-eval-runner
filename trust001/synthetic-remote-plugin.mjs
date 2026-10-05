@@ -12,6 +12,7 @@ export default {
     if (!Array.isArray(page.entries) || !page.entries.some((entry) => entry.key === "trust001/synthetic")) {
       throw new Error("storage scan failed")
     }
+    process.stdout.write("TRUST001_SYNTHETIC_STAGE:storage\n")
 
     await ctx.rpc.register({
       id: "trust001.synthetic",
@@ -35,10 +36,12 @@ export default {
     }, {
       ping: async (input) => ({ value: input.value }),
     })
+    process.stdout.write("TRUST001_SYNTHETIC_STAGE:rpc\n")
 
     await ctx.agent.transform((editor) => {
       if (editor.get("general")) editor.default("general")
     })
+    process.stdout.write("TRUST001_SYNTHETIC_STAGE:agent\n")
 
     let expectedRoster
     await ctx.tool.transform((editor) => {
@@ -57,12 +60,14 @@ export default {
         execute,
       })
     })
+    process.stdout.write("TRUST001_SYNTHETIC_STAGE:tool-transform\n")
 
     const registrations = await ctx.tool.list()
     const roster = registrations.filter((entry) => entry.id === "loom_roster")
     if (roster.length !== 1 || roster[0].execute !== expectedRoster) {
       throw new Error("tool identity failed")
     }
+    process.stdout.write("TRUST001_SYNTHETIC_STAGE:tool-list\n")
 
     await ctx.permission.hook("evaluate", async (event) => {
       if (event.action === "trust001.synthetic.deny") {
@@ -78,5 +83,6 @@ export default {
     })
     await ctx.tool.hook("execute.before", async () => undefined)
     await ctx.tool.hook("execute.after", async () => undefined)
+    process.stdout.write("TRUST001_SYNTHETIC_STAGE:hooks\n")
   },
 }
