@@ -203,7 +203,7 @@ def main() -> int:
             payload = json.loads(proc.stdout.strip().splitlines()[-1])
             plugins = payload["plugins"]
             ids = {item.get("id") for item in plugins if isinstance(item, dict)}
-            if "trust001-bridge" not in ids:
+            if "loom" not in ids:
                 raise RuntimeError(f"bridge not active: {sorted(str(x) for x in ids)}")
             if "hostile" in ids:
                 raise RuntimeError("workspace plugin escaped source closure")
