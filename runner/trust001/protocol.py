@@ -48,6 +48,7 @@ CAPABILITY_KINDS = frozenset({
 EVIDENCE_KINDS = frozenset({
     "evidence.hello",
     "evidence.observation",
+    "evidence.close",
     "evidence.seal",
 })
 
@@ -191,6 +192,8 @@ def validate_evidence(value: dict[str, Any]) -> dict[str, Any]:
         _exact(value, {"version", "kind", "generation", "sequence", "payload"})
         require(type(value["sequence"]) is int and 1 <= value["sequence"] <= 2**53 - 1, "invalid_sequence")
         _bounded_json(value["payload"])
+    elif kind == "evidence.close":
+        _exact(value, {"version", "kind", "generation"})
     elif kind == "evidence.seal":
         _exact(value, {"version", "kind", "generation", "final_sequence"})
         require(type(value["final_sequence"]) is int and 0 <= value["final_sequence"] <= 2**53 - 1,
