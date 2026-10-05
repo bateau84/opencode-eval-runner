@@ -112,4 +112,4 @@ If stock OpenCode cannot keep this source closure immutable without changing req
 
 Effective-authority separation: **UNPROVEN**.
 
-This is expected before candidate construction. Gate 1 should judge whether the proposed controls are coherent and sufficient to authorize a provider-free prototype—not whether they have already been experimentally proven.
+This is expected before candidate construction. The Gate 1 PASS means only that these proposed controls are coherent enough for the owner to consider a separately authorized provider-free prototype; it does not mark them experimentally proven.
