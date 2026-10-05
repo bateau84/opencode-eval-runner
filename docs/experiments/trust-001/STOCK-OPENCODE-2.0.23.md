@@ -74,7 +74,7 @@ This is load-bearing for TRUST-001:
 - bridge/collector secrets MUST NOT be placed in the OpenCode process environment if shell can inherit them;
 - shell subprocesses are evaluated workload authority for the threat model;
 - evidence storage and collector paths must remain outside their writable/reachable authority;
-- the candidate must prevent shell subprocesses from stealing or injecting an established bridge/collector channel, while allowing suppression to result only in incomplete evidence.
+- the candidate must prevent shell subprocesses from stealing/injecting the evidence channel or impersonating the admitted Loom capability peer, while allowing suppression to result only in incomplete/ineligible evidence.
 
 ## Plugin loading escape
 
@@ -86,4 +86,4 @@ Any post-activation change in the effective operation set or admitted source ide
 
 ## Conclusion
 
-v2.0.23 is a better stock target than v2.0.18, mainly due to improved Session APIs. It does not provide the missing trust boundary and does not solve Code Mode finality. The runner-only plan remains viable for investigation, but Gate 1 must treat these gaps explicitly.
+v2.0.23 is a better stock target than v2.0.18, mainly due to improved Session APIs. It does not provide the missing trust boundary and does not solve Code Mode finality. The runner-only plan remains viable for investigation; the Gate 1 review treats these gaps explicitly and leaves their runtime proof to later gates.
