@@ -1,0 +1,54 @@
+name: TRUST-001 provider-free preflight
+
+on:
+  pull_request:
+    paths:
+      - "Containerfile"
+      - "runner/trust001/**"
+      - "container/trust001/**"
+      - "trust001/**"
+      - "tests/test_trust001_*.py"
+      - "tests/trust001/**"
+      - ".github/workflows/trust001-preflight.yml"
+      - "docs/experiments/trust-001/checkpoints/**"
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Verify forbidden OpenCode patch tree absent
+        run: |
+          test ! -e runtime-patches
+          test ! -e opencode-patches
+
+      - name: Compile TRUST-001 Python
+        run: |
+          python3 -m py_compile runner/trust001/*.py
+
+      - name: Run provider-free TRUST-001 unit tests
+        run: |
+          python3 -m unittest discover -s tests -p 'test_trust001_*.py'
+
+  stock-opencode:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Build stock OpenCode candidate image
+        run: |
+          docker build             -f Containerfile             --target opencode             --build-arg OPENCODE_VERSION=2.0.23             -t trust001-stock-opencode:preflight             .
+
+      - name: Verify exact stock version and labels
+        run: |
+          test "$(docker run --rm --entrypoint opencode trust001-stock-opencode:preflight --version)" = "2.0.23"
+          test "$(docker image inspect trust001-stock-opencode:preflight --format '{{ index .Config.Labels "io.opencode-eval.stock-opencode-version" }}')" = "2.0.23"
+          test "$(docker image inspect trust001-stock-opencode:preflight --format '{{ index .Config.Labels "io.opencode-eval.stock-opencode-package" }}')" = "@opencode/cli"
+
+      - name: Record provider-free image identity
+        run: |
+          docker image inspect trust001-stock-opencode:preflight             --format 'image={{.Id}} config={{.Config.Image}} version={{ index .Config.Labels "io.opencode-eval.stock-opencode-version" }}'
