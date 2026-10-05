@@ -34,6 +34,12 @@ jobs:
         run: |
           python3 -m unittest discover -s tests -p 'test_trust001_*.py'
 
+      - name: Check dependency-free bridge scripts
+        run: |
+          node --check trust001/bridge.mjs
+          node --check trust001/synthetic-loom-peer.mjs
+          python3 -m py_compile tests/trust001/run_stock_bridge_preflight.py
+
   stock-opencode:
     runs-on: ubuntu-latest
     steps:
