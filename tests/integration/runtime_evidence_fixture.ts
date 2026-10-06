@@ -63,10 +63,12 @@ export default {
 
       add("nativeSuccess", false, async (input) => ({ content: `NATIVE:${input.value ?? ""}` }))
       add("nativeError", false, async () => { throw new Error("NATIVE-FIXTURE-ERROR") })
-      add("innerEcho", true, async () => {
+      add("innerEcho", true, async (input) => {
         const n = ++echoOrdinal
-        if (n === 1) await release
-        if (n === 2) setTimeout(releaseFirst, 80)
+        if (input?.tag === "same") {
+          if (n === 1) await release
+          if (n === 2) setTimeout(releaseFirst, 80)
+        }
         return { content: `CALL-${n}` }
       })
       add("innerThrow", true, async () => { throw new Error("INNER-FIXTURE-ERROR") })
