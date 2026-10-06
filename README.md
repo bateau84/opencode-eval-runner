@@ -352,9 +352,11 @@ This profile does **not** claim resistance to an evaluated plugin that deliberat
 
 See [Trusted-checkout runtime evidence](docs/trusted-checkout-evidence.md) and the [versioned runtime-evidence result contract](docs/runtime-evidence-contract.md).
 
-OpenCode results now expose `opencode-eval-runner/runtime-evidence/v1` as the single authoritative runtime-evidence object. Native calls are observed through the stock-2.0.23 decoded-execution and Session terminal boundaries. Code Mode inner identity/input/ordering is observable, while exact final script-visible value/error remains explicitly `unsupported`. Existing `tools`, `actions`, `tool_result_evidence`, stdout/stderr, and model text remain convenience/diagnostic data only.
+OpenCode results now expose `opencode-eval-runner/runtime-evidence/v1` as the single authoritative runtime-evidence object. Native calls are observed through the stock-2.0.23 decoded-execution and Session terminal boundaries. Code Mode inner identity/input/ordering is observable, while exact final script-visible value/error remains explicitly `unsupported`. Existing `tools`, `actions`, `tool_result_evidence`, stdout/stderr, and model text remain convenience/diagnostic data only; they do not expose runtime-evidence eligibility and are never substitutes for `runtime_evidence`.
 
 Overall evidence eligibility is separate from assertion eligibility: an unsupported Code Mode finality boundary does not invalidate an unrelated complete native assertion, and redacted/omitted fields only block assertions that require those exact values.
+
+The `github-copilot-cli` transport has no OpenCode runtime observer. It still emits the canonical `runtime_evidence` object, but with status `unsupported`.
 
 > Stock OpenCode 2.0.23 does not expose a supported boundary that proves the exact final value/error seen by a Code Mode script for each inner call. That assertion is reported as unsupported.
 
