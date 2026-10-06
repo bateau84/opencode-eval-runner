@@ -111,14 +111,17 @@ def _collect_sensitive_values(value: Any, out: set[str], depth: int = 0) -> None
 
 def _collect_scalar_credentials(value: Any, out: set[str]) -> None:
     if isinstance(value, str):
-        if value:
-            out.add(value)
         try:
             nested = json.loads(value)
         except (json.JSONDecodeError, TypeError):
+            if value:
+                out.add(value)
             return
         if isinstance(nested, (dict, list)):
             _collect_sensitive_values(nested, out)
+            return
+        if value:
+            out.add(value)
         return
     if type(value) in (int, float) and not isinstance(value, bool):
         if type(value) is float and not math.isfinite(value):
