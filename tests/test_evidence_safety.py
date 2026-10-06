@@ -155,7 +155,7 @@ class EvidenceSafetyTests(unittest.TestCase):
             disposition(projection.summary(), "output", 0)["reason"],
             "credential_inventory_unavailable",
         )
-        self.assertFalse(projection.summary()["evidence_eligible"])
+        self.assertNotIn("evidence_eligible", projection.summary())
 
     def test_success_failure_and_running_events_are_projected_without_invention(self):
         secret = "fixture-secret"
@@ -213,10 +213,11 @@ class EvidenceSafetyTests(unittest.TestCase):
         self.assertEqual(evidence["events"][2]["status"], "running")
         self.assertNotIn("output", evidence["events"][2])
         self.assertNotIn("error", evidence["events"][2])
-        self.assertFalse(evidence["evidence_eligible"])
+        self.assertNotIn("evidence_eligible", evidence)
+        self.assertNotIn("evidence_eligible", evidence["safety"])
         self.assertNotIn(secret, json.dumps(evidence))
 
-    def test_oversize_runtime_evidence_field_is_explicitly_omitted(self):
+    def test_oversize_tool_result_field_is_explicitly_omitted(self):
         raw = "safe-prefix-" + ("x" * 7000)
         events = [{
             "type": "tool_use",
@@ -240,7 +241,8 @@ class EvidenceSafetyTests(unittest.TestCase):
             disposition(evidence["safety"], "output", 0)["reason"],
             "size_limit",
         )
-        self.assertFalse(evidence["evidence_eligible"])
+        self.assertNotIn("evidence_eligible", evidence)
+        self.assertNotIn("evidence_eligible", evidence["safety"])
         self.assertNotIn(raw[:64], json.dumps(evidence))
 
     def test_actual_invoke_path_never_exports_secret_and_keeps_product_failure(self):
@@ -300,7 +302,8 @@ class EvidenceSafetyTests(unittest.TestCase):
             parsed["tool_result_evidence"]["events"][0]["output"],
             {"answer": REDACTED},
         )
-        self.assertFalse(parsed["tool_result_evidence"]["evidence_eligible"])
+        self.assertNotIn("evidence_eligible", parsed["tool_result_evidence"])
+        self.assertNotIn("evidence_eligible", parsed["tool_result_evidence"]["safety"])
 
     def test_timeout_path_sanitizes_before_clipping_and_keeps_timeout_status(self):
         secret = "TIMEOUT-SECRET"
@@ -349,7 +352,8 @@ class EvidenceSafetyTests(unittest.TestCase):
         self.assertNotIn(secret, wire)
         self.assertEqual(result["exit_code"], 124)
         self.assertTrue(result["timed_out"])
-        self.assertFalse(result["tool_result_evidence"]["evidence_eligible"])
+        self.assertNotIn("evidence_eligible", result["tool_result_evidence"])
+        self.assertNotIn("evidence_eligible", result["tool_result_evidence"]["safety"])
 
 
 if __name__ == "__main__":
