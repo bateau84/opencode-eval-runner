@@ -783,11 +783,10 @@ def invoke_opencode(
     sid = session_id(events)
     native_tool_observations = load_native_observations()
 
-    # The structured `opencode run --format json` event stream is the
-    # authoritative evidence source. Starting a second OpenCode process to
-    # export the just-created session is redundant and can add a full timeout
-    # per invocation when export/session bootstrap fails. Keep eval latency
-    # bound to the requested target/judge execution only.
+    # The structured `opencode run --format json` stream remains the product
+    # output source. Reviewed native-tool evidence comes from the runner-owned
+    # observer projection above; stdout/tool payload JSON is never promoted into it.
+    # Starting a second process to export the Session remains unnecessary.
     text = extract_text(events)
     tools = extract_tools(events)
     actions = extract_actions(events)
