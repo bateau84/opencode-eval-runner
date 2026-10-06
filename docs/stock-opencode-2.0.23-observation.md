@@ -42,7 +42,9 @@ However, this wrapper is not the final Code Mode caller boundary. After it retur
 
 The later public `tool.execute.after` hook is also insufficient for exact correlation: every inner call reuses the outer `execute` `Tool.Context.id`. Concurrent identical inner calls therefore have the same public CallID.
 
-The exact final boundary does exist internally. `packages/codemode/src/tool-runtime.ts` invokes Code Mode's `tool.after` with a `CallResult` after the final output conversion. But `packages/core/src/codemode/tool.ts` supplies only its private `progressHooks(record)` there. Those hooks expose name/input/status for UI progress and do not export the value/error. Stock plugin APIs do not provide a supported registration point for an additional Code Mode hook.
+For successful calls, the last converted value exists internally: `packages/codemode/src/tool-runtime.ts` invokes Code Mode's `tool.after` after output validation and its JSON round trip. But `packages/core/src/codemode/tool.ts` supplies only private `progressHooks(record)` there. Those hooks expose name/input/status for UI progress and do not export the value. Stock plugin APIs do not provide a supported registration point for another Code Mode hook.
+
+Errors have an additional private step. After the tool promise fails, `packages/codemode/src/interpreter/interpreter.ts` materializes that host failure into the JavaScript error value used by a `catch` clause. No public plugin/runtime hook observes that materialized error with a unique inner invocation identity.
 
 Therefore:
 
