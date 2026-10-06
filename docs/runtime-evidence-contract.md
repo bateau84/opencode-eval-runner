@@ -88,7 +88,7 @@ For Code Mode inner calls the runner can observe, on stock 2.0.23:
 - decoded/executable input;
 - Session/message/agent;
 - the actual outer \`execute\` CallID;
-- parent binding to that outer invocation;
+- parent binding to the authoritative observed outer \\`execute\\` invocation;
 - start and handler-terminal ordering;
 - success-vs-error outcome at the handler boundary.
 
@@ -123,6 +123,7 @@ It accounts for:
 - duplicate sequence IDs;
 - terminal-without-start;
 - identity changes between start and terminal;
+- missing, dangling, or identity-mismatched Code Mode outer-parent observations;
 - unsupported boundaries;
 - assertion-scoped field availability.
 
