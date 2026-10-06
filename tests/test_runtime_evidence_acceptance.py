@@ -49,8 +49,19 @@ def native_capture():
 
 def code_capture():
     value = native_capture()
+    outer_start = {
+        **value["records"][0],
+        "tool": available("execute"),
+        "input": available({"code": "return 1"}),
+        "boundary": "tool-execute-before",
+    }
+    outer_terminal = {
+        **value["records"][1],
+        "tool": available("execute"),
+        "result": available({"content": "CODE-MODE-DONE"}),
+    }
     value["records"] = [
-        value["records"][0],
+        outer_start,
         {
             "kind": "code_start", "sequence": 2, "invocation_id": "c1",
             "tool": available("runtimeevidence_innerEcho"),
@@ -68,7 +79,7 @@ def code_capture():
             "outcome": "success", "boundary": "tool-handler-return",
             "finality": {"state": "unsupported", "reason": CODE_MODE_FINALITY_REASON},
         },
-        {**value["records"][1], "sequence": 4},
+        {**outer_terminal, "sequence": 4},
     ]
     return value
 
