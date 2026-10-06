@@ -133,6 +133,8 @@ def sequence(item: dict[str, Any], key: str) -> int | None:
 
 def actor_value(item: dict[str, Any], key: str) -> Any:
     actor = unwrap(item.get("actor"))
+    if key == "agent" and isinstance(actor, str):
+        return actor
     if isinstance(actor, dict):
         aliases = {
             "session_id": ("session_id", "sessionID", "sessionId"),
