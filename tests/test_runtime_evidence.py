@@ -215,6 +215,25 @@ class RuntimeEvidenceTests(unittest.TestCase):
         evidence = build_runtime_evidence(capture(native_start(), terminal))
         self.assertEqual(evidence["status"], "invalid")
 
+    def test_terminal_before_start_is_invalid(self):
+        evidence = build_runtime_evidence(capture(
+            native_start(seq=3),
+            native_terminal(seq=2),
+        ))
+        self.assertEqual(evidence["status"], "invalid")
+
+    def test_terminal_without_start_is_invalid(self):
+        evidence = build_runtime_evidence(capture(native_terminal()))
+        self.assertEqual(evidence["status"], "invalid")
+
+    def test_duplicate_sequence_is_invalid(self):
+        evidence = build_runtime_evidence(capture(
+            native_start("a", 1, "a"),
+            native_terminal("a", 2, "a"),
+            native_start("b", 2, "b"),
+        ))
+        self.assertEqual(evidence["status"], "invalid")
+
     def test_concurrent_identical_code_calls_correlate_by_identity_not_fifo(self):
         evidence = build_runtime_evidence(capture(
             native_start(seq=1, call="outer-call"),
