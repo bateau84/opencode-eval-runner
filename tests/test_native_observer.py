@@ -28,7 +28,9 @@ def start(call="call-1", input_value=None, message="msg-1", tool="native_one"):
 def terminal(call="call-1", message="msg-1", tool="native_one", outcome="success"):
     base = {
         "kind": "call_terminal", "tool": tool, "session_id": "ses-1", "agent": "build",
-        "message_id": message, "call_id": call, "boundary": "tool.execute.after", "outcome": outcome,
+        "message_id": message, "call_id": call,
+        "boundary": "session.tool.success" if outcome == "success" else "session.tool.failed",
+        "outcome": outcome,
     }
     if outcome == "success":
         base["result"] = available({"content": "ok"})
@@ -39,7 +41,8 @@ def terminal(call="call-1", message="msg-1", tool="native_one", outcome="success
 
 HEADER = {
     "kind": "capture_start", "version": 1, "source": "stock-opencode-2.0.23-plugin",
-    "input_boundary": "decoded-tool-execute", "terminal_boundary": "tool.execute.after",
+    "input_boundary": "decoded-tool-execute",
+    "terminal_boundary": "session.tool.success+session.tool.failed",
     "correlation": "session-message-call-id", "ordering": "observer-monotonic-sequence",
 }
 
