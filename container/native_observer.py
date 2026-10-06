@@ -42,6 +42,10 @@ def unavailable(reason: str) -> dict[str, Any]:
     return result
 
 
+def _constant(_: str) -> Any:
+    raise InvalidObservation("invalid_json_constant")
+
+
 def _object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
     result: dict[str, Any] = {}
     for key, value in pairs:
@@ -103,7 +107,11 @@ def load_native_observations(path: Path = OBSERVATION_PATH) -> dict[str, Any]:
             if ended:
                 raise InvalidObservation("records_after_capture_end")
             try:
-                event = json.loads(line.decode("utf-8"), object_pairs_hook=_object)
+                event = json.loads(
+                    line.decode("utf-8"),
+                    object_pairs_hook=_object,
+                    parse_constant=_constant,
+                )
             except (json.JSONDecodeError, UnicodeDecodeError) as exc:
                 raise InvalidObservation("malformed_capture") from exc
             if not isinstance(event, dict) or event.get("schema") != SCHEMA:
