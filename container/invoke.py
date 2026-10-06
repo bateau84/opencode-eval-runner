@@ -167,16 +167,6 @@ STDOUT_CAPTURE_LIMIT = 200000
 STDERR_CAPTURE_LIMIT = 20000
 
 
-def _tool_result_text(value: Any, limit: int) -> tuple[str, bool]:
-    text = value if isinstance(value, str) else json.dumps(value, ensure_ascii=False, sort_keys=True)
-    if len(text) <= limit:
-        return text, False
-    marker = "\n[... tool-result field truncated ...]\n"
-    retained = limit - len(marker)
-    head = retained // 2
-    return text[:head] + marker + text[-(retained - head):], True
-
-
 def extract_tool_result_evidence(
     events: list[dict[str, Any]],
     sanitizer: Sanitizer | None = None,
@@ -316,7 +306,6 @@ def extract_tool_result_evidence(
 
     evidence["events"] = recent
     evidence["safety"] = projection.summary()
-    evidence["evidence_eligible"] = evidence["safety"]["evidence_eligible"]
 
     while (
         len(json.dumps(evidence, ensure_ascii=False, separators=(",", ":")))
@@ -328,7 +317,6 @@ def extract_tool_result_evidence(
         evidence["omitted_events"] += 1
         projection.loss("size_limit")
         evidence["safety"] = projection.summary()
-        evidence["evidence_eligible"] = False
 
     return evidence
 
