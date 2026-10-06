@@ -16,6 +16,11 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
+try:
+    from .evidence_safety import OMITTED, Projection, Sanitizer
+except ImportError:
+    from evidence_safety import OMITTED, Projection, Sanitizer
+
 RESULT_SCHEMA = "opencode-eval-runner/v1"
 OPENCODE_EVAL_TITLE = "opencode-eval-runner"
 COPILOT_AGENT_NAME = "eval-runner"
@@ -160,8 +165,13 @@ def _tool_result_text(value: Any, limit: int) -> tuple[str, bool]:
     return text[:head] + marker + text[-(retained - head):], True
 
 
-def extract_tool_result_evidence(events: list[dict[str, Any]]) -> dict[str, Any]:
-    """Bound tool results from the full structured event stream before stdout clipping."""
+def extract_tool_result_evidence(
+    events: list[dict[str, Any]],
+    sanitizer: Sanitizer | None = None,
+) -> dict[str, Any]:
+    """Project tool evidence safely before any field or total-size decision."""
+    sanitizer = sanitizer or Sanitizer()
+    projection = Projection(sanitizer, stage="before_evidence_size")
     evidence: dict[str, Any] = {
         "schema": "opencode-eval-runner/tool-results/v1",
         "source": "opencode.event-stream.full",
@@ -170,44 +180,144 @@ def extract_tool_result_evidence(events: list[dict[str, Any]]) -> dict[str, Any]
         "events": [],
     }
     recent: list[dict[str, Any]] = []
+
+    def project(
+        item: dict[str, Any],
+        event_index: int,
+        field: str,
+        value: Any = OMITTED,
+        *,
+        limit: int,
+        protocol: bool = False,
+    ) -> None:
+        safe = projection.field(
+            field,
+            value,
+            event=event_index,
+            limit=limit,
+            protocol=protocol,
+        )
+        if safe is not OMITTED:
+            item[field] = safe
+
+    def drop_event_fields(sequence: int) -> None:
+        event_index = sequence - 1
+        projection.fields = [
+            field
+            for field in projection.fields
+            if field.get("event") != event_index
+        ]
+
     for event in events:
         if event.get("type") != "tool_use":
             continue
-        part = event.get("part")
-        if not isinstance(part, dict) or part.get("type") != "tool" or not isinstance(part.get("tool"), str):
-            continue
-        state = part.get("state")
-        if not isinstance(state, dict):
-            continue
+
         evidence["observed_events"] += 1
-        item: dict[str, Any] = {
-            "sequence": evidence["observed_events"],
-            "truncated_fields": [],
-        }
-        fields: dict[str, tuple[Any, int]] = {
-            "tool": (part["tool"], 256),
-            "status": (state.get("status", "unknown"), 256),
-            "input": (state.get("input", {}), 2000),
-        }
-        for key, value in (("call_id", part.get("callID")), ("session_id", event.get("sessionID"))):
-            if value is not None:
-                fields[key] = (value, 256)
-        for key in ("output", "error"):
-            if key in state:
-                fields[key] = (state[key], TOOL_RESULT_FIELD_LIMIT)
-        for key, (value, limit) in fields.items():
-            item[key], clipped = _tool_result_text(value, limit)
-            if clipped:
-                item["truncated_fields"].append(key)
+        sequence = evidence["observed_events"]
+        event_index = sequence - 1
+        item: dict[str, Any] = {"sequence": sequence}
+        part = event.get("part")
+
+        if not isinstance(part, dict):
+            reason = "missing" if part is None else "unsupported_representation"
+            for field in ("tool", "status", "input", "call_id", "session_id"):
+                projection.omit(field, reason, event=event_index)
+        else:
+            project(item, event_index, "tool", part.get("tool", OMITTED), limit=256)
+            project(
+                item,
+                event_index,
+                "call_id",
+                part.get("callID", part.get("id", OMITTED)),
+                limit=256,
+            )
+            project(
+                item,
+                event_index,
+                "session_id",
+                event.get("sessionID", event.get("sessionId", OMITTED)),
+                limit=256,
+            )
+
+            state = part.get("state", OMITTED)
+            if not isinstance(state, dict):
+                reason = "missing" if state is OMITTED else "unsupported_representation"
+                projection.omit("status", reason, event=event_index)
+                projection.omit("input", reason, event=event_index)
+            else:
+                status = state.get("status", OMITTED)
+                project(
+                    item,
+                    event_index,
+                    "status",
+                    status,
+                    limit=256,
+                    protocol=True,
+                )
+                project(
+                    item,
+                    event_index,
+                    "input",
+                    state.get("input", OMITTED),
+                    limit=2000,
+                )
+                if status == "completed":
+                    project(
+                        item,
+                        event_index,
+                        "output",
+                        state.get("output", OMITTED),
+                        limit=TOOL_RESULT_FIELD_LIMIT,
+                    )
+                elif status in {"error", "failed"}:
+                    project(
+                        item,
+                        event_index,
+                        "error",
+                        state.get("error", OMITTED),
+                        limit=TOOL_RESULT_FIELD_LIMIT,
+                    )
+                else:
+                    if "output" in state:
+                        project(
+                            item,
+                            event_index,
+                            "output",
+                            state["output"],
+                            limit=TOOL_RESULT_FIELD_LIMIT,
+                        )
+                    if "error" in state:
+                        project(
+                            item,
+                            event_index,
+                            "error",
+                            state["error"],
+                            limit=TOOL_RESULT_FIELD_LIMIT,
+                        )
+
         recent.append(item)
         if len(recent) > TOOL_RESULT_EVENT_LIMIT:
-            recent.pop(0)
+            dropped = recent.pop(0)
+            drop_event_fields(dropped["sequence"])
+            evidence["omitted_events"] += 1
+            projection.loss("event_limit")
 
     evidence["events"] = recent
-    evidence["omitted_events"] = evidence["observed_events"] - len(recent)
-    while len(json.dumps(evidence, ensure_ascii=False)) > TOOL_RESULT_TOTAL_LIMIT and evidence["events"]:
-        evidence["events"].pop(0)
+    evidence["safety"] = projection.summary()
+    evidence["evidence_eligible"] = evidence["safety"]["evidence_eligible"]
+
+    while (
+        len(json.dumps(evidence, ensure_ascii=False, separators=(",", ":")))
+        > TOOL_RESULT_TOTAL_LIMIT
+        and evidence["events"]
+    ):
+        dropped = evidence["events"].pop(0)
+        drop_event_fields(dropped["sequence"])
         evidence["omitted_events"] += 1
+        projection.loss("size_limit")
+        evidence["safety"] = projection.summary()
+        evidence["evidence_eligible"] = False
+
     return evidence
 
 
@@ -674,6 +784,50 @@ def resolve_opencode_reasoning(model: str, reasoning: str) -> tuple[str, str, st
     return model, "provider-default", "provider-default"
 
 
+RUNTIME_JSON_CREDENTIAL_SOURCES = (
+    Path("/seed/auth.json"),
+    Path("/seed/opencode.json"),
+    Path("/seed/models.json"),
+)
+RUNTIME_DATABASE_CREDENTIAL_SOURCES = (Path("/seed/opencode.db"),)
+SAFE_RESULT_PROTOCOL_FIELDS = frozenset({
+    "schema",
+    "transport",
+    "reasoning_source",
+    "exit_code",
+    "timed_out",
+    "infrastructure_error",
+    "timing",
+    "stdout_truncated",
+    "stderr_truncated",
+    "stdout_total_chars",
+    "stderr_total_chars",
+    "tool_result_evidence",
+})
+
+
+def runtime_sanitizer(env: dict[str, str]) -> Sanitizer:
+    return Sanitizer.from_runtime(
+        env,
+        json_sources=RUNTIME_JSON_CREDENTIAL_SOURCES,
+        database_sources=RUNTIME_DATABASE_CREDENTIAL_SOURCES,
+    )
+
+
+def sanitize_result_for_output(
+    result: dict[str, Any],
+    sanitizer: Sanitizer,
+) -> dict[str, Any]:
+    """Final sink guard; product status stays separate from evidence eligibility."""
+    safe: dict[str, Any] = {}
+    for key, value in result.items():
+        if key in SAFE_RESULT_PROTOCOL_FIELDS:
+            safe[key] = value
+        else:
+            safe[key] = sanitizer.output_value(value)
+    return safe
+
+
 def invoke_opencode(
     model: str,
     agent: str,
@@ -683,6 +837,7 @@ def invoke_opencode(
     reasoning: str = "",
 ) -> dict[str, Any]:
     env = prepare_opencode_env()
+    sanitizer = runtime_sanitizer(env)
     plugins = plugin_diagnostic(env)
     expected_plugin = os.environ.get("EVAL_EXPECT_PLUGIN", "").strip()
     plugin_preflight = verify_expected_plugin(env, agent, model, expected_plugin, timeout)
@@ -715,9 +870,10 @@ def invoke_opencode(
         proc = run(command, Path("/workspace"), env, timeout)
     except subprocess.TimeoutExpired as exc:
         run_seconds = time.perf_counter() - run_started
-        stdout = timeout_output(exc.stdout)
-        stderr = timeout_output(exc.stderr)
-        events = parse_events(stdout)
+        raw_stdout = timeout_output(exc.stdout)
+        raw_stderr = timeout_output(exc.stderr)
+        events = parse_events(raw_stdout)
+        safe_stdout, _ = sanitizer.json_lines(raw_stdout)
         sid = session_id(events)
         summary = last_event_summary(events)
         detail = (
@@ -725,9 +881,10 @@ def invoke_opencode(
             f"partial_events={len(events)}"
             + (f"; last_event={json.dumps(summary, sort_keys=True)}" if summary else "")
         )
-        if stderr.strip():
-            detail += "\n" + stderr.strip()
-        return {
+        if raw_stderr.strip():
+            detail += "\n" + raw_stderr.strip()
+        safe_detail, _ = sanitizer.json_lines(detail)
+        result = {
             "schema": RESULT_SCHEMA,
             "transport": "opencode",
             "model": model,
@@ -748,19 +905,22 @@ def invoke_opencode(
                 "export_exit_code": None,
                 "total_seconds": round(run_seconds, 3),
             },
-            "stderr": detail[:STDERR_CAPTURE_LIMIT],
-            "stderr_truncated": len(detail) > STDERR_CAPTURE_LIMIT,
-            "stderr_total_chars": len(detail),
-            "stdout": stdout[:STDOUT_CAPTURE_LIMIT],
-            "stdout_truncated": len(stdout) > STDOUT_CAPTURE_LIMIT,
-            "stdout_total_chars": len(stdout),
-            "tool_result_evidence": extract_tool_result_evidence(events),
+            "stderr": safe_detail[:STDERR_CAPTURE_LIMIT],
+            "stderr_truncated": len(safe_detail) > STDERR_CAPTURE_LIMIT,
+            "stderr_total_chars": len(safe_detail),
+            "stdout": safe_stdout[:STDOUT_CAPTURE_LIMIT],
+            "stdout_truncated": len(safe_stdout) > STDOUT_CAPTURE_LIMIT,
+            "stdout_total_chars": len(safe_stdout),
+            "tool_result_evidence": extract_tool_result_evidence(events, sanitizer),
             "plugin_diagnostic": plugins,
             "plugin_preflight": plugin_preflight,
         }
+        return sanitize_result_for_output(result, sanitizer)
 
     run_seconds = time.perf_counter() - run_started
     events = parse_events(proc.stdout)
+    safe_stdout, _ = sanitizer.json_lines(proc.stdout)
+    safe_stderr, _ = sanitizer.json_lines(proc.stderr)
     sid = session_id(events)
 
     # The structured `opencode run --format json` event stream is the
@@ -775,7 +935,7 @@ def invoke_opencode(
     export_seconds = 0.0
     export_exit_code: int | None = None
 
-    return {
+    result = {
         "schema": RESULT_SCHEMA,
         "transport": "opencode",
         "model": model,
@@ -795,16 +955,17 @@ def invoke_opencode(
             "export_exit_code": export_exit_code,
             "total_seconds": round(run_seconds + export_seconds, 3),
         },
-        "stderr": proc.stderr[:STDERR_CAPTURE_LIMIT],
-        "stderr_truncated": len(proc.stderr) > STDERR_CAPTURE_LIMIT,
-        "stderr_total_chars": len(proc.stderr),
-        "stdout": proc.stdout[:STDOUT_CAPTURE_LIMIT],
-        "stdout_truncated": len(proc.stdout) > STDOUT_CAPTURE_LIMIT,
-        "stdout_total_chars": len(proc.stdout),
-        "tool_result_evidence": extract_tool_result_evidence(events),
+        "stderr": safe_stderr[:STDERR_CAPTURE_LIMIT],
+        "stderr_truncated": len(safe_stderr) > STDERR_CAPTURE_LIMIT,
+        "stderr_total_chars": len(safe_stderr),
+        "stdout": safe_stdout[:STDOUT_CAPTURE_LIMIT],
+        "stdout_truncated": len(safe_stdout) > STDOUT_CAPTURE_LIMIT,
+        "stdout_total_chars": len(safe_stdout),
+        "tool_result_evidence": extract_tool_result_evidence(events, sanitizer),
         "plugin_diagnostic": plugins,
         "plugin_preflight": plugin_preflight,
     }
+    return sanitize_result_for_output(result, sanitizer)
 
 
 def copilot_auth_source(env: dict[str, str]) -> str | None:
@@ -834,9 +995,10 @@ def invoke_copilot(
     reasoning: str = "",
 ) -> dict[str, Any]:
     env = dict(os.environ)
+    sanitizer = runtime_sanitizer(env)
     auth_source = copilot_auth_source(env)
     if not auth_source:
-        return {
+        return sanitize_result_for_output({
             "schema": RESULT_SCHEMA,
             "transport": "github-copilot-cli",
             "model": model,
@@ -852,7 +1014,7 @@ def invoke_copilot(
             "skills_loaded": [],
             "stderr": "github-copilot-cli requires COPILOT_GITHUB_TOKEN, GH_TOKEN, or GITHUB_TOKEN",
             "stdout": "",
-        }
+        }, sanitizer)
 
     root = Path("/tmp/copilot")
     work = root / "work"
@@ -862,7 +1024,10 @@ def invoke_copilot(
     for path in (agent_dir, home, cache):
         path.mkdir(parents=True, exist_ok=True)
 
-    (agent_dir / f"{COPILOT_AGENT_NAME}.agent.md").write_text(copilot_profile(system), encoding="utf-8")
+    (agent_dir / f"{COPILOT_AGENT_NAME}.agent.md").write_text(
+        copilot_profile(system),
+        encoding="utf-8",
+    )
     env["COPILOT_HOME"] = str(home)
     env["COPILOT_CACHE_HOME"] = str(cache)
     env["COPILOT_AUTO_UPDATE"] = "false"
@@ -885,7 +1050,9 @@ def invoke_copilot(
         "--deny-tool", ",".join(COPILOT_DENIED_PERMISSIONS),
     ]
     proc = run(command, work, env, timeout)
-    return {
+    safe_stdout, _ = sanitizer.json_lines(proc.stdout)
+    safe_stderr, _ = sanitizer.json_lines(proc.stderr)
+    result = {
         "schema": RESULT_SCHEMA,
         "transport": "github-copilot-cli",
         "model": model,
@@ -896,21 +1063,24 @@ def invoke_copilot(
         "credential_source": auth_source,
         "exit_code": proc.returncode,
         "session_id": None,
-        "text": proc.stdout.strip() if proc.returncode == 0 else "",
+        "text": safe_stdout.strip() if proc.returncode == 0 else "",
         "tools": [],
         "actions": [],
         "skills_loaded": [],
-        "stderr": proc.stderr[:STDERR_CAPTURE_LIMIT],
-        "stderr_truncated": len(proc.stderr) > STDERR_CAPTURE_LIMIT,
-        "stderr_total_chars": len(proc.stderr),
-        "stdout": proc.stdout[:STDOUT_CAPTURE_LIMIT],
-        "stdout_truncated": len(proc.stdout) > STDOUT_CAPTURE_LIMIT,
-        "stdout_total_chars": len(proc.stdout),
+        "stderr": safe_stderr[:STDERR_CAPTURE_LIMIT],
+        "stderr_truncated": len(safe_stderr) > STDERR_CAPTURE_LIMIT,
+        "stderr_total_chars": len(safe_stderr),
+        "stdout": safe_stdout[:STDOUT_CAPTURE_LIMIT],
+        "stdout_truncated": len(safe_stdout) > STDOUT_CAPTURE_LIMIT,
+        "stdout_total_chars": len(safe_stdout),
     }
+    return sanitize_result_for_output(result, sanitizer)
 
 
 def emit_result(result: dict[str, Any]) -> None:
-    sys.stdout.write(json.dumps(result, separators=(",", ":")) + "\n")
+    sanitizer = runtime_sanitizer(dict(os.environ))
+    safe = sanitize_result_for_output(result, sanitizer)
+    sys.stdout.write(json.dumps(safe, separators=(",", ":")) + "\n")
     sys.stdout.flush()
 
 
