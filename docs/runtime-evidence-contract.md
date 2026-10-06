@@ -88,7 +88,7 @@ For Code Mode inner calls the runner can observe, on stock 2.0.23:
 - decoded/executable input;
 - Session/message/agent;
 - the actual outer \`execute\` CallID;
-- parent binding to the authoritative observed outer \\`execute\\` invocation;
+- parent binding to the authoritative observed outer `execute` invocation;
 - start and handler-terminal ordering;
 - success-vs-error outcome at the handler boundary.
 
