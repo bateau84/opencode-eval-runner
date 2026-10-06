@@ -730,6 +730,10 @@ def build_runtime_evidence(
                 })
             else:
                 accounting_events.append({})
+        elif terminal is not None:
+            # A terminal that does not follow its start is ambiguous/invalid,
+            # not merely "missing".
+            accounting_events.append({})
 
         observations.append({
             "invocation_id": invocation_id,
