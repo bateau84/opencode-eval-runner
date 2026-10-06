@@ -350,7 +350,7 @@ Authoritative runtime observations must come from reviewed instrumentation obser
 
 This profile does **not** claim resistance to an evaluated plugin that deliberately compromises the trusted runtime or instrumentation. Hostile-plugin isolation is a separate optional profile, not a prerequisite for normal Loom evaluation.
 
-See [Trusted-checkout runtime evidence](docs/trusted-checkout-evidence.md).
+See [Trusted-checkout runtime evidence](docs/trusted-checkout-evidence.md) and the [versioned runtime-evidence result contract](docs/runtime-evidence-contract.md). Until the observer lands, `runtime_evidence` is emitted as explicit `unsupported` non-evidence; existing `tools`, `actions`, `tool_result_evidence`, stdout, and similar fields remain convenience/diagnostic data only.
 
 ## Security boundary
 

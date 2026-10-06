@@ -16,7 +16,13 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
+try:
+    from .runtime_evidence import unsupported_runtime_evidence, validate_runtime_evidence
+except ImportError:  # direct container entrypoint
+    from runtime_evidence import unsupported_runtime_evidence, validate_runtime_evidence
+
 RESULT_SCHEMA = "opencode-eval-runner/v1"
+RUNTIME_EVIDENCE_UNSUPPORTED_REASON = "observer_not_implemented"
 OPENCODE_EVAL_TITLE = "opencode-eval-runner"
 COPILOT_AGENT_NAME = "eval-runner"
 COPILOT_AUTH_ENVS = ("COPILOT_GITHUB_TOKEN", "GH_TOKEN", "GITHUB_TOKEN")
@@ -161,7 +167,10 @@ def _tool_result_text(value: Any, limit: int) -> tuple[str, bool]:
 
 
 def extract_tool_result_evidence(events: list[dict[str, Any]]) -> dict[str, Any]:
-    """Bound tool results from the full structured event stream before stdout clipping."""
+    """Bound legacy tool-result diagnostics before stdout clipping.
+
+    This historical field is not authoritative runtime_evidence.
+    """
     evidence: dict[str, Any] = {
         "schema": "opencode-eval-runner/tool-results/v1",
         "source": "opencode.event-stream.full",
@@ -755,6 +764,7 @@ def invoke_opencode(
             "stdout_truncated": len(stdout) > STDOUT_CAPTURE_LIMIT,
             "stdout_total_chars": len(stdout),
             "tool_result_evidence": extract_tool_result_evidence(events),
+            "runtime_evidence": unsupported_runtime_evidence(RUNTIME_EVIDENCE_UNSUPPORTED_REASON),
             "plugin_diagnostic": plugins,
             "plugin_preflight": plugin_preflight,
         }
@@ -763,10 +773,11 @@ def invoke_opencode(
     events = parse_events(proc.stdout)
     sid = session_id(events)
 
-    # The structured `opencode run --format json` event stream is the
-    # authoritative evidence source. Starting a second OpenCode process to
-    # export the just-created session is redundant and can add a full timeout
-    # per invocation when export/session bootstrap fails. Keep eval latency
+    # The structured `opencode run --format json` event stream remains useful for
+    # product/convenience projections (`text`, `tools`, `actions`, and legacy
+    # `tool_result_evidence`). It is not authoritative `runtime_evidence`. Starting
+    # a second OpenCode process to export the just-created session is redundant and
+    # can add a full timeout per invocation when export/session bootstrap fails. Keep eval latency
     # bound to the requested target/judge execution only.
     text = extract_text(events)
     tools = extract_tools(events)
@@ -802,6 +813,7 @@ def invoke_opencode(
         "stdout_truncated": len(proc.stdout) > STDOUT_CAPTURE_LIMIT,
         "stdout_total_chars": len(proc.stdout),
         "tool_result_evidence": extract_tool_result_evidence(events),
+        "runtime_evidence": unsupported_runtime_evidence(RUNTIME_EVIDENCE_UNSUPPORTED_REASON),
         "plugin_diagnostic": plugins,
         "plugin_preflight": plugin_preflight,
     }
@@ -852,6 +864,7 @@ def invoke_copilot(
             "skills_loaded": [],
             "stderr": "github-copilot-cli requires COPILOT_GITHUB_TOKEN, GH_TOKEN, or GITHUB_TOKEN",
             "stdout": "",
+            "runtime_evidence": unsupported_runtime_evidence(RUNTIME_EVIDENCE_UNSUPPORTED_REASON),
         }
 
     root = Path("/tmp/copilot")
@@ -906,10 +919,12 @@ def invoke_copilot(
         "stdout": proc.stdout[:STDOUT_CAPTURE_LIMIT],
         "stdout_truncated": len(proc.stdout) > STDOUT_CAPTURE_LIMIT,
         "stdout_total_chars": len(proc.stdout),
+        "runtime_evidence": unsupported_runtime_evidence(RUNTIME_EVIDENCE_UNSUPPORTED_REASON),
     }
 
 
 def emit_result(result: dict[str, Any]) -> None:
+    validate_runtime_evidence(result.get("runtime_evidence"))
     sys.stdout.write(json.dumps(result, separators=(",", ":")) + "\n")
     sys.stdout.flush()
 
@@ -951,6 +966,7 @@ def main() -> int:
             "skills_loaded": [],
             "stderr": f"{type(exc).__name__}: {exc}",
             "stdout": "",
+            "runtime_evidence": unsupported_runtime_evidence(RUNTIME_EVIDENCE_UNSUPPORTED_REASON),
             "infrastructure_error": True,
         }
         emit_result(result)

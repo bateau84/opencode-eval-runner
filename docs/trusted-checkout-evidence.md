@@ -23,6 +23,8 @@ Required observations MUST preserve enough runtime identity and ordering to eval
 
 Missing, partial, ambiguous, lost, or unsupported required observations MUST make the affected assertion ineligible for PASS. The runner MUST NOT fill gaps from model text, stdout, workspace files, or guessed correlations.
 
+The concrete versioned result shape and fail-closed rules are defined in [Runtime evidence result contract](runtime-evidence-contract.md). Until the observer is implemented, the runner emits `runtime_evidence.status: unsupported` with unknown coverage counts explicitly marked `unsupported`; it does not turn unknown into zero.
+
 The trusted-checkout profile does not claim protection against malicious modification of the runner, stock OpenCode process, reviewed instrumentation, evaluated checkout, or their dependencies.
 
 ## Trust model
@@ -37,6 +39,7 @@ Trusted components:
 
 Not trusted as evidence authority:
 
+- legacy `tool_result_evidence`, `tools`, `actions`, stdout/stderr, and other product/diagnostic projections;
 - model output;
 - agent claims;
 - tool-returned collector-shaped data;
