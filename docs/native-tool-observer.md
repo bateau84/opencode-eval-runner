@@ -21,13 +21,13 @@ For tools whose effective definition has `options.codemode === false`:
    - assistant message ID;
    - real tool call ID;
    - the decoded input actually passed to the tool.
-4. The runner-owned `tool.execute.after` hook records a **terminal** with the same identity plus:
-   - `success` and the stock completed result; or
-   - `failure` and the stock `Tool.Error` representation.
+4. A runner-owned `ctx.event.subscribe()` consumer records the stock Session terminal:
+   - `session.tool.success` with the canonical post-truncation content/metadata; or
+   - `session.tool.failed` with the canonical Session error representation.
 
-Stock 2.0.23 loads inline `OPENCODE_CONFIG_CONTENT` after project/global config sources. The runner registers the observer there so its transform and terminal hook are last among evaluated local plugins.
+Stock 2.0.23 loads inline `OPENCODE_CONFIG_CONTENT` after project/global config sources. The runner registers the observer there so its tool transform is applied after evaluated local plugin transforms rather than depending on filename order.
 
-The terminal boundary is deliberately stated precisely: it is the last plugin `tool.execute.after` representation after stock execution/output validation. Later stock image/session projection is not claimed by this observer.
+The terminal boundary is deliberately Session-owned. This matters for failures: a Promise-plugin rejection can escape before `tool.execute.after`, while the stock Session runner still settles the real call with `session.tool.failed`. Success is likewise taken from `session.tool.success` after stock output truncation, so the observer does not reconstruct a later result from an earlier hook.
 
 ## Correlation and ordering
 
