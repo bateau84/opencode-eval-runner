@@ -374,11 +374,11 @@ export default {
               write({
                 kind: "code_terminal",
                 invocation_id: invocationID,
-                tool: item.id,
-                session_id: context.sessionID,
-                agent: context.agent,
-                message_id: context.messageID,
-                call_id: context.id,
+                tool: project(item.id),
+                session_id: project(context.sessionID),
+                agent: project(context.agent),
+                message_id: project(context.messageID),
+                call_id: project(context.id),
                 outcome: "error",
                 boundary: "tool-handler-throw",
                 finality: {
