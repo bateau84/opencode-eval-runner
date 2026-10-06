@@ -32,7 +32,15 @@ jobs:
 
       - name: Run provider-free native observer probe
         run: |
-          docker run --rm             --network none             --tmpfs /tmp:rw,exec,nosuid,nodev,size=1g,mode=1777             --tmpfs /workspace:rw,nosuid,nodev,size=64m,mode=1777             --volume "$PWD:/probe-repo:ro"             --entrypoint python3             opencode-eval-runner:native-observer-probe             /probe-repo/tests/integration/run_native_observer_probe.py             > native-observer-probe.json
+          docker run --rm \
+            --network none \
+            --tmpfs /tmp:rw,exec,nosuid,nodev,size=1g,mode=1777 \
+            --tmpfs /workspace:rw,nosuid,nodev,size=64m,mode=1777 \
+            --volume "$PWD:/probe-repo:ro" \
+            --entrypoint python3 \
+            opencode-eval-runner:native-observer-probe \
+            /probe-repo/tests/integration/run_native_observer_probe.py \
+            > native-observer-probe.json
           cat native-observer-probe.json
 
       - name: Preserve probe report
