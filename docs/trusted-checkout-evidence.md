@@ -29,7 +29,7 @@ Loom eval harness
   -> stock OpenCode 2.0.23
      + runner-owned same-process observer
      + trusted evaluated checkout
-  -> sanitized internal observer capture
+  -> sanitized runner-owned one-connection observer stream
   -> canonical runtime_evidence v1 builder/validator
   -> one runner result
   -> host-side v1 revalidation
@@ -53,7 +53,7 @@ The integrated stock observer uses:
 - Session lookup for delegated-session ancestry;
 - monotonic observer ordering.
 
-It does not use FIFO, input equality, or completion order to correlate calls.
+It does not use FIFO, input equality, or completion order to correlate calls. Observer records cross the process boundary through a runner-owned one-connection loopback stream. The listener closes after the trusted observer connects and the endpoint is removed from the process environment before evaluated tool subprocesses run; target-writable `/tmp` files are not evidence inputs.
 
 A tool/product error does not automatically make evidence incomplete. Evidence completeness and product outcome are separate.
 
