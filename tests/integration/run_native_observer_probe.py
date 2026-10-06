@@ -175,7 +175,10 @@ def inside() -> int:
             isinstance(r.get("start_sequence"), int) and isinstance(r.get("terminal_sequence"), int)
             and r["start_sequence"] < r["terminal_sequence"] for r in records
         ),
-        "two_call_ordering": len(records) == 3 and records[0]["terminal_sequence"] < records[1]["start_sequence"]
+        "two_call_ordering": len(records) == 3
+            and all(isinstance(records[index].get("terminal_sequence"), int) for index in (0, 1))
+            and all(isinstance(records[index].get("start_sequence"), int) for index in (1, 2))
+            and records[0]["terminal_sequence"] < records[1]["start_sequence"]
             and records[1]["terminal_sequence"] < records[2]["start_sequence"],
         "no_observer_retry": len(requests) == 4,
         "collector_shaped_payload_not_promoted": len(records) == 3,
