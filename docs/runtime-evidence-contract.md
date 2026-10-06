@@ -176,6 +176,7 @@ These are current adapter safety limits, not provider or model guarantees.
 The outer result schema remains `opencode-eval-runner/v1`, but `runtime_evidence` is now mandatory. The host CLI validates it after container execution and rejects a result that omits it or violates this v1 contract.
 
 Official OpenCode and Copilot images in this revision emit the required object. A legacy or custom image built against the older result shape must be upgraded together with the host runner. This does not require any OpenCode modification: the supported OpenCode profile uses stock 2.0.23. Copilot results satisfy the result-shape requirement by reporting runtime evidence as explicitly `unsupported`.
+
 ## Unsupported areas
 
 - \`code_mode_finality\`: stock OpenCode 2.0.23 does not expose the exact final value/error seen by each Code Mode script call.
