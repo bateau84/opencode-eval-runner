@@ -400,7 +400,6 @@ class Projection:
         return {
             "schema": SCHEMA,
             "inventory_complete": self.sanitizer.inventory_complete,
-            "evidence_eligible": self.sanitizer.inventory_complete and not losses,
             "fields": self.fields,
             "losses": losses,
         }
