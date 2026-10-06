@@ -308,7 +308,7 @@ def prepare_opencode_env() -> dict[str, str]:
         )
     observer_root = config / "eval-native-observer"
     observer_root.mkdir(parents=True, exist_ok=True)
-    shutil.copyfile(Path(__file__).with_name("native_observer.ts"), observer_root / "index.ts")
+    shutil.copyfile(Path(__file__).with_name("native_observer.ts"), observer_root / "server.ts")
 
     if seed_config_root.is_dir():
         # Loom itself can be an OpenCode global config root. OpenCode 2.0.11's
@@ -665,7 +665,7 @@ def plugin_diagnostic(env: dict[str, str]) -> dict[str, Any]:
         "loom_index_exists": (loom_root / "index.ts").is_file(),
         "loom_flat_exists": loom_flat.is_file(),
         "loom_module_index_exists": (loom_module_root / "index.ts").is_file(),
-        "native_observer_exists": (observer_root / "index.ts").is_file(),
+        "native_observer_exists": (observer_root / "server.ts").is_file(),
         "native_observer_inline_configured": "eval-native-observer" in env.get("OPENCODE_CONFIG_CONTENT", ""),
     }
 
