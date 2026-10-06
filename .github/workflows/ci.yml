@@ -16,7 +16,7 @@ jobs:
 
       - name: Python checks
         run: |
-          python3 -m py_compile runner/cli.py container/invoke.py
+          python3 -m py_compile runner/cli.py container/invoke.py tests/integration/run_code_mode_observer_probe.py
           python3 -m unittest discover -s tests -p 'test_*.py'
 
       - name: Build fake Copilot transport for action smoke test
@@ -68,6 +68,12 @@ jobs:
 
       - name: Build OpenCode transport image
         run: docker build -f Containerfile --target opencode -t opencode-eval-runner:opencode-test .
+
+      - name: Probe stock Code Mode inner observation boundary
+        run: |
+          python3 tests/integration/run_code_mode_observer_probe.py \
+            --image opencode-eval-runner:opencode-test \
+            --output /tmp/code-mode-observer-probe
 
       - name: Build Copilot transport image
         run: docker build -f Containerfile --target copilot -t opencode-eval-runner:copilot-test .
