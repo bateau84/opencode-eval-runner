@@ -92,23 +92,31 @@ Using input equality, FIFO order, object identity, or completion order to join
 this hook back to wrapper records would invent a correlation contract that stock
 OpenCode does not provide.
 
-### 3. Private Code Mode `tool.after`
+### 3. Private Code Mode terminal and catch materialization
 
-The exact final inner boundary exists inside `@opencode/codemode`.
+The last success-value boundary exists inside `@opencode/codemode`.
 
 In `packages/codemode/src/tool-runtime.ts`, `hooked(...)` runs
 `hooks["tool.after"]` from `Effect.onExit` around the Code Mode execution body.
 For a successful call, this happens after output decoding and the JSON
-stringify/parse round trip. Its `CallResult` contains the actual success value,
-failure error, or interruption.
+stringify/parse round trip, so its `CallResult.value` is the plain value that the
+tool promise will deliver into the interpreter.
 
 However, `packages/core/src/codemode/tool.ts` constructs Code Mode with only
 OpenCode's private `progressHooks(record)`. That hook uses the internal call
 object only to update UI rows and publishes name/input/status. It does **not**
-publish the final value/error, and stock plugin APIs provide no supported way to
-add another Code Mode hook there.
+publish the success value, and stock plugin APIs provide no supported way to add
+another Code Mode hook there.
 
-That is the missing boundary.
+The error path is later still. A failed tool promise reaches the interpreter and
+`packages/codemode/src/interpreter/interpreter.ts` materializes the failure into
+the JavaScript error value bound by a `catch` clause. There is no plugin/runtime
+hook at that materialization boundary either. The private Code Mode `tool.after`
+can see the host-side failure before this conversion, but that is not the exact
+JavaScript error object seen by the script.
+
+So stock exposes neither the final success value with public unique correlation
+nor the final catch-path error representation. Those are the missing boundaries.
 
 ## PR #41 reuse decision
 
@@ -174,6 +182,7 @@ surfaces, so the partial records must not be promoted as proof of the final
 caller-visible value/error.
 
 A future stock OpenCode API could make this capability supported by exposing the
-internal Code Mode per-call identity and final `CallResult` to plugins, or by
-allowing a supported Code Mode hook to be registered at that boundary. Until
-then, the correct runner result is `unsupported`.
+internal Code Mode per-call identity and post-conversion success value to plugins,
+plus the materialized catch-path error value (or one supported terminal event that
+carries both forms with the same invocation identity). Until then, the correct
+runner result is `unsupported`.
