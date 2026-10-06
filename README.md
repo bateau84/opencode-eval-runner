@@ -74,6 +74,14 @@ Additional variables require explicit `--env NAME`.
 
 Reasoning can be pinned explicitly with `--reasoning LEVEL`. The pinned stock OpenCode 2.0.23 CLI represents a model variant in the model reference, so the runner maps `--model provider/model --reasoning LEVEL` to `opencode run --model provider/model#LEVEL`. Supplying both a `#variant` in `--model` and `--reasoning` is rejected as ambiguous. If the model reference already contains a variant and `--reasoning` is omitted, the result records that variant with `"reasoning_source": "model-variant"`. If neither form supplies a level, the runner leaves OpenCode's provider/model default untouched and records `"reasoning": "provider-default"`.
 
+### Native tool runtime observations
+
+OpenCode results also include `native_tool_observations` for native/direct tools on the pinned stock 2.0.23 runtime. A runner-owned in-process plugin records decoded executable input at the tool implementation boundary and correlates it with the final runner-owned `tool.execute.after` success/failure using the exact Session/message/call identity.
+
+This field is fail-closed: missing capture, observer loss, missing terminals, sequence gaps, invalid fields, or incomplete shutdown make `evidence_eligible` false. Model text and tool-returned collector-shaped JSON are never parsed into this projection.
+
+See `docs/native-tool-observer.md` for the exact boundary and limitations. Code Mode inner calls are not covered by this native observer.
+
 ### `github-copilot-cli`
 
 Use this for pure model/role/judge execution when OpenCode runtime tools are not required.
