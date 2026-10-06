@@ -749,6 +749,18 @@ class OpenCodeTransportTests(unittest.TestCase):
             self.assertIn(expected, containerfile)
 
 
+    def test_runtime_injects_canonical_observer_as_final_inline_plugin(self):
+        invoke = (Path(__file__).resolve().parents[1] / "container" / "invoke.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn('observer_root = config / "eval-runtime-observer"', invoke)
+        self.assertIn('Path(__file__).with_name("native_observer.ts")', invoke)
+        self.assertIn('observer_root / "server.ts"', invoke)
+        self.assertIn('"OPENCODE_CONFIG_CONTENT": json.dumps({"plugins": [observer_root.as_uri()]})', invoke)
+        self.assertIn("OBSERVATION_PATH.unlink(missing_ok=True)", invoke)
+        self.assertIn('"runtime_evidence": runtime_evidence', invoke)
+        self.assertNotIn('"native_tool_observations"', invoke)
+
     def test_runtime_exposes_seeded_global_plugins(self):
         invoke = (Path(__file__).resolve().parents[1] / "container" / "invoke.py").read_text(
             encoding="utf-8"

@@ -11,6 +11,8 @@ import sys
 import tempfile
 from pathlib import Path
 
+from container.runtime_evidence import RuntimeEvidenceError, validate_runtime_evidence
+
 DEFAULT_IMAGES = {
     "opencode": "ghcr.io/bateau84/opencode-eval-runner:opencode-edge",
     "github-copilot-cli": "ghcr.io/bateau84/opencode-eval-runner:copilot-edge",
@@ -32,6 +34,17 @@ RUNTIME_GID = 1000
 
 class RunnerError(RuntimeError):
     pass
+
+
+def validate_container_result(result: object) -> dict:
+    """Reject result objects that cannot carry contracted runtime evidence."""
+    if not isinstance(result, dict):
+        raise RunnerError("container result must be a JSON object")
+    try:
+        validate_runtime_evidence(result.get("runtime_evidence"))
+    except RuntimeEvidenceError as exc:
+        raise RunnerError(f"container result has invalid runtime_evidence: {exc}") from exc
+    return result
 
 
 def default_auth_path() -> Path:
@@ -381,8 +394,7 @@ def invoke(args: argparse.Namespace) -> int:
                 + (f": {detail[:2000]}" if detail else "")
             ) from exc
 
-        if not isinstance(result, dict):
-            raise RunnerError("container result must be a JSON object")
+        result = validate_container_result(result)
 
         result_host.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
         if args.print_result:

@@ -1,127 +1,168 @@
 # Trusted-checkout runtime evidence
 
-Status: **replacement direction for TRUST-001**.
+Status: **implemented integration on PR #45**.
 
-This document supersedes the hostile-runtime direction explored in PR #41 and PR #43. Those PRs remain useful research/reference material, but normal Loom evaluation does not require the runner to defend itself from a deliberately malicious Loom checkout that shares its runtime authority.
+This document supersedes the hostile-runtime direction explored in PR #41 and PR #43 for normal Loom evaluation.
 
-## Contract
+## TRUST-001 scope
 
-### TRUST-001 — authoritative runtime observation
+For evaluation of an explicitly trusted checkout, evidence used for scoring must originate from reviewed runtime instrumentation observing actual execution.
 
-For evaluation of an explicitly trusted checkout, evidence used for scoring MUST originate from reviewed runtime instrumentation observing actual execution.
-
-The following MUST NOT independently establish that an event occurred:
+The following do not independently establish that an event occurred:
 
 - model assertions or generated prose;
 - tool payloads shaped like collector/evidence records;
-- requested or intended actions;
-- inferred actor, parent, or execution identity;
+- requested/intended actions;
+- inferred identity;
 - reconstructed results;
 - target-writable evidence files.
 
-Required observations MUST preserve enough runtime identity and ordering to evaluate the consumer contract, including actor/session/call identity, input, result or error, parent binding where applicable, and execution order.
+Missing, partial, ambiguous, lost, or unsupported required observations make the affected assertion ineligible for PASS.
 
-Missing, partial, ambiguous, lost, or unsupported required observations MUST make the affected assertion ineligible for PASS. The runner MUST NOT fill gaps from model text, stdout, workspace files, or guessed correlations.
+The normal profile does not claim protection from a deliberately malicious evaluated plugin that compromises the shared trusted OpenCode process. Hostile-plugin isolation is a separate optional profile.
 
-The trusted-checkout profile does not claim protection against malicious modification of the runner, stock OpenCode process, reviewed instrumentation, evaluated checkout, or their dependencies.
+## Integrated architecture
 
-## Trust model
-
-Trusted components:
-
-- the selected `opencode-eval-runner` revision;
-- pinned **stock OpenCode 2.0.23**;
-- reviewed runtime instrumentation;
-- the explicitly selected Loom checkout and its reviewed dependencies;
-- host-side evidence projection/persistence code.
-
-Not trusted as evidence authority:
-
-- model output;
-- agent claims;
-- tool-returned collector-shaped data;
-- normal product/session/workspace files;
-- caller-supplied identity or completeness claims.
-
-This is an evaluation-correctness boundary, not a hostile-code security boundary.
-
-## Required evidence behavior
-
-The target behavior remains strict even though the security scope is smaller:
-
-- **Native calls:** observe the actual runtime call, actor/session/call identity, accepted/executable input, and terminal result/error.
-- **Code Mode inner calls:** assign a unique runtime observation identity per actual inner invocation, bind it to the real outer `execute` call, and observe the final value/error that Code Mode exposes to the script.
-- **Delegation:** derive child Session identity and ancestry from runtime facts, not a parent result payload.
-- **Ordering:** preserve runtime observation order; do not correlate concurrent calls by FIFO or input equality.
-- **Completeness:** explicitly report missing starts/terminals, capture loss, unsupported boundaries, and incomplete scope.
-- **Confidentiality:** redact or omit credentials before the runner first persists, clips, logs, or exports evidence.
-- **Noninterference:** observation must not add product retries or change normal Loom execution semantics.
-
-If stock OpenCode's supported interfaces cannot expose an exact required boundary, the result is `unsupported`/ineligible for that assertion. The response is not to invent evidence and not to turn the normal profile into a hostile-code isolation project.
-
-## Implementation direction
-
-Keep the normal path:
-
-```text
+\`\`\`text
 Loom eval harness
   -> opencode-eval-runner invoke
   -> stock OpenCode 2.0.23
-     + reviewed runner-owned observation instrumentation
-     + trusted Loom checkout
-  -> safe host projection
+     + runner-owned same-process observer
+     + trusted evaluated checkout
+  -> sanitized internal observer capture
+  -> canonical runtime_evidence v1 builder/validator
+  -> one runner result
+  -> host-side v1 revalidation
   -> Loom judging
-```
+\`\`\`
 
-The preferred implementation is same-process reviewed instrumentation using supported stock OpenCode plugin/runtime surfaces. It may use a runner-owned observer plugin, tool/session hooks, live runtime events, and reviewed wrappers where those surfaces preserve the required boundary.
+The public authority is only:
 
-OpenCode source patches, forks, remote PluginHost isolation, evidence signing, and a capability broker are not requirements of this profile.
+\`opencode-eval-runner/runtime-evidence/v1\`
 
-Provider-free integration tests must prove the exact observation/correlation behavior before a field becomes eligible evidence.
+There is no public \`native_tool_observations\` or \`evidence_accounting\` authority. Existing \`tools\`, \`actions\`, \`tool_result_evidence\`, stdout/stderr, model text, and similar fields remain convenience/diagnostic data.
 
-See [Stock OpenCode 2.0.23 observation surface](stock-opencode-2.0.23-observation.md) for the retained source/capability findings from PR #43.
+## Native boundary
 
-## Reuse from PR #41
+The integrated stock observer uses:
 
-| Work | Disposition |
-| --- | --- |
-| Evidence-safety projection/redaction and fail-closed field handling | **Reuse/adapt**; keep the behavior, decouple it from hostile-runtime image/signing assumptions |
-| Credential protection before host/file/print sinks | **Reuse** |
-| Disposable OpenCode state/profile work | **Reuse where useful** for deterministic eval isolation |
-| Normal `invoke` compatibility and provider-free integration probes | **Reuse/adapt** to stock 2.0.23 |
-| Native/Code Mode observation schemas and concurrency tests | **Reuse as behavioral requirements/tests** |
-| Delegated-session identity/ancestry probes | **Reuse** |
-| Patched OpenCode runtime | **Drop** |
-| HMAC observer/import trust boundary | **Drop** for the normal profile |
-| protected-channel / remote tool service | **Drop** |
-| plugin isolation / remote PluginHost work | **Drop** |
-| Cosign evidence-authenticity machinery | **Drop** as a TRUST-001 prerequisite |
-| adversarial same-authority attack tests | **Move to optional future untrusted profile** |
+- a transformed decoded \`tool.execute\` wrapper for the actual executable input;
+- Session-owned \`session.tool.success\` / \`session.tool.failed\` events for terminal success/error;
+- identity-based correlation using Session/message/CallID internally;
+- an opaque public invocation identity;
+- Session lookup for delegated-session ancestry;
+- monotonic observer ordering.
 
-## Reuse from PR #43
+It does not use FIFO, input equality, or completion order to correlate calls.
 
-| Work | Disposition |
-| --- | --- |
-| Stock OpenCode 2.0.23 source/capability assessment | **Reuse** |
-| Identification of public Session/event/tool surfaces | **Reuse** |
-| Scope/completeness rules that prevent false absence/PASS | **Reuse and simplify** |
-| First-sink confidentiality inventory | **Reuse and simplify** |
-| Loom callback/capability inventory | **Reference when needed for compatibility** |
-| hostile-runtime TCB/authority model | **Drop** from the normal profile |
-| isolated Loom execution domain | **Drop** |
-| capability/evidence-channel peer-authentication requirements | **Drop** |
-| OCI adversarial boundary experiment/gates | **Drop** |
+A tool/product error does not automatically make evidence incomplete. Evidence completeness and product outcome are separate.
 
-## Implementation sequence
+## Code Mode boundary
 
-This is normal engineering work, not a multi-authorization security experiment:
+The stock 2.0.23 experiment proved a useful partial boundary.
 
-1. Pin and verify stock OpenCode 2.0.23.
-2. Add the smallest reviewed observation instrumentation that can capture native and Code Mode execution without changing product semantics.
-3. Port the useful PR #41 evidence-safety projection so captured values are protected before persistence/export.
-4. Add explicit completeness/loss fields and fail closed when required data is missing.
-5. Exercise direct, Code Mode, delegation, error, timeout, and concurrent reverse-completion cases provider-free.
-6. Compose through Loom's existing `eval:live -> run-evals.py -> invoke` path.
-7. Only after those checks pass should Loom consume the new evidence schema for PASS/FAIL decisions.
+Supported:
 
-A future **untrusted-plugin execution profile** may add isolation if there is a real need to evaluate hostile plugin code. It must remain optional and separate from the normal trusted-checkout path.
+- unique execution identity for each inner call;
+- actual selected tool;
+- decoded/executable input;
+- Session/message/agent;
+- actual outer \`execute\` CallID and parent invocation binding;
+- start and handler-terminal ordering;
+- concurrency and reverse completion identity;
+- handler success-vs-error outcome.
+
+Unsupported:
+
+- exact final success value delivered to the Code Mode script;
+- exact final error representation seen by the script catch path.
+
+The public contract therefore keeps:
+
+\`code_mode_execution: complete\`
+
+when those supported facts are complete, while reporting:
+
+\`code_mode_finality: unsupported\`
+
+No earlier transform-wrapper value/error is promoted as caller-final evidence.
+
+> Stock OpenCode 2.0.23 does not expose a supported boundary that proves the exact final value/error seen by a Code Mode script for each inner call. That assertion is reported as unsupported.
+
+## Completeness and assertion eligibility
+
+The canonical runtime-evidence implementation folds in the useful accounting behavior from PR #46:
+
+- explicit \`complete | incomplete | unsupported | invalid\`;
+- capture closure;
+- missing terminals;
+- observer/callback failures;
+- timeout/interruption;
+- malformed and duplicate observations;
+- identity ambiguity;
+- per-boundary coverage;
+- assertion-scoped eligibility.
+
+An unsupported boundary does not poison an unrelated complete boundary.
+
+A redacted or omitted field also does not make an unrelated assertion fail. An assertion that requires that exact field remains ineligible.
+
+Unknown coverage is represented as unknown field state, never numeric zero.
+
+## Evidence safety
+
+The evidence-safety work from PR #47 is applied before authoritative observation persistence and output sinks.
+
+\`\`\`text
+raw value in observer memory
+  -> sanitize/redact/omit
+  -> size decision
+  -> internal capture
+  -> canonical validation/accounting
+  -> result serialization
+  -> stdout/file persistence
+\`\`\`
+
+Public field states are only:
+
+- \`available\`
+- \`redacted\`
+- \`omitted\`
+- \`unsupported\`
+
+The internal safety helper does not expose a competing \`exact\` public vocabulary.
+
+Product \`exit_code\`, timeout, and product success/failure remain separate from evidence eligibility.
+
+## Provider-free gates
+
+PR #45 carries provider-free tests for:
+
+- native success;
+- native error;
+- executable input;
+- actor/Session/message/CallID identity;
+- Code Mode observed facts;
+- explicit unsupported Code Mode finality;
+- concurrent identical calls with reverse completion;
+- foreground delegated Session ancestry;
+- incomplete/missing terminal;
+- timeout;
+- credential redaction before output;
+- collector-shaped model/tool payload rejection.
+
+The diagnostic Code Mode probe remains as the stock-runtime proof for the unsupported final boundary.
+
+## Out of scope
+
+The integrated normal profile does not introduce:
+
+- OpenCode patch/fork;
+- remote PluginHost;
+- protected channel;
+- HMAC or signing trust boundary;
+- Cosign requirement;
+- capability broker;
+- hostile-plugin isolation.
+
+Those remain optional future work only if Loom later needs to evaluate actively hostile plugin code.
