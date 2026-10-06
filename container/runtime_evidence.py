@@ -551,6 +551,43 @@ def _parent(start: Mapping[str, Any]) -> dict[str, Any]:
     return field_unavailable("omitted", "session_parent_unavailable")
 
 
+def _available_string(raw: Any) -> str | None:
+    if (
+        isinstance(raw, Mapping)
+        and raw.get("state") == "available"
+        and set(raw) == {"state", "value"}
+        and type(raw.get("value")) is str
+        and raw["value"]
+    ):
+        return raw["value"]
+    return None
+
+
+def _code_parent_is_observed(
+    start: Mapping[str, Any],
+    starts: Mapping[str, Mapping[str, Any]],
+) -> bool:
+    parent_id = start.get("parent_invocation_id")
+    if type(parent_id) is not str or not parent_id:
+        return False
+    outer = starts.get(parent_id)
+    if not isinstance(outer, Mapping) or outer.get("kind") != "native_start":
+        return False
+    if outer.get("boundary") != "tool-execute-before":
+        return False
+    outer_sequence = outer.get("sequence")
+    child_sequence = start.get("sequence")
+    if type(outer_sequence) is not int or type(child_sequence) is not int or outer_sequence >= child_sequence:
+        return False
+    outer_tool = _available_string(outer.get("tool"))
+    if outer_tool is not None and outer_tool != "execute":
+        return False
+    return all(
+        outer.get(name) == start.get(name)
+        for name in ("session_id", "agent", "message_id", "call_id")
+    )
+
+
 def _capture_issue_kind(code: str) -> str:
     if code in {
         "malformed_capture",
@@ -635,6 +672,11 @@ def build_runtime_evidence(
     for invocation_id, start in sorted(starts.items(), key=lambda item: item[1]["sequence"]):
         mode = "native" if start.get("kind") == "native_start" else "code_mode"
         boundary = BOUNDARY_NATIVE if mode == "native" else BOUNDARY_CODE_MODE_EXECUTION
+        if mode == "code_mode" and not _code_parent_is_observed(start, starts):
+            # A Code Mode parent is authoritative only when it resolves to the
+            # observed model-facing outer execute invocation with the same
+            # runtime identity. A dangling opaque token is invalid evidence.
+            accounting_events.append({})
         terminal = terminals.get(invocation_id)
         expected_terminal = "native_terminal" if mode == "native" else "code_terminal"
         if terminal is not None and terminal.get("kind") != expected_terminal:
@@ -896,6 +938,7 @@ def validate_runtime_evidence(raw: Any) -> dict[str, Any]:
     previous_start = -1
     terminal_count = 0
     reconstructed: list[dict[str, Any]] = []
+    validated_by_id: dict[str, Mapping[str, Any]] = {}
 
     for index, observation in enumerate(evidence["observations"]):
         where = f"runtime_evidence.observations[{index}]"
@@ -916,6 +959,26 @@ def validate_runtime_evidence(raw: Any) -> dict[str, Any]:
             _string(parent["id"], f"{where}.parent.value.id")
         if mode == "code_mode":
             required["parent"] = parent_state
+            if status != "invalid":
+                _require(
+                    parent_state == "available"
+                    and isinstance(parent, dict)
+                    and parent.get("kind") == "invocation",
+                    f"{where}.parent must identify an observed outer invocation",
+                )
+                outer = validated_by_id.get(parent["id"])
+                _require(
+                    isinstance(outer, Mapping) and outer.get("mode") == "native",
+                    f"{where}.parent must reference an earlier native observation",
+                )
+                outer_tool_state, outer_tool = _field(outer.get("tool"), f"{where}.parent.outer.tool")
+                if outer_tool_state == "available":
+                    _require(outer_tool == "execute", f"{where}.parent must reference outer execute")
+                for identity_name in ("actor", "session_id", "message_id", "call_id"):
+                    _require(
+                        outer.get(identity_name) == observation.get(identity_name),
+                        f"{where}.parent outer identity does not match {identity_name}",
+                    )
 
         start_sequence = observation["start_sequence"]
         _require(type(start_sequence) is int and start_sequence >= 0, f"{where}.start_sequence must be >= 0")
@@ -940,6 +1003,7 @@ def validate_runtime_evidence(raw: Any) -> dict[str, Any]:
         )
         if outcome == "missing":
             _require(terminal_state == result_state == error_state == "omitted", f"{where} missing terminal must be explicit")
+            validated_by_id[invocation_id] = observation
             continue
         _require(terminal_state == "available" and terminal_sequence > start_sequence, f"{where}.terminal_sequence must follow start")
         _require(terminal_sequence not in seen_sequences, f"{where}.terminal_sequence must be unique")
@@ -964,6 +1028,7 @@ def validate_runtime_evidence(raw: Any) -> dict[str, Any]:
             "boundary": boundary,
             "required_fields": terminal_required,
         })
+        validated_by_id[invocation_id] = observation
 
     if aggregate_available:
         _require(starts == len(evidence["observations"]), "coverage starts does not match observations")

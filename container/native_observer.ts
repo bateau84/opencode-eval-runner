@@ -258,7 +258,7 @@ export default {
       kind: "capture_start",
       version: 1,
       source: "stock-opencode-2.0.23-plugin",
-      native_input_boundary: "decoded-tool-execute",
+      native_input_boundary: "decoded-tool-execute+outer-execute-before",
       native_terminal_boundary: "session.tool.success+session.tool.failed",
       code_input_boundary: "decoded-code-tool-handler",
       code_terminal_boundary: "tool-handler-return+tool-handler-throw",
@@ -395,25 +395,53 @@ export default {
       }
     })
 
-    // Public hooks are used only to bind inner calls to the actual outer
-    // execute CallID. They are not Code Mode final-result evidence.
-    await ctx.tool.hook("execute.before", (event: any) => {
+    // The synthetic Code Mode execute tool is created inside Tool.snapshot,
+    // after registration transforms have run. Observe that real model-facing
+    // invocation at the stock execute.before runtime hook so it cannot vanish
+    // from the native boundary. This is an exact observed effective input, but
+    // unlike transformed registered tools it is before CodeMode.Input decode.
+    await ctx.tool.hook("execute.before", async (event: any) => {
       if (event?.tool !== "execute") return
       if (
-        typeof event.sessionID === "string" &&
-        typeof event.messageID === "string" &&
-        typeof event.id === "string"
+        typeof event.sessionID !== "string" ||
+        typeof event.agent !== "string" ||
+        typeof event.messageID !== "string" ||
+        typeof event.id !== "string"
       ) {
-        const key = identityKey({
-          sessionID: event.sessionID,
-          messageID: event.messageID,
-          callID: event.id,
-        })
-        activeOuter.set(
-          key,
-          nativeActive.get(key)?.invocationID ?? "native-outer-unobserved:" + randomUUID(),
-        )
+        callbackFailures += 1
+        return
       }
+
+      const identity: Identity = {
+        invocationID: nativeInvocationID(),
+        tool: "execute",
+        sessionID: event.sessionID,
+        agent: event.agent,
+        messageID: event.messageID,
+        callID: event.id,
+      }
+      const key = identityKey(identity)
+      const existing = nativeActive.get(key)
+      if (existing) {
+        activeOuter.set(key, existing.invocationID)
+        return
+      }
+
+      nativeStarts += 1
+      nativeActive.set(key, identity)
+      activeOuter.set(key, identity.invocationID)
+      write({
+        kind: "native_start",
+        invocation_id: identity.invocationID,
+        tool: project(identity.tool),
+        session_id: project(identity.sessionID),
+        agent: project(identity.agent),
+        message_id: project(identity.messageID),
+        call_id: project(identity.callID),
+        parent_session_id: await parentSession(ctx, identity.sessionID),
+        input: project(event.input),
+        boundary: "tool-execute-before",
+      })
     })
     await ctx.tool.hook("execute.after", (event: any) => {
       if (event?.tool !== "execute") return

@@ -132,7 +132,7 @@ def load_runtime_observations(path: Path = OBSERVATION_PATH) -> dict[str, Any]:
                 "kind": "capture_start",
                 "version": 1,
                 "source": "stock-opencode-2.0.23-plugin",
-                "native_input_boundary": "decoded-tool-execute",
+                "native_input_boundary": "decoded-tool-execute+outer-execute-before",
                 "native_terminal_boundary": "session.tool.success+session.tool.failed",
                 "code_input_boundary": "decoded-code-tool-handler",
                 "code_terminal_boundary": "tool-handler-return+tool-handler-throw",

@@ -13,7 +13,8 @@ OpenCode remains stock and immutable. A missing observation boundary is reported
 | Live runtime events | `ctx.event.subscribe()` | supported source; ordering/drain must be proven by integration test |
 | Session creation / ancestry | `session.created` + Session API | supported |
 | Agent for a step | Session step/message events | supported |
-| Native tool call identity/input | Session tool input/called events | supported source |
+| Native/direct decoded input | transformed registered `tool.execute` | supported |
+| Synthetic outer Code Mode `execute` identity/effective input | `execute.before` + Session terminal | supported partial input boundary; pre-decode |
 | Native terminal success/failure | Session tool success/failed events | supported source |
 | Tool pre-execution hook | `ctx.tool.hook("execute.before")` | supported; occurs before tool decode/execution |
 | Tool post-handler hook | `ctx.tool.hook("execute.after")` | supported; occurs after core tool execution but before Code Mode final conversion |
@@ -27,6 +28,8 @@ Stock Session events are the preferred source for native terminal facts because 
 
 The observer must bind call identity, Session, agent/message context, input and terminal result/error without reconstructing them from prose or matching by value.
 
+The model-facing Code Mode `execute` tool is not in the transformed registry: stock OpenCode creates it later inside `Tool.snapshot`. Its real invocation is therefore recorded from `execute.before` and settled by the same Session terminal event. This prevents a Code Mode run from disappearing from the native boundary. The hook input is exact at that stock surface but is before `CodeMode.Input` decode.
+
 ## Code Mode
 
 Code Mode executes inner tools through the normal tool registry, so same-process reviewed instrumentation can observe real inner execution without isolating Loom.
@@ -36,6 +39,7 @@ The bounded stock-2.0.23 experiment establishes a useful partial path:
 - `ctx.tool.transform(...)` can wrap the actual effective leaf registration;
 - core decodes input before entering that wrapper, so the wrapper sees executable input;
 - the real outer `execute` `Tool.Context` reaches each inner handler, providing actual Session, agent, message and outer CallID;
+- that same outer call is independently present as an authoritative native observation, and each inner parent ID must resolve to it;
 - the wrapper can allocate a unique per-inner observation ID at handler entry, so identical concurrent calls and reverse completion do not require input/FIFO correlation.
 
 However, this wrapper is not the final Code Mode caller boundary. After it returns, core can encode the result, run mutating `tool.execute.after` hooks, normalize content, and Code Mode can select its return representation and perform output validation plus a JSON stringify/parse round trip.
