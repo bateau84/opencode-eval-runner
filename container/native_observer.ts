@@ -10,10 +10,19 @@ let starts = 0
 let terminals = 0
 let observerFailures = 0
 let unavailableFields = 0
-const active = new Map<string, { tool: string; sessionID: string; agent: string; messageID: string; callID: string }>()
 
-function keyOf(value: { sessionID: string; messageID: string; id: string }) {
-  return `${value.sessionID}\u0000${value.messageID}\u0000${value.id}`
+type Identity = {
+  tool: string
+  sessionID: string
+  agent: string
+  messageID: string
+  callID: string
+}
+
+const active = new Map<string, Identity>()
+
+function key(sessionID: string, messageID: string, callID: string) {
+  return [sessionID, messageID, callID].join("\u0000")
 }
 
 function snapshot(value: unknown): { state: "available"; value: unknown } | { state: "omitted"; reason: string } {
@@ -68,11 +77,47 @@ function write(record: Record<string, unknown>) {
   }
 }
 
-function errorView(error: any) {
-  const value: Record<string, unknown> = { type: "Tool.Error", message: error?.message }
-  if (error && Object.prototype.hasOwnProperty.call(error, "error")) value.error = error.error
-  if (error && Object.prototype.hasOwnProperty.call(error, "metadata")) value.metadata = error.metadata
-  return value
+function terminal(event: any) {
+  if (event?.type !== "session.tool.success" && event?.type !== "session.tool.failed") return
+  const data = event.data
+  if (
+    !data ||
+    typeof data.sessionID !== "string" ||
+    typeof data.assistantMessageID !== "string" ||
+    typeof data.id !== "string"
+  ) {
+    observerFailures++
+    return
+  }
+
+  const current = active.get(key(data.sessionID, data.assistantMessageID, data.id))
+  if (!current) return
+  active.delete(key(data.sessionID, data.assistantMessageID, data.id))
+  terminals++
+
+  const common = {
+    kind: "call_terminal",
+    tool: current.tool,
+    session_id: data.sessionID,
+    agent: current.agent,
+    message_id: data.assistantMessageID,
+    call_id: data.id,
+    boundary: event.type,
+  }
+  if (event.type === "session.tool.success") {
+    write({
+      ...common,
+      outcome: "success",
+      result: field({
+        content: data.content,
+        ...(data.metadata === undefined ? {} : { metadata: data.metadata }),
+        executed: data.executed,
+        ...(data.resultState === undefined ? {} : { result_state: data.resultState }),
+      }),
+    })
+    return
+  }
+  write({ ...common, outcome: "failure", error: field(data.error) })
 }
 
 export default {
@@ -90,10 +135,19 @@ export default {
       version: 1,
       source: "stock-opencode-2.0.23-plugin",
       input_boundary: "decoded-tool-execute",
-      terminal_boundary: "tool.execute.after",
+      terminal_boundary: "session.tool.success+session.tool.failed",
       correlation: "session-message-call-id",
       ordering: "observer-monotonic-sequence",
     })
+
+    const controller = new AbortController()
+    const eventTask = (async () => {
+      try {
+        for await (const event of ctx.event.subscribe({ signal: controller.signal })) terminal(event)
+      } catch {
+        if (!controller.signal.aborted) observerFailures++
+      }
+    })()
 
     await ctx.tool.transform((editor: any) => {
       for (const item of editor.list()) {
@@ -101,17 +155,17 @@ export default {
         editor.update(item.id, (tool: any) => {
           const execute = tool.execute
           tool.execute = async (input: unknown, context: any) => {
-            const identity = {
+            const identity: Identity = {
               tool: item.id,
               sessionID: context.sessionID,
               agent: context.agent,
               messageID: context.messageID,
               callID: context.id,
             }
-            const key = keyOf({ sessionID: identity.sessionID, messageID: identity.messageID, id: identity.callID })
+            const identityKey = key(identity.sessionID, identity.messageID, identity.callID)
             starts++
-            if (active.has(key)) observerFailures++
-            active.set(key, identity)
+            if (active.has(identityKey)) observerFailures++
+            active.set(identityKey, identity)
             write({
               kind: "call_start",
               tool: identity.tool,
@@ -128,37 +182,13 @@ export default {
       }
     })
 
-    await ctx.tool.hook("execute.after", async (event: any) => {
-      const key = keyOf(event)
-      const start = active.get(key)
-      if (!start) return
-      active.delete(key)
-      terminals++
-      if (
-        start.tool !== event.tool ||
-        start.sessionID !== event.sessionID ||
-        start.agent !== event.agent ||
-        start.messageID !== event.messageID ||
-        start.callID !== event.id
-      ) observerFailures++
-
-      const common = {
-        kind: "call_terminal",
-        tool: event.tool,
-        session_id: event.sessionID,
-        agent: event.agent,
-        message_id: event.messageID,
-        call_id: event.id,
-        boundary: "tool.execute.after",
-      }
-      if (event.status === "completed") {
-        write({ ...common, outcome: "success", result: field(event.result) })
-      } else {
-        write({ ...common, outcome: "failure", error: field(errorView(event.error)) })
-      }
-    })
-
     return async () => {
+      // Session terminal events are published before the step can finish. Give
+      // the already-running local subscriber one turn to consume queued events,
+      // then close it without letting observer failure affect product behavior.
+      await new Promise<void>((resolve) => setTimeout(resolve, 0))
+      controller.abort()
+      await eventTask
       write({
         kind: "capture_end",
         calls_started: starts,
