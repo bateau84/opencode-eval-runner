@@ -128,7 +128,7 @@ def load_native_observations(path: Path = OBSERVATION_PATH) -> dict[str, Any]:
                 expected = {
                     "source": "stock-opencode-2.0.23-plugin",
                     "input_boundary": "decoded-tool-execute",
-                    "terminal_boundary": "tool.execute.after",
+                    "terminal_boundary": "session.tool.success+session.tool.failed",
                     "correlation": "session-message-call-id",
                     "ordering": "observer-monotonic-sequence",
                 }
@@ -163,7 +163,12 @@ def load_native_observations(path: Path = OBSERVATION_PATH) -> dict[str, Any]:
                 continue
 
             if kind == "call_terminal":
-                if event.get("boundary") != "tool.execute.after":
+                outcome = event.get("outcome")
+                expected_boundary = {
+                    "success": "session.tool.success",
+                    "failure": "session.tool.failed",
+                }.get(outcome)
+                if expected_boundary is None or event.get("boundary") != expected_boundary:
                     raise InvalidObservation("unsupported_terminal_boundary")
                 session_id = _identity(event.get("session_id"))
                 message_id = _identity(event.get("message_id"))
@@ -174,7 +179,6 @@ def load_native_observations(path: Path = OBSERVATION_PATH) -> dict[str, Any]:
                     raise InvalidObservation("ambiguous_terminal")
                 if record["tool"] != _identity(event.get("tool")) or record["agent"] != _identity(event.get("agent")):
                     raise InvalidObservation("identity_changed")
-                outcome = event.get("outcome")
                 if outcome == "success" and "result" in event and "error" not in event:
                     record["result"] = _field(event["result"])
                 elif outcome == "failure" and "error" in event and "result" not in event:
