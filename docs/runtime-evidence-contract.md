@@ -53,6 +53,19 @@ Dynamic observation fields use exactly these public states:
 
 Unknown counts are never converted to \`0\`.
 
+## Consumer decision rule
+
+A consumer must decide evidence eligibility per assertion, not from the top-level flag alone:
+
+1. Validate the `runtime_evidence` object against this schema before using it.
+2. If overall status is `incomplete` or `invalid`, no runtime assertion is eligible for PASS.
+3. Declare the boundary or boundaries required by the assertion. Every required boundary must be `complete`.
+4. If the assertion depends on an exact observation field, that field must be `available`. `redacted` or `omitted` makes that value-dependent assertion incomplete; `unsupported` makes it unsupported.
+5. Never fill a missing authoritative fact from `tools`, `actions`, `tool_result_evidence`, stdout/stderr, model text, or workspace files.
+
+For example, an assertion that a direct tool ran can depend on `native`. An assertion about a Code Mode inner tool identity/input can depend on `code_mode_execution`. An assertion about the exact final value or error seen by a Code Mode script depends on `code_mode_finality` and is therefore unsupported on stock OpenCode 2.0.23.
+
+
 ## Native observation
 
 The runner-owned stock OpenCode 2.0.23 observer records:
@@ -151,6 +164,18 @@ Product outcome remains independent:
 - a successful product result can have incomplete evidence;
 - \`exit_code\` and timeout status do not become evidence eligibility.
 
+## Operational bounds
+
+The current stock observer bounds authoritative capture to 8 MiB and at most 20,001 JSONL events, and bounds each projected dynamic field to 256 KiB. Crossing an aggregate capture bound makes the capture invalid/ineligible; the runner does not truncate it into apparently complete evidence. A field that exceeds its field bound is explicitly `omitted` with reason `size_limit`, so assertions requiring that exact value remain ineligible.
+
+These are current adapter safety limits, not provider or model guarantees.
+
+
+## Compatibility and migration
+
+The outer result schema remains `opencode-eval-runner/v1`, but `runtime_evidence` is now mandatory. The host CLI validates it after container execution and rejects a result that omits it or violates this v1 contract.
+
+Official OpenCode and Copilot images in this revision emit the required object. A legacy or custom image built against the older result shape must be upgraded together with the host runner. This does not require any OpenCode modification: the supported OpenCode profile uses stock 2.0.23. Copilot results satisfy the result-shape requirement by reporting runtime evidence as explicitly `unsupported`.
 ## Unsupported areas
 
 - \`code_mode_finality\`: stock OpenCode 2.0.23 does not expose the exact final value/error seen by each Code Mode script call.
