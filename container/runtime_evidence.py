@@ -6,11 +6,12 @@ from typing import Any
 
 RUNTIME_EVIDENCE_SCHEMA = "opencode-eval-runner/runtime-evidence/v1"
 
-STATUSES = {"complete", "incomplete", "unsupported", "invalid"}
-FIELD_STATES = {"available", "redacted", "omitted", "unsupported"}
-MODES = {"native", "code_mode"}
-OUTCOMES = {"success", "error", "missing"}
-PROCESS_STATES = {"completed", "timeout", "interrupted", "unsupported"}
+STATUSES = frozenset({"complete", "incomplete", "unsupported", "invalid"})
+FIELD_STATES = frozenset({"available", "redacted", "omitted", "unsupported"})
+MODES = frozenset({"native", "code_mode"})
+OUTCOMES = frozenset({"success", "error", "missing"})
+PROCESS_STATES = frozenset({"completed", "timeout", "interrupted", "unsupported"})
+EVENT_KINDS = frozenset({"start", "terminal"})
 
 BOUNDARY_NATIVE = "native"
 BOUNDARY_CODE_MODE_EXECUTION = "code_mode_execution"
@@ -136,11 +137,6 @@ def _codes(raw: Any, where: str) -> list[str]:
     return values
 
 
-STATUSES = ("complete", "incomplete", "unsupported", "invalid")
-FIELD_STATES = frozenset({"available", "redacted", "omitted", "unsupported"})
-PROCESS_STATES = frozenset({"completed", "timeout", "interrupted", "unsupported"})
-EVENT_KINDS = frozenset({"start", "terminal"})
-
 _GLOBAL_INVALID = frozenset({
     "invalid_accounting_input",
     "malformed_observation",
@@ -178,7 +174,6 @@ def _new_boundary(*, declared_supported: bool = False, declared_unsupported: boo
         "terminals": 0,
         "missing_terminals": 0,
         "required_fields_omitted": 0,
-        "required_fields_truncated": 0,
         "required_fields_unsupported": 0,
         "issues": ["unsupported_boundary"] if declared_unsupported else [],
     }
@@ -221,8 +216,8 @@ def account_runtime_evidence(
 
     Each observation must contain kind, sequence, invocation_id,
     boundary, and required_fields. required_fields maps semantic
-    field names to available, redacted, omitted, truncated, or
-    unsupported. Adapters decide which fields are required; this layer only
+    field names to available, redacted, omitted, or unsupported.
+    Adapters decide which fields are required; this layer only
     accounts for their explicit states.
 
     observation_closed is an ordinary correctness signal from the capture
@@ -242,7 +237,6 @@ def account_runtime_evidence(
         "ambiguous_invocations": 0,
         "duplicate_sequences": 0,
         "required_fields_omitted": 0,
-        "required_fields_truncated": 0,
         "required_fields_unsupported": 0,
         "process_state": process_state if process_state in PROCESS_STATES else "invalid",
         "supported_boundaries": [],
@@ -416,8 +410,6 @@ def account_runtime_evidence(
         _add_issue(issues, "missing_terminal")
     if coverage["required_fields_omitted"]:
         _add_issue(issues, "required_field_omitted")
-    if coverage["required_fields_truncated"]:
-        _add_issue(issues, "required_field_truncated")
     if coverage["required_fields_unsupported"]:
         _add_issue(issues, "required_field_unsupported")
     if unsupported:
