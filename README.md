@@ -359,6 +359,7 @@ If you override `--image`, treat the host runner and image as one compatibility 
 For runtime verdicts, do not use top-level `evidence_eligible` by itself. An assertion may use evidence only when every boundary it requires is `complete` and every exact field it requires is `available`. `redacted`, `omitted`, or `unsupported` required fields are not PASS evidence. Existing `tools`, `actions`, `tool_result_evidence`, stdout/stderr, and model text are diagnostic/convenience data and must not fill an authoritative-evidence gap. See [Runtime evidence contract v1](docs/runtime-evidence-contract.md).
 
 The eval repository still owns the assertion semantics and decides PASS, FAIL, or non-evidence after applying those eligibility rules.
+
 ## Image versions
 
 The transport images currently pin:
