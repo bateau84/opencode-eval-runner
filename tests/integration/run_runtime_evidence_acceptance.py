@@ -20,6 +20,10 @@ import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
+ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 from container.runtime_evidence import (
     BOUNDARY_CODE_MODE_EXECUTION,
     BOUNDARY_CODE_MODE_FINALITY,
@@ -30,7 +34,6 @@ from container.runtime_evidence import (
     validate_runtime_evidence,
 )
 
-ROOT = Path(__file__).resolve().parents[2]
 FIXTURE = Path(__file__).with_name("runtime_evidence_fixture.ts")
 SECRET = "runtime-evidence-acceptance-secret-7f6e5d4c"
 STATUSES = {"complete", "incomplete", "unsupported", "invalid"}
