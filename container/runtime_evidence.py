@@ -138,7 +138,7 @@ def _codes(raw: Any, where: str) -> list[str]:
 
 STATUSES = ("complete", "incomplete", "unsupported", "invalid")
 FIELD_STATES = frozenset({"available", "redacted", "omitted", "unsupported"})
-PROCESS_STATES = frozenset({"completed", "timeout", "interrupted"})
+PROCESS_STATES = frozenset({"completed", "timeout", "interrupted", "unsupported"})
 EVENT_KINDS = frozenset({"start", "terminal"})
 
 _GLOBAL_INVALID = frozenset({
@@ -562,6 +562,7 @@ def _parent(start: Mapping[str, Any]) -> dict[str, Any]:
 def _capture_issue_kind(code: str) -> str:
     if code in {
         "malformed_capture",
+        "malformed_observation",
         "wrong_schema",
         "ambiguous_order",
         "records_after_capture_end",
@@ -622,6 +623,9 @@ def build_runtime_evidence(
             adapter_invalid = True
             continue
         target[invocation_id] = record
+
+    if adapter_invalid and "malformed_observation" not in loss_codes:
+        loss_codes.append("malformed_observation")
 
     observations: list[dict[str, Any]] = []
     accounting_events: list[dict[str, Any]] = []
@@ -974,7 +978,16 @@ def validate_runtime_evidence(raw: Any) -> dict[str, Any]:
         unsupported_boundaries=(BOUNDARY_CODE_MODE_FINALITY,),
         observer_failures=observer_failures if observer_state == "available" else 0,
         callback_failures=callback_failures if callback_state == "available" else 0,
-        losses=sum(_capture_issue_kind(code) == "incomplete" for code in losses),
+        losses=sum(
+            code in {
+                "missing_capture",
+                "empty_capture",
+                "unterminated_capture",
+                "missing_capture_end",
+                "capture_io_error",
+            }
+            for code in losses
+        ),
         process_state=process_state,
     )
     _require(status == accounting["status"], "runtime_evidence.status does not match canonical accounting")
