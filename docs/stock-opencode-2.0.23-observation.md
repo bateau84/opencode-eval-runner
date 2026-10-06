@@ -13,8 +13,8 @@ OpenCode remains stock and immutable. A missing observation boundary is reported
 | Live runtime events | `ctx.event.subscribe()` | supported source; ordering/drain must be proven by integration test |
 | Session creation / ancestry | `session.created` + Session API | supported |
 | Agent for a step | Session step/message events | supported |
-| Native tool call identity/input | Session tool input/called events | supported source |
-| Native terminal success/failure | Session tool success/failed events | supported source |
+| Native tool call identity/input | Tool transform wrapping the decoded executable boundary | implemented and integration-tested |
+| Native terminal success/failure | Last runner-owned `tool.execute.after` hook | implemented and integration-tested |
 | Tool pre-execution hook | `ctx.tool.hook("execute.before")` | supported; occurs before tool decode/execution |
 | Tool post-handler hook | `ctx.tool.hook("execute.after")` | supported; occurs after handler result but before later core normalization |
 | Tool registration wrapping | `ctx.tool.transform(...)` | supported candidate for reviewed same-process instrumentation |
@@ -23,9 +23,16 @@ OpenCode remains stock and immutable. A missing observation boundary is reported
 
 ## Native calls
 
-Stock Session events are the preferred source for native terminal facts because they represent the runtime's own Session lifecycle rather than model or tool payload claims.
+The implemented native observer uses two supported stock boundaries:
 
-The observer must bind call identity, Session, agent/message context, input and terminal result/error without reconstructing them from prose or matching by value.
+- a final tool transform wraps direct tools (`options.codemode === false`) and records the value passed to `tool.execute`, after stock input decoding;
+- a final runner-owned `tool.execute.after` hook records the resolved tool name, exact Session/agent/message/call identity, and the completed result or `Tool.Error`.
+
+The observer is injected through `OPENCODE_CONFIG_CONTENT`, which stock 2.0.23 loads as the final local config source. That makes its transform/hook later than discovered global/project plugins rather than relying on filename ordering.
+
+Correlation is only by `(sessionID, messageID, callID)`. Input equality, FIFO pairing, model text, and tool-returned JSON are not correlation sources.
+
+The terminal snapshot is the last plugin-hook representation after stock tool execution/output validation. Later stock image/session projection is outside this observer's claimed boundary and is not silently reconstructed.
 
 ## Code Mode
 
