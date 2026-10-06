@@ -126,6 +126,25 @@ def matching(evidence: dict[str, Any], suffix: str) -> list[dict[str, Any]]:
     return [item for item in aggregate_invocations(evidence) if tool_matches(item, suffix)]
 
 
+def outer_for_inner(evidence: dict[str, Any], item: dict[str, Any]) -> dict[str, Any]:
+    parent = unwrap(item.get("parent"))
+    if not isinstance(parent, dict) or parent.get("kind") != "invocation":
+        return {}
+    parent_id = parent.get("id")
+    if not isinstance(parent_id, str) or not parent_id:
+        return {}
+    return next(
+        (
+            candidate
+            for candidate in aggregate_invocations(evidence)
+            if candidate.get("invocation_id") == parent_id
+            and candidate.get("mode") == "native"
+            and tool_name(candidate) == "execute"
+        ),
+        {},
+    )
+
+
 def sequence(item: dict[str, Any], key: str) -> int | None:
     value = unwrap(item.get(key))
     return value if type(value) is int else None
@@ -454,6 +473,9 @@ def validate_code(result: dict[str, Any], suffix: str, expected: str, *, error: 
     final_field = item.get("error") if error else item.get("result")
     other_field = item.get("result") if error else item.get("error")
     parent = unwrap(item.get("parent"))
+    outer = outer_for_inner(evidence, item)
+    native = boundaries.get(BOUNDARY_NATIVE) if isinstance(boundaries, dict) else None
+    native_starts = unwrap(native.get("starts")) if isinstance(native, dict) else None
     outcome = item.get("outcome")
     checks.update({
         "product_success": result.get("exit_code") == 0 and result.get("text") == expected,
@@ -470,7 +492,15 @@ def validate_code(result: dict[str, Any], suffix: str, expected: str, *, error: 
         "inner_parent_bound_to_outer_invocation": isinstance(parent, dict)
             and parent.get("kind") == "invocation"
             and isinstance(parent.get("id"), str)
-            and bool(parent.get("id")),
+            and bool(parent.get("id"))
+            and outer.get("invocation_id") == parent.get("id"),
+        "outer_execute_observed_authoritatively": bool(outer)
+            and terminal_present(outer)
+            and unwrap(outer.get("call_id")) == unwrap(item.get("call_id"))
+            and unwrap(outer.get("session_id")) == unwrap(item.get("session_id"))
+            and unwrap(outer.get("message_id")) == unwrap(item.get("message_id"))
+            and unwrap(outer.get("actor")) == unwrap(item.get("actor")),
+        "native_absence_cannot_hide_outer_execute": type(native_starts) is int and native_starts >= 1,
         "inner_terminal_observed": terminal_present(item),
         "inner_outcome_observed": outcome == ("error" if error else "success"),
         "final_value_or_error_explicitly_unsupported": field_state(final_field) == "unsupported"
@@ -488,6 +518,7 @@ def validate_concurrent(result: dict[str, Any]) -> dict[str, bool]:
     starts = [sequence(item, "start_sequence") for item in ordered]
     terminals = [sequence(item, "terminal_sequence") for item in ordered]
     parents = [json.dumps(unwrap(item.get("parent")), sort_keys=True) for item in ordered]
+    outers = [outer_for_inner(evidence, item) for item in ordered]
     checks.update({
         "product_success": result.get("exit_code") == 0 and result.get("text") == "PRODUCT-CONCURRENT_REVERSE",
         "two_inner_observations": len(ordered) == 2,
@@ -499,7 +530,14 @@ def validate_concurrent(result: dict[str, Any]) -> dict[str, bool]:
             and starts[0] < starts[1] < terminals[1] < terminals[0],
         "same_actual_outer_parent": len(parents) == 2
             and parents[0] == parents[1]
-            and parents[0] not in {"null", "{}"},
+            and parents[0] not in {"null", "{}"}
+            and len(outers) == 2
+            and bool(outers[0])
+            and outers[0].get("invocation_id") == outers[1].get("invocation_id")
+            and all(
+                unwrap(outer.get("call_id")) == unwrap(item.get("call_id"))
+                for outer, item in zip(outers, ordered)
+            ),
         "finality_remains_unsupported_for_both": len(ordered) == 2
             and all(field_state(item.get("result")) == "unsupported" for item in ordered),
         "overall_evidence_stays_eligible": evidence.get("status") == "complete"
