@@ -40,7 +40,7 @@ The public authority is only:
 
 \`opencode-eval-runner/runtime-evidence/v1\`
 
-There is no public \`native_tool_observations\` or \`evidence_accounting\` authority. Existing \`tools\`, \`actions\`, \`tool_result_evidence\`, stdout/stderr, model text, and similar fields remain convenience/diagnostic data.
+There is no public \`native_tool_observations\` or \`evidence_accounting\` authority. Existing \`tools\`, \`actions\`, \`tool_result_evidence\`, stdout/stderr, model text, and similar fields remain convenience/diagnostic data. They expose no runtime-evidence eligibility signal and are never promoted into \`runtime_evidence\`.
 
 ## Native boundary
 
@@ -152,6 +152,12 @@ PR #45 carries provider-free tests for:
 - collector-shaped model/tool payload rejection.
 
 The diagnostic Code Mode probe remains as the stock-runtime proof for the unsupported final boundary.
+
+## Explicit unsupported areas
+
+- Exact Code Mode caller-final value/error is unsupported on stock OpenCode 2.0.23.
+- GitHub Copilot CLI invocations expose a canonical \`runtime_evidence\` object with status \`unsupported\`; they do not have the OpenCode runtime observer.
+- The trusted-checkout profile does not defend the observer from a deliberately hostile plugin sharing the OpenCode process.
 
 ## Out of scope
 
