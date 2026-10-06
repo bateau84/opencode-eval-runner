@@ -79,6 +79,8 @@ OpenCode source patches, forks, remote PluginHost isolation, evidence signing, a
 
 Provider-free integration tests must prove the exact observation/correlation behavior before a field becomes eligible evidence.
 
+See [Stock OpenCode 2.0.23 observation surface](stock-opencode-2.0.23-observation.md) for the retained source/capability findings from PR #43.
+
 ## Reuse from PR #41
 
 | Work | Disposition |
