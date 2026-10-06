@@ -20,16 +20,15 @@ export default {
       })
       editor.add({
         name: "fail",
-        description: "Return an invalid declared output to force a real stock runtime Tool.Error.",
+        description: "Throw a real native tool failure so stock runtime normalizes it to Tool.Error.",
         input: {
           type: "object",
           properties: { tag: { type: "string" } },
           required: ["tag"],
           additionalProperties: false,
         },
-        output: { type: "number" },
         options: { namespace: "nativeprobe", codemode: false },
-        execute: async (input: any) => ({ content: `should-not-complete:${input.tag}`, output: "not-a-number" as any }),
+        execute: async (input: any) => { throw new Error(`native-probe-failure:${input.tag}`) },
       })
     })
 
