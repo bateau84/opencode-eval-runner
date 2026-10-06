@@ -1,6 +1,6 @@
 # opencode-eval-runner
 
-Reusable OCI isolation for behavioral evals that invoke OpenCode or GitHub Copilot CLI.
+Reusable OCI execution boundary for isolated eval invocations using OpenCode or GitHub Copilot CLI.
 
 The runner intentionally does **not** own an eval corpus, grading semantics, or agent policy. Those stay in the repository being evaluated. This project owns the execution boundary:
 
@@ -27,6 +27,25 @@ eval harness
 ```
 
 The caller may use the same model for both, but they do not share OpenCode session state or filesystem state.
+
+## What this repository runs
+
+This project runs **one isolated invocation at a time**. It is not an eval-suite engine: the calling repository owns cases, iterations, assertions, target/judge orchestration, grading, and final PASS/FAIL policy.
+
+The current public input interface is CLI or GitHub Action arguments plus prompt/system files; there is **no input JSON request API**. Each invocation produces the documented JSON Result contract.
+
+Supported usage modes are:
+
+| Mode | Interface |
+| --- | --- |
+| Local OpenCode invocation | `opencode-eval-runner invoke --transport opencode ...` |
+| Local Copilot invocation | `opencode-eval-runner invoke --transport github-copilot-cli ...` |
+| Local eval suite | Repository harness repeatedly calls the CLI |
+| GitHub Action direct invocation | Action inputs with `model` set |
+| GitHub Action repository harness | Action `command` mode |
+| GitHub Action setup only | Leave `model` and `command` empty, then call the CLI in a later step |
+
+See **[Invocation usage and interface reference](docs/invocation-usage.md)** for the complete input contract, all CLI options, environment variables, all GitHub Action inputs, direct-mode limitations, and execution examples.
 
 ## Transports
 
@@ -94,6 +113,8 @@ Reasoning can be pinned with the same `--reasoning LEVEL` runner option. Copilot
 This transport reuses the trust-boundary pattern already proven in `nrkno/mats-opencode-setup`.
 
 ## Local usage
+
+For the full option/default/reference table, see [Invocation usage and interface reference](docs/invocation-usage.md).
 
 Build the transport you need:
 
@@ -173,7 +194,7 @@ opencode-eval-runner invoke \
   ...
 ```
 
-Stock OpenCode 2.0.23 does not expose the old singular `debug agent <id>` command that returned a resolved tool map. The runner therefore performs the strongest supported zero-inference preflight: it requires the expected plugin entrypoint to be materialized in the isolated OpenCode config, runs `opencode debug agents` to prove the configured location starts successfully with plugins active, and requires the selected agent to resolve. Missing plugin materialization, plugin/startup failure, or missing agent is infrastructure/non-evidence, never a behavioral FAIL. Actual tool use remains a repository-owned behavioral assertion in the eval corpus.
+The expected-plugin preflight is zero-inference. The runner requires the plugin entrypoint to be materialized in the isolated config, starts a private stock OpenCode 2.0.23 server, creates a non-resuming Session prompt so plugin activation reaches its barrier without model inference, and verifies that the named plugin is present and active in the runtime plugin inventory. Agent resolution remains part of the real `opencode run --agent` invocation. Missing materialization, activation failure, or later agent resolution failure is infrastructure/non-evidence, never a behavioral FAIL. Actual tool use remains a repository-owned behavioral assertion in the eval corpus.
 
 ### Evaluating a skill
 
@@ -215,6 +236,8 @@ PYTHONPATH=. python3 bin/opencode-eval-runner invoke \
 The token value is not placed on the container command line.
 
 ## GitHub Actions
+
+For all 21 Action inputs, defaults, execution-mode precedence, and CLI-only capabilities, see [Invocation usage and interface reference](docs/invocation-usage.md#github-action-interface).
 
 The repository is a composite GitHub Action. It supports either a single direct invocation or setup plus a repository-owned eval harness.
 
