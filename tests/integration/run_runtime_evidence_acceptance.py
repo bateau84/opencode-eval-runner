@@ -395,6 +395,22 @@ def scenario_outcomes(result: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def validate_authority_surfaces(result: dict[str, Any]) -> dict[str, bool]:
+    diagnostic = result.get("tool_result_evidence")
+    safety = diagnostic.get("safety") if isinstance(diagnostic, dict) else None
+    return {
+        "runtime_evidence_is_only_eligibility_surface": (
+            isinstance(result.get("runtime_evidence"), dict)
+            and "evidence_eligible" not in result
+            and (not isinstance(diagnostic, dict) or "evidence_eligible" not in diagnostic)
+            and (not isinstance(safety, dict) or "evidence_eligible" not in safety)
+            and "native_tool_observations" not in result
+            and "evidence_accounting" not in result
+        ),
+    }
+
+
+
 def validate_contract(evidence: dict[str, Any]) -> dict[str, bool]:
     try:
         validate_runtime_evidence(evidence)
@@ -709,6 +725,7 @@ def run_scenario(image: str, scenario: str, output: Path) -> dict[str, Any]:
         result = json.loads(result_path.read_text(encoding="utf-8")) if result_path.is_file() else {}
         oracle = read_oracle(workspace / "runtime-evidence-oracle.jsonl")
         checks = VALIDATORS[scenario](result, oracle, provider.requests)
+        checks.update(validate_authority_surfaces(result))
         report = {
             "scenario": scenario,
             "runner_exit_code": proc.returncode,
