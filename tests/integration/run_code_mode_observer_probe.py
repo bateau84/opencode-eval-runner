@@ -435,8 +435,8 @@ def summarize(report: dict, image: str) -> dict:
                 "status": "unsupported",
                 "reason": "stock_codemode_final_boundary_not_exposed",
                 "missing_boundary": (
-                    "@opencode/codemode tool.after sees the final CallResult, "
-                    "but stock CodeModeTool wires it only to private progressHooks"
+                    "post-conversion success is private to @opencode/codemode tool.after; "
+                    "catch-path errors are materialized later with no public hook"
                 ),
             },
         },
