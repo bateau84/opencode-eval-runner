@@ -15,7 +15,9 @@ For registered native/direct tools it observes:
    - \`session.tool.success\`
    - \`session.tool.failed\`.
 
-Stock Code Mode's model-facing `execute` tool is synthetic: OpenCode creates it inside `Tool.snapshot` after registration transforms have run. The observer records that outer invocation at the stock `execute.before` hook. Its input is the exact effective value seen by that hook, before `CodeMode.Input` decode. The same Session terminal events settle it.\n\nThe Session terminal is intentional. A rejected transformed handler can bypass \`tool.execute.after\` while stock OpenCode still settles the invocation through \`session.tool.failed\`.
+Stock Code Mode's model-facing `execute` tool is synthetic: OpenCode creates it inside `Tool.snapshot` after registration transforms have run. The observer records that outer invocation at the stock `execute.before` hook. Its input is the exact effective value seen by that hook, before `CodeMode.Input` decode. The same Session terminal events settle it.
+
+The Session terminal is intentional. A rejected transformed handler can bypass \`tool.execute.after\` while stock OpenCode still settles the invocation through \`session.tool.failed\`.
 
 ## Identity and ordering
 
