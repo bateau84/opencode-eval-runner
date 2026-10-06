@@ -78,7 +78,7 @@ opencode-eval-runner invoke [options]
 | --- | --- | --- | --- |
 | <code>--model MODEL</code> | **Required** | Both | Model identifier passed to the selected transport. |
 | <code>--reasoning LEVEL</code> | Optional | Both | OpenCode maps this to the model <code>#variant</code>; Copilot maps it to <code>--effort</code>. |
-| <code>--agent NAME</code> | Optional | Primarily OpenCode | Select the OpenCode agent. |
+| <code>--agent NAME</code> | Optional | OpenCode | Select the OpenCode agent. Copilot uses its fixed isolated <code>eval-runner</code> profile. |
 | <code>--skill ID</code> | Optional | OpenCode only | Records the skill under test. It does not force the skill to load. |
 | <code>--expected-plugin NAME</code> | Optional | OpenCode only | Fail closed before inference unless the named plugin is materialized and active in the isolated OpenCode runtime. |
 | <code>--prompt-file PATH</code> | **Required** | Both | UTF-8 invocation prompt. |
