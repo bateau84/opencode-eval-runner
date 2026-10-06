@@ -4,7 +4,7 @@ Public schema: \`opencode-eval-runner/runtime-evidence/v1\`.
 
 \`runtime_evidence\` is the only authoritative runtime-evidence object in the runner result. Raw observer records are internal adapter input and are not serialized as a competing public result.
 
-The existing \`tools\`, \`actions\`, \`tool_result_evidence\`, stdout/stderr, Session/model text, and workspace files are convenience or diagnostic data only.
+The existing \`tools\`, \`actions\`, \`tool_result_evidence\`, stdout/stderr, Session/model text, and workspace files are convenience or diagnostic data only. They do not publish runtime-evidence eligibility and must not be used as substitutes even when their contents look like runtime-evidence JSON.
 
 ## Top-level meaning
 
@@ -149,6 +149,12 @@ Product outcome remains independent:
 - a tool error can still have complete evidence;
 - a successful product result can have incomplete evidence;
 - \`exit_code\` and timeout status do not become evidence eligibility.
+
+## Unsupported areas
+
+- \`code_mode_finality\`: stock OpenCode 2.0.23 does not expose the exact final value/error seen by each Code Mode script call.
+- \`github-copilot-cli\`: this transport has no OpenCode runtime observer, so its \`runtime_evidence\` object is explicitly \`unsupported\`.
+- hostile evaluated plugins: same-process instrumentation is not protected from a plugin that deliberately compromises the trusted runtime.
 
 ## Trust scope
 
