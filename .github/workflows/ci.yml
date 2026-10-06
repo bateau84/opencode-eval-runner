@@ -16,7 +16,7 @@ jobs:
 
       - name: Python checks
         run: |
-          python3 -m py_compile runner/cli.py container/invoke.py
+          python3 -m py_compile runner/cli.py container/invoke.py container/native_observer.py
           python3 -m unittest discover -s tests -p 'test_*.py'
 
       - name: Build fake Copilot transport for action smoke test
