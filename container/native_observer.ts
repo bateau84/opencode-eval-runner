@@ -1,8 +1,7 @@
 import { randomUUID } from "node:crypto"
-import { appendFileSync, mkdirSync, writeFileSync } from "node:fs"
-import { dirname } from "node:path"
+import { createConnection } from "node:net"
 
-const PATH = "/tmp/runtime/runtime-observer.jsonl"
+const OBSERVER_STREAM_ENV = "OPENCODE_EVAL_OBSERVER_STREAM"
 const SCHEMA = "opencode-eval-runner/runtime-observer-event/v1"
 const FIELD_LIMIT = 256 * 1024
 const MAX_DEPTH = 32
@@ -20,6 +19,19 @@ let unavailableFields = 0
 const CODE_FINALITY_REASON = "stock_codemode_final_boundary_not_exposed"
 const CREDENTIALS_ENV = "OPENCODE_EVAL_OBSERVER_CREDENTIALS"
 const INVENTORY_ENV = "OPENCODE_EVAL_OBSERVER_CREDENTIALS_COMPLETE"
+
+const rawStreamEndpoint = process.env[OBSERVER_STREAM_ENV] ?? ""
+delete process.env[OBSERVER_STREAM_ENV]
+const streamMatch = /^127\.0\.0\.1:(\d+)$/.exec(rawStreamEndpoint)
+const captureSocket = streamMatch
+  ? createConnection({ host: "127.0.0.1", port: Number(streamMatch[1]) })
+  : null
+if (captureSocket) {
+  captureSocket.on("error", () => {
+    observerFailures += 1
+  })
+  captureSocket.unref()
+}
 
 type Field =
   | { state: "available"; value: unknown }
@@ -173,8 +185,13 @@ function write(record: Record<string, unknown>) {
     callback_failures: callbackFailures,
     ...record,
   }
+  if (!captureSocket || captureSocket.destroyed) {
+    observerFailures += 1
+    return
+  }
   try {
-    appendFileSync(PATH, JSON.stringify(event) + "\n", { encoding: "utf8" })
+    captureSocket.write(JSON.stringify(event) + "\n")
+    if (record.kind === "capture_end") captureSocket.end()
   } catch {
     observerFailures += 1
   }
@@ -247,13 +264,6 @@ function terminal(event: any) {
 export default {
   id: "eval-runtime-observer",
   async setup(ctx: any) {
-    try {
-      mkdirSync(dirname(PATH), { recursive: true })
-      writeFileSync(PATH, "", { encoding: "utf8" })
-    } catch {
-      observerFailures += 1
-    }
-
     write({
       kind: "capture_start",
       version: 1,
