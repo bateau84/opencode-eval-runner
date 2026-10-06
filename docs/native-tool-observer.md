@@ -25,7 +25,7 @@ The adapter correlates using the real runtime identity tuple:
 
 It never correlates by FIFO, input equality, tool name, or completion order.
 
-The public invocation ID is opaque. Dynamic identity/input/result/error fields are sanitized before the internal capture file is written.
+The public invocation ID is opaque. Code Mode inner records reference the invocation ID of the observed outer \\`execute\\` record; a dangling or identity-mismatched parent is invalid evidence. Dynamic identity/input/result/error fields are sanitized before the internal capture file is written.
 
 The canonical \`runtime_evidence\` builder then validates:
 
