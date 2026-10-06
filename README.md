@@ -76,7 +76,7 @@ Reasoning can be pinned explicitly with `--reasoning LEVEL`. The pinned stock Op
 
 ### Native tool runtime observations
 
-OpenCode results also include `native_tool_observations` for native/direct tools on the pinned stock 2.0.23 runtime. A runner-owned in-process plugin records decoded executable input at the tool implementation boundary and correlates it with the final runner-owned `tool.execute.after` success/failure using the exact Session/message/call identity.
+OpenCode results also include `native_tool_observations` for native/direct tools on the pinned stock 2.0.23 runtime. A runner-owned in-process plugin records decoded executable input at the tool implementation boundary and correlates it with stock `session.tool.success` / `session.tool.failed` terminals using the exact Session/message/call identity.
 
 This field is fail-closed: missing capture, observer loss, missing terminals, sequence gaps, invalid fields, or incomplete shutdown make `evidence_eligible` false. Model text and tool-returned collector-shaped JSON are never parsed into this projection.
 
