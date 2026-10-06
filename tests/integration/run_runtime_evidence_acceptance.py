@@ -354,6 +354,7 @@ class FixtureProvider:
             "native_error": ("nativeError", {"value": "error-input"}),
             "redaction": ("secret", {}),
             "collector": ("collector", {}),
+            "capture_tamper": ("tamperCapture", {}),
             "timeout": ("slow", {}),
             "interrupted": ("interrupt", {}),
         }
@@ -641,6 +642,35 @@ def validate_collector(result: dict[str, Any]) -> dict[str, bool]:
     return checks
 
 
+def validate_capture_tamper(result: dict[str, Any]) -> dict[str, bool]:
+    evidence = evidence_of(result)
+    checks = validate_contract(evidence)
+    items = aggregate_invocations(evidence)
+    tamper = matching(evidence, "tamperCapture")
+    item = tamper[0] if len(tamper) == 1 else {}
+    terminal = unwrap(item.get("result"))
+    forged_absent = all(
+        candidate.get("invocation_id") != "forged-target-capture"
+        and tool_name(candidate) != "forged_target_tool"
+        for candidate in items
+    )
+    checks.update({
+        "product_success": result.get("exit_code") == 0
+            and result.get("text") == "PRODUCT-CAPTURE_TAMPER",
+        "authoritative_capture_remains_complete": evidence.get("status") == "complete"
+            and evidence.get("evidence_eligible") is True,
+        "tamper_tool_authoritatively_observed": len(tamper) == 1 and terminal_present(item),
+        "evaluated_shell_tamper_completed_successfully": len(tamper) == 1
+            and terminal_present(item)
+            and item.get("outcome") == "success"
+            and json_contains(terminal, "TAMPER-COMPLETE")
+            and json_contains(terminal, "OLD_PATH_TAMPER_COMPLETE"),
+        "old_path_create_delete_modify_did_not_affect_evidence": forged_absent,
+        "tamper_attempt_cannot_append_authoritative_record": forged_absent,
+    })
+    return checks
+
+
 VALIDATORS = {
     "native_success": lambda result, oracle, requests: validate_native_success(result, oracle),
     "native_error": lambda result, oracle, requests: validate_native_error(result),
@@ -652,6 +682,7 @@ VALIDATORS = {
     "interrupted": lambda result, oracle, requests: validate_incomplete(result, "interrupt", timed_out=False),
     "redaction": lambda result, oracle, requests: validate_redaction(result),
     "collector": lambda result, oracle, requests: validate_collector(result),
+    "capture_tamper": lambda result, oracle, requests: validate_capture_tamper(result),
 }
 
 

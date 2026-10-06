@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import json
 import os
+import socket
 import stat
+import threading
 from pathlib import Path
 from typing import Any
 
-OBSERVATION_PATH = Path("/tmp/runtime/runtime-observer.jsonl")
+OBSERVER_STREAM_ENV = "OPENCODE_EVAL_OBSERVER_STREAM"
 SCHEMA = "opencode-eval-runner/runtime-observer-event/v1"
 MAX_CAPTURE_BYTES = 8 * 1024 * 1024
 MAX_RECORDS = 20001
@@ -45,6 +47,53 @@ def _read(path: Path) -> bytes:
         os.close(fd)
 
 
+class RuntimeObservationTransport:
+    """One-connection runner-owned loopback stream for observer records."""
+
+    def __init__(self) -> None:
+        self._listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self._listener.bind(("127.0.0.1", 0))
+        self._listener.listen(1)
+        host, port = self._listener.getsockname()
+        self.endpoint = f"{host}:{port}"
+        self._data = bytearray()
+        self._issue: str | None = None
+        self._closing = False
+        self._thread = threading.Thread(target=self._receive, name="runtime-observer-capture", daemon=True)
+        self._thread.start()
+
+    def _receive(self) -> None:
+        try:
+            connection, _ = self._listener.accept()
+            self._listener.close()
+            with connection:
+                while True:
+                    chunk = connection.recv(65536)
+                    if not chunk:
+                        break
+                    if len(self._data) + len(chunk) > MAX_CAPTURE_BYTES:
+                        self._issue = "malformed_capture"
+                        continue
+                    self._data.extend(chunk)
+        except OSError:
+            if not self._closing:
+                self._issue = "capture_io_error"
+
+    def finish(self) -> dict[str, Any]:
+        self._closing = True
+        try:
+            self._listener.close()
+        except OSError:
+            pass
+        self._thread.join(timeout=2)
+        if self._thread.is_alive():
+            self._issue = "capture_io_error"
+        capture = load_runtime_observations(bytes(self._data))
+        if self._issue and self._issue not in capture["issues"]:
+            capture["issues"].append(self._issue)
+        return capture
+
+
 def _counter(value: Any) -> int | None:
     return value if type(value) is int and value >= 0 else None
 
@@ -60,14 +109,18 @@ def empty_capture(reason: str) -> dict[str, Any]:
     }
 
 
-def load_runtime_observations(path: Path = OBSERVATION_PATH) -> dict[str, Any]:
+def load_runtime_observations(source: bytes | Path) -> dict[str, Any]:
     """Parse internal observer input without assigning evidence status.
+
+    Production passes bytes received from the runner-owned one-connection stream.
+    Path input remains only for parser/unit-test coverage; it is not an
+    authoritative runtime transport.
 
     The runtime_evidence builder is the only owner of completeness, status,
     eligibility, and the public wire representation.
     """
     try:
-        raw = _read(path)
+        raw = source if isinstance(source, bytes) else _read(source)
     except FileNotFoundError:
         return empty_capture("missing_capture")
     except (OSError, InvalidObservation):

@@ -18,7 +18,7 @@ from typing import Any
 
 try:
     from .evidence_safety import OMITTED, Projection, Sanitizer
-    from .native_observer import OBSERVATION_PATH, load_runtime_observations
+    from .native_observer import OBSERVER_STREAM_ENV, RuntimeObservationTransport
     from .runtime_evidence import (
         build_runtime_evidence,
         unsupported_runtime_evidence,
@@ -26,7 +26,7 @@ try:
     )
 except ImportError:
     from evidence_safety import OMITTED, Projection, Sanitizer
-    from native_observer import OBSERVATION_PATH, load_runtime_observations
+    from native_observer import OBSERVER_STREAM_ENV, RuntimeObservationTransport
     from runtime_evidence import (
         build_runtime_evidence,
         unsupported_runtime_evidence,
@@ -827,8 +827,8 @@ def runtime_sanitizer(env: dict[str, str]) -> Sanitizer:
 
 def configure_runtime_observer_env(env: dict[str, str], sanitizer: Sanitizer) -> None:
     # The same inventory used by the Python pre-sink guard is supplied to the
-    # in-process observer so no raw dynamic credential value is written to its
-    # capture file before projection.
+    # in-process observer so no raw dynamic credential value reaches the
+    # runner-owned capture stream before projection.
     env["OPENCODE_EVAL_OBSERVER_CREDENTIALS"] = json.dumps(
         list(sanitizer.credentials),
         ensure_ascii=False,
@@ -837,6 +837,17 @@ def configure_runtime_observer_env(env: dict[str, str], sanitizer: Sanitizer) ->
     env["OPENCODE_EVAL_OBSERVER_CREDENTIALS_COMPLETE"] = (
         "1" if sanitizer.inventory_complete else "0"
     )
+
+
+def finalize_runtime_observer(
+    transport: RuntimeObservationTransport,
+    env: dict[str, str],
+) -> dict[str, Any]:
+    """Drain and close the runner-owned observer stream exactly once."""
+    try:
+        return transport.finish()
+    finally:
+        env.pop(OBSERVER_STREAM_ENV, None)
 
 
 def sanitize_result_for_output(
@@ -892,9 +903,10 @@ def invoke_opencode(
         command += ["--agent", agent]
     command += ["--model", invoked_model, prompt]
 
-    # The preflight process can activate the observer. Never mix its records
-    # with the real invocation.
-    OBSERVATION_PATH.unlink(missing_ok=True)
+    # Preflight intentionally receives no observer endpoint. Create a
+    # one-connection runner-owned stream only for the real invocation.
+    observer_transport = RuntimeObservationTransport()
+    env[OBSERVER_STREAM_ENV] = observer_transport.endpoint
     run_started = time.perf_counter()
     try:
         proc = run(command, Path("/workspace"), env, timeout)
@@ -905,7 +917,7 @@ def invoke_opencode(
         events = parse_events(raw_stdout)
         safe_stdout, _ = sanitizer.json_lines(raw_stdout)
         sid = session_id(events)
-        capture = load_runtime_observations()
+        capture = finalize_runtime_observer(observer_transport, env)
         runtime_evidence = build_runtime_evidence(
             capture,
             sanitizer,
@@ -953,13 +965,16 @@ def invoke_opencode(
             "plugin_preflight": plugin_preflight,
         }
         return sanitize_result_for_output(result, sanitizer)
+    except BaseException:
+        finalize_runtime_observer(observer_transport, env)
+        raise
 
     run_seconds = time.perf_counter() - run_started
     events = parse_events(proc.stdout)
     safe_stdout, _ = sanitizer.json_lines(proc.stdout)
     safe_stderr, _ = sanitizer.json_lines(proc.stderr)
     sid = session_id(events)
-    capture = load_runtime_observations()
+    capture = finalize_runtime_observer(observer_transport, env)
     runtime_evidence = build_runtime_evidence(
         capture,
         sanitizer,

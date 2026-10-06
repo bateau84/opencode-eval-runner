@@ -137,13 +137,13 @@ Authoritative dynamic values follow this order:
 raw observation in observer memory
   -> sanitize/redact/omit
   -> size decision
-  -> internal capture record
+  -> runner-owned one-connection stream
   -> validate/account
   -> result serialization
   -> stdout/host-file persistence
 \`\`\`
 
-Credential material is therefore removed before the first observation-file or result-output sink. Oversized or unsafe values become explicit field states rather than clipped authoritative values.
+Credential material is therefore removed before the first authoritative observation transport or result-output sink. Oversized or unsafe values become explicit field states rather than clipped authoritative values.
 
 Product outcome remains independent:
 

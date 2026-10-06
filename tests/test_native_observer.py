@@ -1,11 +1,16 @@
 from __future__ import annotations
 
 import json
+import socket
 from pathlib import Path
 import tempfile
 import unittest
 
-from container.native_observer import SCHEMA, load_runtime_observations
+from container.native_observer import (
+    SCHEMA,
+    RuntimeObservationTransport,
+    load_runtime_observations,
+)
 
 
 def available(value):
@@ -107,6 +112,24 @@ class RuntimeObserverAdapterTests(unittest.TestCase):
         self.assertEqual(result["issues"], [])
         self.assertNotIn("status", result)
         self.assertNotIn("evidence_eligible", result)
+
+    def test_runner_owned_stream_capture_round_trip(self):
+        records = [
+            event(0, **HEADER),
+            native_start(),
+            native_terminal(),
+            capture_end(),
+        ]
+        payload = ("\n".join(json.dumps(item) for item in records) + "\n").encode()
+        transport = RuntimeObservationTransport()
+        host, raw_port = transport.endpoint.rsplit(":", 1)
+        with socket.create_connection((host, int(raw_port)), timeout=1) as client:
+            client.sendall(payload)
+        result = transport.finish()
+        self.assertTrue(result["capture_started"])
+        self.assertTrue(result["capture_ended"])
+        self.assertEqual(len(result["records"]), 2)
+        self.assertEqual(result["issues"], [])
 
     def test_missing_capture_does_not_report_zero_coverage(self):
         result = load_runtime_observations(Path("/definitely/missing/runtime-observer.jsonl"))

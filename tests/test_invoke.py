@@ -757,7 +757,10 @@ class OpenCodeTransportTests(unittest.TestCase):
         self.assertIn('Path(__file__).with_name("native_observer.ts")', invoke)
         self.assertIn('observer_root / "server.ts"', invoke)
         self.assertIn('"OPENCODE_CONFIG_CONTENT": json.dumps({"plugins": [observer_root.as_uri()]})', invoke)
-        self.assertIn("OBSERVATION_PATH.unlink(missing_ok=True)", invoke)
+        self.assertIn("RuntimeObservationTransport()", invoke)
+        self.assertIn("env[OBSERVER_STREAM_ENV] = observer_transport.endpoint", invoke)
+        self.assertIn("finalize_runtime_observer(observer_transport, env)", invoke)
+        self.assertNotIn("runtime-observer.jsonl", invoke)
         self.assertIn('"runtime_evidence": runtime_evidence', invoke)
         self.assertNotIn('"native_tool_observations"', invoke)
 
