@@ -563,6 +563,7 @@ def _capture_issue_kind(code: str) -> str:
     if code in {
         "malformed_capture",
         "malformed_observation",
+        "duplicate_sequence",
         "wrong_schema",
         "ambiguous_order",
         "records_after_capture_end",
@@ -597,6 +598,7 @@ def build_runtime_evidence(
     records = capture.get("records") if isinstance(capture.get("records"), list) else []
     starts: dict[str, Mapping[str, Any]] = {}
     terminals: dict[str, Mapping[str, Any]] = {}
+    seen_raw_sequences: set[int] = set()
     adapter_invalid = False
     loss_codes: list[str] = []
 
@@ -618,6 +620,12 @@ def build_runtime_evidence(
         if type(invocation_id) is not str or not invocation_id or type(sequence) is not int or sequence < 0:
             adapter_invalid = True
             continue
+        if sequence in seen_raw_sequences:
+            adapter_invalid = True
+            if "duplicate_sequence" not in loss_codes:
+                loss_codes.append("duplicate_sequence")
+            continue
+        seen_raw_sequences.add(sequence)
         target = starts if kind in {"native_start", "code_start"} else terminals if kind in {"native_terminal", "code_terminal"} else None
         if target is None or invocation_id in target:
             adapter_invalid = True
