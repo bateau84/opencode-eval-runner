@@ -34,28 +34,28 @@ def capture(*records, ended=True, failures=0, callbacks=0, issues=()):
     }
 
 
-def native_start(iid="n1", seq=1, call="call-1", input_value=None):
+def native_start(iid="n1", seq=1, call="call-1", input_value=None, tool="runtimeevidence_nativeSuccess"):
     return {
         "kind": "native_start",
         "sequence": seq,
         "invocation_id": iid,
-        "tool": available("runtimeevidence_nativeSuccess"),
+        "tool": available(tool),
         "session_id": available("ses-1"),
         "agent": available("general"),
         "message_id": available("msg-1"),
         "call_id": available(call),
         "parent_session_id": available(None),
         "input": available(input_value or {"value": "accepted"}),
-        "boundary": "decoded-tool-execute",
+        "boundary": "tool-execute-before" if tool == "execute" else "decoded-tool-execute",
     }
 
 
-def native_terminal(iid="n1", seq=2, call="call-1", outcome="success", value=None):
+def native_terminal(iid="n1", seq=2, call="call-1", outcome="success", value=None, tool="runtimeevidence_nativeSuccess"):
     item = {
         "kind": "native_terminal",
         "sequence": seq,
         "invocation_id": iid,
-        "tool": available("runtimeevidence_nativeSuccess"),
+        "tool": available(tool),
         "session_id": available("ses-1"),
         "agent": available("general"),
         "message_id": available("msg-1"),
@@ -127,10 +127,10 @@ class RuntimeEvidenceTests(unittest.TestCase):
 
     def test_code_execution_facts_are_eligible_but_final_value_is_not(self):
         evidence = build_runtime_evidence(capture(
-            native_start(),
+            native_start(call="outer-call", input_value={"code": "return 1"}, tool="execute"),
             code_start(),
             code_terminal(),
-            native_terminal(seq=5),
+            native_terminal(seq=5, call="outer-call", tool="execute"),
         ))
         code = next(item for item in evidence["observations"] if item["mode"] == "code_mode")
         self.assertEqual(evidence["coverage"]["boundaries"][BOUNDARY_CODE_MODE_EXECUTION]["status"], "complete")
@@ -236,12 +236,12 @@ class RuntimeEvidenceTests(unittest.TestCase):
 
     def test_concurrent_identical_code_calls_correlate_by_identity_not_fifo(self):
         evidence = build_runtime_evidence(capture(
-            native_start(seq=1, call="outer-call"),
+            native_start(seq=1, call="outer-call", input_value={"code": "return 1"}, tool="execute"),
             code_start("a", 2),
             code_start("b", 3),
             code_terminal("b", 4),
             code_terminal("a", 5),
-            native_terminal(seq=6, call="outer-call"),
+            native_terminal(seq=6, call="outer-call", tool="execute"),
         ))
         code = [item for item in evidence["observations"] if item["mode"] == "code_mode"]
         self.assertEqual([item["invocation_id"] for item in code], ["a", "b"])
@@ -251,6 +251,23 @@ class RuntimeEvidenceTests(unittest.TestCase):
             [{"tag": "same"}, {"tag": "same"}],
         )
         self.assertEqual(assertion_status(evidence, [BOUNDARY_CODE_MODE_EXECUTION]), "complete")
+
+    def test_code_parent_must_resolve_to_observed_outer_execute(self):
+        evidence = build_runtime_evidence(capture(
+            code_start(seq=1),
+            code_terminal(seq=2),
+        ))
+        self.assertEqual(evidence["status"], "invalid")
+        self.assertFalse(evidence["evidence_eligible"])
+
+        evidence = build_runtime_evidence(capture(
+            native_start(seq=1, call="outer-call", tool="runtimeevidence_nativeSuccess"),
+            code_start(seq=2),
+            code_terminal(seq=3),
+            native_terminal(seq=4, call="outer-call"),
+        ))
+        self.assertEqual(evidence["status"], "invalid")
+        self.assertFalse(evidence["evidence_eligible"])
 
     def test_validator_rejects_forged_global_eligibility(self):
         evidence = build_runtime_evidence(capture(native_start(), native_terminal()))
