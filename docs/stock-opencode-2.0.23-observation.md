@@ -14,7 +14,7 @@ OpenCode remains stock and immutable. A missing observation boundary is reported
 | Session creation / ancestry | `session.created` + Session API | supported |
 | Agent for a step | Session step/message events | supported |
 | Native tool call identity/input | Tool transform wrapping the decoded executable boundary | implemented and integration-tested |
-| Native terminal success/failure | Last runner-owned `tool.execute.after` hook | implemented and integration-tested |
+| Native terminal success/failure | `session.tool.success` / `session.tool.failed` from `ctx.event.subscribe()` | implemented and integration-tested |
 | Tool pre-execution hook | `ctx.tool.hook("execute.before")` | supported; occurs before tool decode/execution |
 | Tool post-handler hook | `ctx.tool.hook("execute.after")` | supported; occurs after handler result but before later core normalization |
 | Tool registration wrapping | `ctx.tool.transform(...)` | supported candidate for reviewed same-process instrumentation |
@@ -26,13 +26,13 @@ OpenCode remains stock and immutable. A missing observation boundary is reported
 The implemented native observer uses two supported stock boundaries:
 
 - a final tool transform wraps direct tools (`options.codemode === false`) and records the value passed to `tool.execute`, after stock input decoding;
-- a final runner-owned `tool.execute.after` hook records the resolved tool name, exact Session/agent/message/call identity, and the completed result or `Tool.Error`.
+- a runner-owned live event subscriber records canonical `session.tool.success` / `session.tool.failed` terminals and correlates them to the start by exact Session/message/call identity.
 
 The observer is injected through `OPENCODE_CONFIG_CONTENT`, which stock 2.0.23 loads as the final local config source. That makes its transform/hook later than discovered global/project plugins rather than relying on filename ordering.
 
 Correlation is only by `(sessionID, messageID, callID)`. Input equality, FIFO pairing, model text, and tool-returned JSON are not correlation sources.
 
-The terminal snapshot is the last plugin-hook representation after stock tool execution/output validation. Later stock image/session projection is outside this observer's claimed boundary and is not silently reconstructed.
+The terminal snapshot is Session-owned: success is the post-truncation Session content/metadata and failure is the canonical Session error. This also covers defects that bypass `tool.execute.after`; no terminal is invented when the Session itself has not settled the call.
 
 ## Code Mode
 
