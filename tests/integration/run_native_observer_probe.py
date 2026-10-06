@@ -119,6 +119,34 @@ def inside() -> int:
 
     observed = result.get("native_tool_observations", {})
     records = observed.get("records", [])
+    runtime_tool_parts = []
+    for line in result.get("stdout", "").splitlines():
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        part = event.get("part") if isinstance(event, dict) else None
+        if event.get("type") == "tool_use" and isinstance(part, dict) and part.get("type") == "tool":
+            runtime_tool_parts.append(part)
+
+    observer_identity = [
+        (record.get("tool"), record.get("message_id"), record.get("call_id"))
+        for record in records
+    ]
+    runtime_identity = [
+        (part.get("tool"), part.get("messageID"), part.get("id"))
+        for part in runtime_tool_parts
+    ]
+    success_results = [
+        record.get("result", {}).get("value", {})
+        for record in records
+        if record.get("outcome") == "success"
+    ]
+    failure_message = (
+        records[1].get("error", {}).get("value", {}).get("message")
+        if len(records) == 3
+        else None
+    )
     checks = {
         "stock_2_0_23": version in {"2.0.23", "opencode v2.0.23"},
         "transport_success": result.get("exit_code") == 0,
@@ -128,10 +156,21 @@ def inside() -> int:
         "real_call_ids": [r.get("call_id") for r in records] == ["native-call-1", "native-call-fail", "native-call-2"],
         "session_identity": bool(result.get("session_id")) and all(r.get("session_id") == result.get("session_id") for r in records),
         "actor_identity": all(r.get("agent") == "build" and isinstance(r.get("message_id"), str) and r.get("message_id") for r in records),
+        "runtime_identity_crosscheck": len(runtime_tool_parts) == 3 and observer_identity == runtime_identity,
         "accepted_input": [r.get("input", {}).get("value", {}).get("tag") for r in records]
             == ["accepted:raw-1", "accepted:raw-fail", "accepted:raw-2"],
         "terminal_outcomes": [r.get("outcome") for r in records] == ["success", "failure", "success"],
-        "terminal_error": len(records) == 3 and isinstance(records[1].get("error", {}).get("value", {}).get("message"), str),
+        "terminal_success_result": len(success_results) == 2
+            and [value.get("metadata", {}).get("accepted") for value in success_results]
+                == ["accepted:raw-1", "accepted:raw-2"]
+            and all(
+                isinstance(value.get("content"), list)
+                and value["content"]
+                and '"fake":true' in value["content"][0].get("text", "").replace(" ", "")
+                for value in success_results
+            ),
+        "terminal_error": isinstance(failure_message, str)
+            and failure_message == "native-probe-failure:accepted:raw-fail",
         "start_terminal_correlation": all(
             isinstance(r.get("start_sequence"), int) and isinstance(r.get("terminal_sequence"), int)
             and r["start_sequence"] < r["terminal_sequence"] for r in records
