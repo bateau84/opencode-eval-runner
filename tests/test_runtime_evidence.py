@@ -5,6 +5,7 @@ import unittest
 from contextlib import redirect_stdout
 
 from container.invoke import emit_result
+from runner.cli import RunnerError, validate_container_result
 from container.runtime_evidence import (
     RUNTIME_EVIDENCE_SCHEMA,
     RuntimeEvidenceError,
@@ -133,6 +134,17 @@ class RuntimeEvidenceContractTests(unittest.TestCase):
         with redirect_stdout(output):
             emit_result(result)
         self.assertIn('"runtime_evidence"', output.getvalue())
+
+    def test_host_rejects_missing_runtime_evidence(self):
+        with self.assertRaisesRegex(RunnerError, "invalid runtime_evidence"):
+            validate_container_result({"schema": "opencode-eval-runner/v1"})
+
+    def test_host_accepts_explicit_unsupported_contract(self):
+        result = {
+            "schema": "opencode-eval-runner/v1",
+            "runtime_evidence": unsupported_runtime_evidence("observer_not_implemented"),
+        }
+        self.assertIs(validate_container_result(result), result)
 
 
 if __name__ == "__main__":

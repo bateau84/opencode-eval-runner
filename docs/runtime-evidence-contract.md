@@ -157,7 +157,7 @@ The validator rejects:
 - unsupported observation fields that are not reflected in `coverage.unsupported`;
 - unavailable values represented as empty/default values instead of an explicit field state.
 
-The container validates `runtime_evidence` immediately before emitting the result. A malformed future observer result therefore becomes an infrastructure error rather than behavioral evidence.
+The container validates `runtime_evidence` immediately before emitting the result, and the host runner validates it again before persistence or printing. An alternate or stale image that omits or corrupts the contract is therefore rejected as infrastructure failure rather than accepted as behavioral evidence.
 
 ## Relationship to PR #41
 
