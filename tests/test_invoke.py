@@ -755,6 +755,7 @@ class OpenCodeTransportTests(unittest.TestCase):
         )
         self.assertIn('observer_root = config / "eval-native-observer"', invoke)
         self.assertIn('Path(__file__).with_name("native_observer.ts")', invoke)
+        self.assertIn('observer_root / "server.ts"', invoke)
         self.assertIn('"OPENCODE_CONFIG_CONTENT": json.dumps({"plugins": [observer_root.as_uri()]})', invoke)
         self.assertIn("OBSERVATION_PATH.unlink(missing_ok=True)", invoke)
         self.assertIn('"native_tool_observations": native_tool_observations', invoke)
