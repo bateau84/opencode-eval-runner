@@ -16,7 +16,10 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-from container.native_observer import OBSERVATION_PATH, load_native_observations
+if __package__:
+    from container.native_observer import OBSERVATION_PATH, load_native_observations
+else:
+    from native_observer import OBSERVATION_PATH, load_native_observations
 
 RESULT_SCHEMA = "opencode-eval-runner/v1"
 OPENCODE_EVAL_TITLE = "opencode-eval-runner"
