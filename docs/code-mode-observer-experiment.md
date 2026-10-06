@@ -20,7 +20,7 @@ Stock OpenCode 2.0.23 supports a useful partial observation path:
 | unique inner invocation identity | runner-owned `tool.transform` wrapper allocates an ID when the decoded leaf handler is actually entered | **supported** |
 | actual selected tool | wrapper is attached to the effective registered tool | **supported** |
 | executable input | wrapper runs after core input decoding and receives the value passed to the leaf handler | **supported** |
-| real outer `execute` binding | the real `Tool.Context` carries Session/message/outer CallID into each inner leaf | **supported** |
+| real outer `execute` binding | the real `Tool.Context` carries Session/message/outer CallID into each inner leaf; production evidence also records the outer call at `execute.before` | **supported** |
 | start / handler-terminal ordering | runner observer sequence around the transformed leaf handler | **supported** |
 | exact final value delivered to the Code Mode script | no supported public stock boundary exposes it with unique inner identity | **unsupported** |
 | exact final error seen by the script catch path | no supported public stock boundary exposes it with unique inner identity | **unsupported** |
@@ -56,6 +56,8 @@ per-call ID at a real execution boundary and observe:
 - decoded/executable input;
 - the real Session ID, agent, message ID and outer `execute` CallID carried in
   `Tool.Context`;
+- a parent ID that resolves to the separately observed model-facing outer `execute`
+  invocation rather than to an internal correlation-only token;
 - handler return or throw;
 - start and handler completion order.
 
