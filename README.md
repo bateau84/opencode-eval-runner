@@ -72,7 +72,7 @@ Known API-key environment variables are passed when present:
 
 Additional variables require explicit `--env NAME`.
 
-Reasoning can be pinned explicitly with `--reasoning LEVEL`. The pinned OpenCode 2.0.18 CLI represents a model variant in the model reference, so the runner maps `--model provider/model --reasoning LEVEL` to `opencode run --model provider/model#LEVEL`. Supplying both a `#variant` in `--model` and `--reasoning` is rejected as ambiguous. If the model reference already contains a variant and `--reasoning` is omitted, the result records that variant with `"reasoning_source": "model-variant"`. If neither form supplies a level, the runner leaves OpenCode's provider/model default untouched and records `"reasoning": "provider-default"`.
+Reasoning can be pinned explicitly with `--reasoning LEVEL`. The pinned stock OpenCode 2.0.23 CLI represents a model variant in the model reference, so the runner maps `--model provider/model --reasoning LEVEL` to `opencode run --model provider/model#LEVEL`. Supplying both a `#variant` in `--model` and `--reasoning` is rejected as ambiguous. If the model reference already contains a variant and `--reasoning` is omitted, the result records that variant with `"reasoning_source": "model-variant"`. If neither form supplies a level, the runner leaves OpenCode's provider/model default untouched and records `"reasoning": "provider-default"`.
 
 ### `github-copilot-cli`
 
@@ -173,7 +173,7 @@ opencode-eval-runner invoke \
   ...
 ```
 
-OpenCode 2.0.18 does not expose the old singular `debug agent <id>` command that returned a resolved tool map. The runner therefore performs the strongest supported zero-inference preflight: it requires the expected plugin entrypoint to be materialized in the isolated OpenCode config, runs `opencode debug agents` to prove the configured location starts successfully with plugins active, and requires the selected agent to resolve. Missing plugin materialization, plugin/startup failure, or missing agent is infrastructure/non-evidence, never a behavioral FAIL. Actual tool use remains a repository-owned behavioral assertion in the eval corpus.
+Stock OpenCode 2.0.23 does not expose the old singular `debug agent <id>` command that returned a resolved tool map. The runner therefore performs the strongest supported zero-inference preflight: it requires the expected plugin entrypoint to be materialized in the isolated OpenCode config, runs `opencode debug agents` to prove the configured location starts successfully with plugins active, and requires the selected agent to resolve. Missing plugin materialization, plugin/startup failure, or missing agent is infrastructure/non-evidence, never a behavioral FAIL. Actual tool use remains a repository-owned behavioral assertion in the eval corpus.
 
 ### Evaluating a skill
 
@@ -315,7 +315,7 @@ The eval repository decides whether that observed behavior is PASS, FAIL, or non
 
 The transport images currently pin:
 
-- OpenCode CLI `2.0.18`
+- OpenCode CLI `2.0.23`
 - GitHub Copilot CLI `1.0.83`
 
 The two CLIs are not bundled together. OpenCode's npm package is used only as a build-time native-binary selector; GitHub Copilot CLI is installed from its native release installer. Node/npm are absent from the final runtime images.
@@ -339,6 +339,18 @@ OPENCODE_EVAL_RUNNER_COPILOT_IMAGE=...
 ```
 
 Tags matching `v*` are published with `opencode-` and `copilot-` prefixes.
+
+## Evaluation trust model
+
+The normal evaluation profile is a **trusted-checkout** profile. It assumes the runner, pinned stock OpenCode runtime, reviewed instrumentation, and explicitly selected evaluated checkout/dependencies are trusted components of the evaluation environment.
+
+They are not trusted merely because they produce data that looks like evidence. Model prose, tool-returned collector-shaped JSON, target-writable files, requested actions, inferred identities, and reconstructed results do not establish that an event occurred.
+
+Authoritative runtime observations must come from reviewed instrumentation observing actual execution. Missing, partial, ambiguous, or unsupported required observations are non-evidence and must fail closed for the affected assertion.
+
+This profile does **not** claim resistance to an evaluated plugin that deliberately compromises the trusted runtime or instrumentation. Hostile-plugin isolation is a separate optional profile, not a prerequisite for normal Loom evaluation.
+
+See [Trusted-checkout runtime evidence](docs/trusted-checkout-evidence.md).
 
 ## Security boundary
 
