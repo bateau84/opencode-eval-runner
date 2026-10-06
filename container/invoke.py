@@ -16,6 +16,8 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
+from container.native_observer import OBSERVATION_PATH, load_native_observations
+
 RESULT_SCHEMA = "opencode-eval-runner/v1"
 OPENCODE_EVAL_TITLE = "opencode-eval-runner"
 COPILOT_AGENT_NAME = "eval-runner"
@@ -304,6 +306,10 @@ def prepare_opencode_env() -> dict[str, str]:
             json.dumps({"$schema": "https://opencode.ai/config.json"}) + "\n",
             encoding="utf-8",
         )
+    observer_root = config / "eval-native-observer"
+    observer_root.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(Path(__file__).with_name("native_observer.ts"), observer_root / "index.ts")
+
     if seed_config_root.is_dir():
         # Loom itself can be an OpenCode global config root. OpenCode 2.0.11's
         # packaged runtime can fail to register directory plugins even when
@@ -345,6 +351,10 @@ def prepare_opencode_env() -> dict[str, str]:
         "XDG_CACHE_HOME": str(cache),
         "XDG_STATE_HOME": str(state),
         "OPENCODE_CONFIG_DIR": str(config),
+        # Inline config is the highest-priority local config in stock 2.0.23.
+        # Register the runner-owned observer there so its tool transform runs
+        # after project/global plugin transforms instead of depending on filename order.
+        "OPENCODE_CONFIG_CONTENT": json.dumps({"plugins": [observer_root.as_uri()]}),
         "OPENCODE_DB": "opencode.db",
         "OPENCODE_DISABLE_AUTOUPDATE": "1",
     })
@@ -641,6 +651,7 @@ def plugin_diagnostic(env: dict[str, str]) -> dict[str, Any]:
     loom_root = plugins_root / "loom"
     loom_flat = plugins_root / "loom.ts"
     loom_module_root = config_root / "loom-plugin"
+    observer_root = config_root / "eval-native-observer"
     return {
         "config_root": str(config_root),
         "config_root_exists": config_root.exists(),
@@ -654,6 +665,8 @@ def plugin_diagnostic(env: dict[str, str]) -> dict[str, Any]:
         "loom_index_exists": (loom_root / "index.ts").is_file(),
         "loom_flat_exists": loom_flat.is_file(),
         "loom_module_index_exists": (loom_module_root / "index.ts").is_file(),
+        "native_observer_exists": (observer_root / "index.ts").is_file(),
+        "native_observer_inline_configured": "eval-native-observer" in env.get("OPENCODE_CONFIG_CONTENT", ""),
     }
 
 
@@ -710,6 +723,10 @@ def invoke_opencode(
     if agent:
         command += ["--agent", agent]
     command += ["--model", invoked_model, prompt]
+
+    # A plugin-preflight process may have activated the observer already.
+    # Never let that prior process become evidence for the real invocation.
+    OBSERVATION_PATH.unlink(missing_ok=True)
     run_started = time.perf_counter()
     try:
         proc = run(command, Path("/workspace"), env, timeout)
@@ -719,6 +736,7 @@ def invoke_opencode(
         stderr = timeout_output(exc.stderr)
         events = parse_events(stdout)
         sid = session_id(events)
+        native_tool_observations = load_native_observations()
         summary = last_event_summary(events)
         detail = (
             f"opencode run timed out after {timeout}s; "
@@ -755,6 +773,7 @@ def invoke_opencode(
             "stdout_truncated": len(stdout) > STDOUT_CAPTURE_LIMIT,
             "stdout_total_chars": len(stdout),
             "tool_result_evidence": extract_tool_result_evidence(events),
+            "native_tool_observations": native_tool_observations,
             "plugin_diagnostic": plugins,
             "plugin_preflight": plugin_preflight,
         }
@@ -762,6 +781,7 @@ def invoke_opencode(
     run_seconds = time.perf_counter() - run_started
     events = parse_events(proc.stdout)
     sid = session_id(events)
+    native_tool_observations = load_native_observations()
 
     # The structured `opencode run --format json` event stream is the
     # authoritative evidence source. Starting a second OpenCode process to
@@ -802,6 +822,7 @@ def invoke_opencode(
         "stdout_truncated": len(proc.stdout) > STDOUT_CAPTURE_LIMIT,
         "stdout_total_chars": len(proc.stdout),
         "tool_result_evidence": extract_tool_result_evidence(events),
+        "native_tool_observations": native_tool_observations,
         "plugin_diagnostic": plugins,
         "plugin_preflight": plugin_preflight,
     }
