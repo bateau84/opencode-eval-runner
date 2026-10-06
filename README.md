@@ -285,7 +285,7 @@ Example:
 
 ## Result contract
 
-Each invocation writes one JSON document:
+Each invocation writes one `opencode-eval-runner/v1` JSON document. Every official result includes the canonical `runtime_evidence` object.
 
 ```json
 {
@@ -299,18 +299,66 @@ Each invocation writes one JSON document:
   "exit_code": 0,
   "session_id": "...",
   "text": "...",
-  "tools": ["skill"],
-  "actions": [{"tool": "skill", "args": {"id": "architectural-design"}}],
-  "skills_loaded": ["architectural-design"],
+  "tools": [],
+  "actions": [],
+  "skills_loaded": [],
   "stderr": "",
-  "stdout": "..."
+  "stdout": "...",
+  "runtime_evidence": {
+    "schema": "opencode-eval-runner/runtime-evidence/v1",
+    "status": "complete",
+    "evidence_eligible": true,
+    "observations": [],
+    "coverage": {
+      "observation_closed": {"state": "available", "value": true},
+      "process_state": "completed",
+      "starts": {"state": "available", "value": 0},
+      "terminals": {"state": "available", "value": 0},
+      "missing_terminals": {"state": "available", "value": 0},
+      "observer_failures": {"state": "available", "value": 0},
+      "callback_failures": {"state": "available", "value": 0},
+      "losses": [],
+      "unsupported": ["stock_codemode_final_boundary_not_exposed"],
+      "boundaries": {
+        "native": {
+          "status": "complete",
+          "evidence_eligible": true,
+          "starts": {"state": "available", "value": 0},
+          "terminals": {"state": "available", "value": 0},
+          "missing_terminals": {"state": "available", "value": 0},
+          "issues": []
+        },
+        "code_mode_execution": {
+          "status": "complete",
+          "evidence_eligible": true,
+          "starts": {"state": "available", "value": 0},
+          "terminals": {"state": "available", "value": 0},
+          "missing_terminals": {"state": "available", "value": 0},
+          "issues": []
+        },
+        "code_mode_finality": {
+          "status": "unsupported",
+          "evidence_eligible": false,
+          "starts": {"state": "unsupported", "reason": "stock_codemode_final_boundary_not_exposed"},
+          "terminals": {"state": "unsupported", "reason": "stock_codemode_final_boundary_not_exposed"},
+          "missing_terminals": {"state": "unsupported", "reason": "stock_codemode_final_boundary_not_exposed"},
+          "issues": ["stock_codemode_final_boundary_not_exposed"]
+        }
+      }
+    }
+  }
 }
 ```
 
-The container emits this object as a single JSON line on stdout. The host harness writes artifact files itself, so no writable bind mount is required for result transport.
+The container emits this object as a single JSON line on stdout. The host harness re-validates `runtime_evidence` before it writes the result artifact, so a missing or malformed runtime-evidence object is rejected rather than silently downgraded.
 
-The eval repository decides whether that observed behavior is PASS, FAIL, or non-evidence.
+`runtime_evidence` is required for every official transport result. `github-copilot-cli` also emits the canonical object, but with `status: "unsupported"` because it has no OpenCode runtime observer.
 
+If you override `--image`, treat the host runner and image as one compatibility pair. Legacy or custom images that do not emit a valid `opencode-eval-runner/runtime-evidence/v1` object are rejected by this host version; upgrade the host executable and image together.
+
+For runtime verdicts, do not use top-level `evidence_eligible` by itself. An assertion may use evidence only when every boundary it requires is `complete` and every exact field it requires is `available`. `redacted`, `omitted`, or `unsupported` required fields are not PASS evidence. Existing `tools`, `actions`, `tool_result_evidence`, stdout/stderr, and model text are diagnostic/convenience data and must not fill an authoritative-evidence gap. See [Runtime evidence contract v1](docs/runtime-evidence-contract.md).
+
+The eval repository still owns the assertion semantics and decides PASS, FAIL, or non-evidence after applying those eligibility rules.
 ## Image versions
 
 The transport images currently pin:
