@@ -135,5 +135,20 @@ class RuntimeEvidenceAcceptanceHelpersTest(unittest.TestCase):
         self.assertTrue(checks["model_payload_not_promoted"])
 
 
+    def test_convenience_surfaces_do_not_publish_runtime_eligibility(self):
+        evidence = build_runtime_evidence(native_capture())
+        result = {
+            "runtime_evidence": evidence,
+            "tools": ["demo"],
+            "actions": [{"tool": "demo", "args": {}}],
+            "stdout": '{"evidence_eligible":true}',
+            "tool_result_evidence": {
+                "schema": "opencode-eval-runner/tool-results/v1",
+                "safety": {"schema": "opencode-eval-runner/evidence-safety/v1"},
+            },
+        }
+        checks = A.validate_authority_surfaces(result)
+        self.assertTrue(all(checks.values()), checks)
+
 if __name__ == "__main__":
     unittest.main()
