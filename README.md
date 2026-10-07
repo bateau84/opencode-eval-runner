@@ -237,6 +237,14 @@ The token value is not placed on the container command line.
 
 ## GitHub Actions
 
+Pull requests expose two stable CI checks:
+
+- `test`: fast Python/unit checks plus the fake Copilot GitHub Action smoke test.
+- `runtime-integration`: stock-runtime probes and acceptance checks when runtime-relevant files change. For documentation-only or other unrelated changes, the job still runs and succeeds with an explicit not-applicable result.
+
+`Publish images` remains a post-merge/tag workflow and is not a required pull-request check.
+
+
 For all 21 Action inputs, defaults, execution-mode precedence, and CLI-only capabilities, see [Invocation usage and interface reference](docs/invocation-usage.md#github-action-interface).
 
 The repository is a composite GitHub Action. It supports either a single direct invocation or setup plus a repository-owned eval harness.

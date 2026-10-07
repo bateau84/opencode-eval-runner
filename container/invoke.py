@@ -346,50 +346,6 @@ def extract_loaded_skills(events: list[dict[str, Any]]) -> list[str]:
     return found
 
 
-def loaded_skills_from_export(exported: Any) -> list[str]:
-    found: list[str] = []
-    messages = exported if isinstance(exported, list) else exported.get("messages", []) if isinstance(exported, dict) else []
-    for message in messages:
-        if not isinstance(message, dict):
-            continue
-        info = message.get("info")
-        if not isinstance(info, dict) or info.get("role") != "assistant":
-            continue
-        for part in message.get("parts", []):
-            if not isinstance(part, dict):
-                continue
-            skill = completed_skill_from_part(part)
-            if skill and skill not in found:
-                found.append(skill)
-    return found
-
-
-def assistant_from_export(exported: Any) -> tuple[str, list[str], list[dict[str, Any]]]:
-    parts: list[str] = []
-    tools: list[str] = []
-    actions: list[dict[str, Any]] = []
-    messages = exported if isinstance(exported, list) else exported.get("messages", []) if isinstance(exported, dict) else []
-    for message in messages:
-        if not isinstance(message, dict):
-            continue
-        info = message.get("info")
-        if not isinstance(info, dict) or info.get("role") != "assistant":
-            continue
-        for part in message.get("parts", []):
-            if not isinstance(part, dict):
-                continue
-            if part.get("type") == "text" and isinstance(part.get("text"), str):
-                value = part["text"].strip()
-                if value and part.get("synthetic") is not True and part.get("ignored") is not True:
-                    parts.append(value)
-            if part.get("type") == "tool" and isinstance(part.get("tool"), str):
-                tools.append(part["tool"])
-                action = tool_action(part)
-                if action:
-                    actions.append(action)
-    return "\n\n".join(parts), list(dict.fromkeys(tools)), actions
-
-
 def prepare_opencode_env() -> dict[str, str]:
     env = dict(os.environ)
     root = Path("/tmp/runtime")
