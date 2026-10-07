@@ -25,12 +25,16 @@ from runner.eval_types import ArtifactIdentity, EvalJob, JsonValue, RunPlan
 
 EVAL_RUN_SCHEMA = "opencode-eval-runner/eval-run/v1"
 EVAL_ARTIFACT_SCHEMA = "opencode-eval-runner/eval-artifact/v1"
+EVAL_PAIRED_ARTIFACT_SCHEMA = "opencode-eval-runner/eval-paired-artifact/v1"
+EVAL_PAIR_IDENTITY_SCHEMA = "opencode-eval-runner/eval-pair-identity/v1"
 RUNNER_RESULT_SCHEMA = "opencode-eval-runner/v1"
 
 CLASSIFICATIONS = frozenset({"pass", "fail", "non-evidence"})
 LANES = frozenset({"standard", "runtime"})
 READINESS_STATUSES = frozenset({"ready", "incomplete", "unsupported", "invalid"})
 FAILURE_PLANES = frozenset({"infrastructure", "product", "evidence"})
+PAIRED_EXECUTION_MODES = frozenset({"sequential", "parallel"})
+PAIRED_SIDES = ("baseline", "candidate")
 _SHA256_HEX = re.compile(r"^[0-9a-f]{64}$")
 
 
@@ -307,6 +311,150 @@ def validate_eval_artifact(value: Any) -> dict[str, Any]:
     return verify_artifact_evidence_id(value)
 
 
+def calculate_pair_id(run_id: str, case_id: str, iteration: int) -> str:
+    """Return the stable identity shared by both sides of one paired eval."""
+
+    _string(run_id, "paired identity.run_id")
+    _string(case_id, "paired identity.case")
+    _integer(iteration, "paired identity.iteration", minimum=1)
+    identity = {
+        "schema": EVAL_PAIR_IDENTITY_SCHEMA,
+        "run_id": run_id,
+        "case": case_id,
+        "iteration": iteration,
+    }
+    return hashlib.sha256(canonical_json_bytes(identity)).hexdigest()
+
+
+def _validate_paired_execution_policy(value: Any, where: str) -> dict[str, Any]:
+    policy = _object(value, where)
+    _strict_json_value(policy, where)
+    required = {"mode", "order"}
+    _require(
+        required <= set(policy),
+        f"{where} is missing required fields: {sorted(required - set(policy))}",
+    )
+    _require(policy["mode"] in PAIRED_EXECUTION_MODES, f"{where}.mode is unsupported")
+    order = _array(policy["order"], f"{where}.order")
+    _require(
+        len(order) == 2 and set(order) == set(PAIRED_SIDES),
+        f"{where}.order must contain baseline and candidate exactly once",
+    )
+    return policy
+
+
+def _validate_paired_eval_artifact_shape(
+    value: Any,
+    *,
+    require_evidence_id: bool,
+) -> dict[str, Any]:
+    artifact = _object(value, "paired eval artifact")
+    _strict_json_value(artifact, "paired eval artifact")
+    required = {
+        "schema",
+        "run_id",
+        "case",
+        "iteration",
+        "pair_id",
+        "execution_policy",
+        "sides",
+    }
+    if require_evidence_id:
+        required.add("paired_artifact_evidence_id")
+    _require(
+        required <= set(artifact),
+        "paired eval artifact is missing required fields: "
+        f"{sorted(required - set(artifact))}",
+    )
+
+    _require(
+        artifact["schema"] == EVAL_PAIRED_ARTIFACT_SCHEMA,
+        "paired eval artifact schema is unsupported",
+    )
+    run_id = _string(artifact["run_id"], "paired eval artifact.run_id")
+    case_id = _string(artifact["case"], "paired eval artifact.case")
+    iteration = _integer(
+        artifact["iteration"],
+        "paired eval artifact.iteration",
+        minimum=1,
+    )
+    expected_pair_id = calculate_pair_id(run_id, case_id, iteration)
+    _require(
+        artifact["pair_id"] == expected_pair_id,
+        "paired eval artifact pair_id does not match run/case/iteration identity",
+    )
+    _validate_paired_execution_policy(
+        artifact["execution_policy"],
+        "paired eval artifact.execution_policy",
+    )
+
+    sides = _object(artifact["sides"], "paired eval artifact.sides")
+    _require(
+        set(sides) == set(PAIRED_SIDES),
+        "paired eval artifact.sides must contain exactly baseline and candidate",
+    )
+    expected_identity = (run_id, case_id, iteration)
+    for side in PAIRED_SIDES:
+        nested = validate_eval_artifact(sides[side])
+        actual_identity = (
+            nested["run_id"],
+            nested["case"],
+            nested["iteration"],
+        )
+        _require(
+            actual_identity == expected_identity,
+            f"paired eval artifact side {side!r} identity does not match pair identity",
+        )
+
+    if require_evidence_id:
+        evidence_id = artifact["paired_artifact_evidence_id"]
+        _require(
+            type(evidence_id) is str
+            and _SHA256_HEX.fullmatch(evidence_id) is not None,
+            "paired eval artifact.paired_artifact_evidence_id must be a lowercase "
+            "SHA-256 hex digest",
+        )
+    return artifact
+
+
+def calculate_paired_artifact_evidence_id(value: Mapping[str, Any]) -> str:
+    """Calculate paired-artifact integrity without altering either side."""
+
+    artifact = _validate_paired_eval_artifact_shape(
+        dict(value),
+        require_evidence_id=False,
+    )
+    evidence = dict(artifact)
+    evidence.pop("paired_artifact_evidence_id", None)
+    return hashlib.sha256(canonical_json_bytes(evidence)).hexdigest()
+
+
+def attach_paired_artifact_evidence_id(value: Mapping[str, Any]) -> dict[str, Any]:
+    """Return a paired artifact with a fresh top-level integrity identifier."""
+
+    artifact = dict(value)
+    artifact.pop("paired_artifact_evidence_id", None)
+    artifact["paired_artifact_evidence_id"] = calculate_paired_artifact_evidence_id(
+        artifact
+    )
+    return artifact
+
+
+def validate_paired_eval_artifact(value: Any) -> dict[str, Any]:
+    """Validate both side artifacts, paired identity, policy, and integrity."""
+
+    artifact = _validate_paired_eval_artifact_shape(
+        value,
+        require_evidence_id=True,
+    )
+    expected = calculate_paired_artifact_evidence_id(artifact)
+    _require(
+        artifact["paired_artifact_evidence_id"] == expected,
+        "paired eval artifact paired_artifact_evidence_id mismatch",
+    )
+    return artifact
+
+
 def validate_eval_run(value: Any) -> dict[str, Any]:
     """Validate the generic eval-run/v1 manifest/summary envelope."""
     run = _object(value, "eval run")
@@ -389,6 +537,15 @@ def deserialize_eval_artifact(data: str | bytes) -> dict[str, Any]:
     return validate_eval_artifact(_load_json(data, "eval artifact"))
 
 
+def serialize_paired_eval_artifact(value: Any) -> bytes:
+    artifact = validate_paired_eval_artifact(value)
+    return canonical_json_bytes(artifact)
+
+
+def deserialize_paired_eval_artifact(data: str | bytes) -> dict[str, Any]:
+    return validate_paired_eval_artifact(_load_json(data, "paired eval artifact"))
+
+
 def serialize_eval_run(value: Any) -> bytes:
     run = validate_eval_run(value)
     return canonical_json_bytes(run)
@@ -403,6 +560,7 @@ def deserialize_eval_run(data: str | bytes) -> dict[str, Any]:
 _OWNER_FILE = ".eval-run-owner.json"
 _RUN_MANIFEST_FILE = "run.json"
 _JOBS_DIR = "jobs"
+_PAIRS_DIR = "pairs"
 _MAX_CASE_COMPONENT_BYTES = 200
 
 
@@ -535,6 +693,18 @@ class RunArtifactStore:
     def job_path_for(self, job: EvalJob) -> Path:
         return self.job_path(artifact_identity_for_job(self.run_id, job))
 
+    def paired_job_relative_path(self, identity: ArtifactIdentity) -> Path:
+        """Return the stable path of one paired case/iteration artifact."""
+        self._assert_identity(identity)
+        return (
+            Path(_PAIRS_DIR)
+            / _case_component(identity.case_id)
+            / f"iteration-{identity.iteration}.json"
+        )
+
+    def paired_job_path(self, identity: ArtifactIdentity) -> Path:
+        return self.root / self.paired_job_relative_path(identity)
+
     def manifest_job_paths(self, plan: RunPlan) -> tuple[str, ...]:
         """Return portable per-job relative paths for run-manifest plumbing."""
         if plan.run_id != self.run_id:
@@ -664,6 +834,45 @@ class RunArtifactStore:
         if actual != expected:
             raise EvalArtifactStorageError(
                 f"artifact identity {actual!r} does not match storage identity {expected!r}"
+            )
+        return artifact
+
+    def write_paired_job_artifact(
+        self,
+        identity: ArtifactIdentity,
+        artifact: JsonValue,
+    ) -> None:
+        """Validate and atomically persist one eval-paired-artifact/v1 object."""
+        self._assert_identity(identity)
+        validated = validate_paired_eval_artifact(artifact)
+        actual = (
+            validated["run_id"],
+            validated["case"],
+            validated["iteration"],
+        )
+        expected = (identity.run_id, identity.case_id, identity.iteration)
+        if actual != expected:
+            raise EvalArtifactStorageError(
+                f"paired artifact identity {actual!r} does not match storage "
+                f"identity {expected!r}"
+            )
+        self._atomic_write_json(self.paired_job_path(identity), validated)
+
+    def read_paired_job_artifact(
+        self,
+        identity: ArtifactIdentity,
+    ) -> dict[str, Any]:
+        """Re-read and verify one durable eval-paired-artifact/v1 object."""
+        self._assert_identity(identity)
+        artifact = validate_paired_eval_artifact(
+            self._read_json(self.paired_job_path(identity))
+        )
+        actual = (artifact["run_id"], artifact["case"], artifact["iteration"])
+        expected = (identity.run_id, identity.case_id, identity.iteration)
+        if actual != expected:
+            raise EvalArtifactStorageError(
+                f"paired artifact identity {actual!r} does not match storage "
+                f"identity {expected!r}"
             )
         return artifact
 

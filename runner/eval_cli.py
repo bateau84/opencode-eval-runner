@@ -21,14 +21,13 @@ from runner.eval_artifacts import (
     artifact_identity_for_job,
     claim_run_artifact_directory,
 )
-from runner.eval_engine import build_eval_artifact, evaluate_target_outcome
+from runner.eval_engine import build_eval_artifact, run_evaluation_phase
 from runner.eval_evidence import EvidenceRequirement
 from runner.eval_execute import (
     InvokeAdapter,
     SleepFn,
     TransientProviderRetryPolicy,
     invoke_once,
-    run_target_attempts,
 )
 from runner.eval_plan import EvalPlanningError, build_run_plan, list_cases
 from runner.eval_types import EvalJob, InvocationSpec, JsonValue, RunPlan
@@ -348,20 +347,17 @@ def _execute_job(
                 "profile target_evidence_requirement must return EvidenceRequirement"
             )
 
-        target = run_target_attempts(
-            target_spec,
-            retry_policy=retry_policy,
-            max_attempts=max_attempts,
-            invoker=invoker,
-            evidence_requirement=evidence_requirement,
-            sleep=sleep,
-        )
-        result = evaluate_target_outcome(
+        result = run_evaluation_phase(
             case=job.case,
             prepared=prepared,
-            target=target,
+            target_spec=target_spec,
+            evidence_requirement=evidence_requirement,
             profile=_ProfileWithJudgeOverrides(profile, args),
             project_metadata=project_metadata,
+            target_retry_policy=retry_policy,
+            target_max_attempts=max_attempts,
+            target_invoker=invoker,
+            target_sleep=sleep,
             judge_retry_policy=retry_policy,
             judge_max_attempts=max_attempts,
             judge_invoker=invoker,
