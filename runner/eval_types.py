@@ -24,6 +24,9 @@ ExecutionLane: TypeAlias = Literal["standard", "runtime"]
 FailurePlane: TypeAlias = Literal["infrastructure", "product", "evidence"]
 InvocationTransport: TypeAlias = Literal["opencode", "github-copilot-cli"]
 WorkspaceMode: TypeAlias = Literal["ro", "rw"]
+CheckStatus: TypeAlias = Literal["pass", "fail", "non-evidence"]
+SemanticStatus: TypeAlias = Literal["pass", "fail"]
+EvalClassification: TypeAlias = Literal["pass", "fail", "non-evidence"]
 
 
 @dataclass(frozen=True)
@@ -116,6 +119,25 @@ class AttemptRecord:
     host_exit_code: int | None
     result: dict[str, JsonValue] | None
     failure: AttemptFailure | None
+
+
+@dataclass(frozen=True)
+class CheckOutcome:
+    """Project-owned deterministic check normalized for generic classification."""
+
+    name: str
+    status: CheckStatus
+    reason: str
+    metadata: dict[str, JsonValue]
+
+
+@dataclass(frozen=True)
+class SemanticDecision:
+    """Project-owned semantic judgment normalized to pass/fail."""
+
+    status: SemanticStatus
+    summary: str
+    data: JsonValue
 
 
 @dataclass(frozen=True)
