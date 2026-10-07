@@ -18,6 +18,7 @@ from runner.eval_artifacts import (
     canonical_json_bytes,
 )
 from runner.eval_classification import EvalProfileCallbacks, classify_evaluation
+from runner.eval_evidence import EvidenceRequirement
 from runner.eval_execute import (
     InvokeAdapter,
     JudgeExecutionOutcome,
@@ -25,6 +26,7 @@ from runner.eval_execute import (
     TargetExecutionOutcome,
     invoke_once,
     run_judge_attempts,
+    run_target_attempts,
 )
 from runner.eval_types import (
     AttemptFailure,
@@ -210,6 +212,56 @@ def evaluate_target_outcome(
         judge_contract_failure=judge_contract_failure,
         semantic=semantic,
         project_metadata=metadata,
+    )
+
+
+def run_evaluation_phase(
+    *,
+    case: NormalizedCase,
+    prepared: Any,
+    target_spec: InvocationSpec,
+    evidence_requirement: EvidenceRequirement,
+    profile: EvalProfileCallbacks,
+    project_metadata: Mapping[str, JsonValue] | None = None,
+    target_retry_policy: RetryPolicy | None = None,
+    target_max_attempts: int = 1,
+    target_invoker: InvokeAdapter = invoke_once,
+    target_sleep: SleepFn = time.sleep,
+    judge_retry_policy: RetryPolicy | None = None,
+    judge_max_attempts: int = 1,
+    judge_invoker: InvokeAdapter = invoke_once,
+    judge_sleep: SleepFn = time.sleep,
+) -> EvaluationResult:
+    """Run the reusable target/readiness/checks/judge/classification phase.
+
+    Normal eval mode and paired eval mode share this primitive so paired
+    orchestration cannot silently diverge from the proven single-case lifecycle.
+    Project preparation and invocation construction stay outside this helper.
+    """
+
+    if not isinstance(target_spec, InvocationSpec):
+        raise TypeError("target_spec must be an InvocationSpec")
+    if not isinstance(evidence_requirement, EvidenceRequirement):
+        raise TypeError("evidence_requirement must be an EvidenceRequirement")
+
+    target = run_target_attempts(
+        target_spec,
+        retry_policy=target_retry_policy,
+        max_attempts=target_max_attempts,
+        invoker=target_invoker,
+        evidence_requirement=evidence_requirement,
+        sleep=target_sleep,
+    )
+    return evaluate_target_outcome(
+        case=case,
+        prepared=prepared,
+        target=target,
+        profile=profile,
+        project_metadata=project_metadata,
+        judge_retry_policy=judge_retry_policy,
+        judge_max_attempts=judge_max_attempts,
+        judge_invoker=judge_invoker,
+        judge_sleep=judge_sleep,
     )
 
 
