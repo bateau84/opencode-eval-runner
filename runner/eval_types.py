@@ -1,7 +1,7 @@
 """Shared internal types for the generic eval engine.
 
-These are data envelopes only. Validation, selection, expansion, and
-scheduling policy live in runner.eval_plan.
+These are data envelopes only. Validation, selection, expansion, scheduling,
+artifact storage, and artifact integrity policy live in their owning modules.
 """
 from __future__ import annotations
 
@@ -54,3 +54,12 @@ class RunPlan:
     jobs: tuple[EvalJob, ...]
     standard_parallelism: int
     runtime_parallelism: int
+
+
+@dataclass(frozen=True)
+class ArtifactIdentity:
+    """Stable identity for one durable case/iteration artifact."""
+
+    run_id: str
+    case_id: str
+    iteration: int
