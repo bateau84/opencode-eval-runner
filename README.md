@@ -371,6 +371,15 @@ Each invocation writes one `opencode-eval-runner/v1` JSON document. Every offici
 
 The container emits this object as a single JSON line on stdout. The host harness re-validates `runtime_evidence` before it writes the result artifact, so a missing or malformed runtime-evidence object is rejected rather than silently downgraded.
 
+### Large OpenCode model catalogs
+
+The runner treats imported `models.json` as a potential credential source, not harmless metadata. Generated OpenCode model caches may exceed the usual **4 MB** limit for authentication and configuration JSON. The credential inventory now scans **up to 64 MB** of model-catalog JSON while retaining the original 4 MB bound for auth/config. It reads and validates the *entire* selected source, including sensitive values near its end; no prefix-only, skipped-source, or trust-by-extension exceptions are permitted.
+
+Oversized, malformed, or unreadable catalogs now fail host-side preflight **before inference begins** with an actionable credential-inventory error. The container independently repeats the fail-closed scan before output: if its inventory is unavailable, required observations remain non-evidence and the result-sink guard redacts convenience fields instead of reporting unsanitized data. The higher catalog-specific bound is deliberate and finite to avoid unbounded memory use. If the cache exceeds it, supply a valid minimal `--models-catalog` seed containing the required provider and model until a larger bounded source strategy is designed.
+
+The runtime image and host runner must be updated together; changing only the host Python library does **not** change the container's credential scanner.
+
+
 `runtime_evidence` is required for every official transport result. `github-copilot-cli` also emits the canonical object, but with `status: "unsupported"` because it has no OpenCode runtime observer.
 
 If you override `--image`, treat the host runner and image as one compatibility pair. Legacy or custom images that do not emit a valid `opencode-eval-runner/runtime-evidence/v1` object are rejected by this host version; upgrade the host executable and image together.

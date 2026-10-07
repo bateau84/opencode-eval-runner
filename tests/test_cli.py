@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import sqlite3
 import tempfile
@@ -8,6 +9,8 @@ import unittest
 import subprocess
 from pathlib import Path
 from unittest.mock import patch
+
+from container.evidence_safety import JSON_SOURCE_LIMIT, MODEL_CATALOG_SOURCE_LIMIT
 
 from runner.cli import (
     COPILOT_AUTH_ENVS,
@@ -47,6 +50,69 @@ class RunnerCliTests(unittest.TestCase):
     def test_default_models_uses_xdg_cache_home(self):
         with tempfile.TemporaryDirectory() as tmp, patch.dict(os.environ, {"XDG_CACHE_HOME": tmp}, clear=False):
             self.assertEqual(default_models_path(), Path(tmp) / "opencode" / "models.json")
+
+    def test_large_valid_model_catalog_mounts_and_inventories_before_inference(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            workspace, input_dir, output_dir = (
+                root / "workspace", root / "input", root / "output"
+            )
+            for path in (workspace, input_dir, output_dir):
+                path.mkdir()
+            catalog = root / "models.json"
+            catalog.write_text(
+                json.dumps({
+                    "openai": {
+                        "models": {"gpt-6-luna": {"description": "x" * JSON_SOURCE_LIMIT}},
+                        "api_key": "tail-secret",
+                    },
+                }),
+                encoding="utf-8",
+            )
+            self.assertGreater(catalog.stat().st_size, JSON_SOURCE_LIMIT)
+            args = argparse.Namespace(
+                engine="docker", image="reviewed-image", workspace=str(workspace),
+                workspace_mode="ro", output=str(root / "result.json"),
+                transport="opencode", model="openai/gpt-6-luna", agent="general",
+                timeout_seconds=30, env=[], auth=None, config=None,
+                models_catalog=str(catalog),
+            )
+            with (
+                patch("runner.cli.shutil.which", return_value="/usr/bin/docker"),
+                patch.dict(os.environ, {}, clear=True),
+            ):
+                command, _ = build_container_command(args, input_dir, output_dir)
+            self.assertIn(f"{catalog.resolve()}:/seed/models.json:ro", command)
+
+    def test_invalid_model_catalog_fails_before_container_execution(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            workspace, input_dir, output_dir = (
+                root / "workspace", root / "input", root / "output"
+            )
+            for path in (workspace, input_dir, output_dir):
+                path.mkdir()
+            catalog = root / "models.json"
+            args = argparse.Namespace(
+                engine="docker", image="reviewed-image", workspace=str(workspace),
+                workspace_mode="ro", output=str(root / "result.json"),
+                transport="opencode", model="openai/gpt-6-luna", agent="general",
+                timeout_seconds=30, env=[], auth=None, config=None,
+                models_catalog=str(catalog),
+            )
+            with (
+                patch("runner.cli.shutil.which", return_value="/usr/bin/docker"),
+                patch.dict(os.environ, {}, clear=True),
+                patch("runner.cli.subprocess.run") as run,
+            ):
+                catalog.write_text("{invalid", encoding="utf-8")
+                with self.assertRaisesRegex(RunnerError, "credential inventory unavailable"):
+                    build_container_command(args, input_dir, output_dir)
+                with catalog.open("wb") as source:
+                    source.truncate(MODEL_CATALOG_SOURCE_LIMIT + 1)
+                with self.assertRaisesRegex(RunnerError, "credential inventory unavailable"):
+                    build_container_command(args, input_dir, output_dir)
+                run.assert_not_called()
 
     def test_default_database_uses_xdg_data_home(self):
         with tempfile.TemporaryDirectory() as tmp, patch.dict(os.environ, {"XDG_DATA_HOME": tmp}, clear=False):

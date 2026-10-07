@@ -753,8 +753,8 @@ def resolve_opencode_reasoning(model: str, reasoning: str) -> tuple[str, str, st
 RUNTIME_JSON_CREDENTIAL_SOURCES = (
     Path("/seed/auth.json"),
     Path("/seed/opencode.json"),
-    Path("/seed/models.json"),
 )
+RUNTIME_MODEL_CATALOG_CREDENTIAL_SOURCES = (Path("/seed/models.json"),)
 RUNTIME_DATABASE_CREDENTIAL_SOURCES = (Path("/seed/opencode.db"),)
 SAFE_RESULT_PROTOCOL_FIELDS = frozenset({
     "schema",
@@ -778,6 +778,7 @@ def runtime_sanitizer(env: dict[str, str]) -> Sanitizer:
         env,
         json_sources=RUNTIME_JSON_CREDENTIAL_SOURCES,
         database_sources=RUNTIME_DATABASE_CREDENTIAL_SOURCES,
+        model_catalog_sources=RUNTIME_MODEL_CATALOG_CREDENTIAL_SOURCES,
     )
 
 

@@ -18,6 +18,10 @@ REDACTED = "***REDACTED***"
 OMITTED = object()
 SUPPORTED_JSON_ESCAPE_LAYERS = 3
 JSON_SOURCE_LIMIT = 4_000_000
+# OpenCode's generated provider/model cache routinely exceeds the smaller
+# credential/config bound. Keep a distinct, finite bound for this source;
+# never skip its credential scan or classify a partial scan as complete.
+MODEL_CATALOG_SOURCE_LIMIT = 64_000_000
 MAX_DEPTH = 32
 MAX_NODES = 20_000
 
@@ -131,16 +135,30 @@ def _collect_scalar_credentials(value: Any, out: set[str]) -> None:
         _collect_sensitive_values(value, out)
 
 
-def _json_source_credentials(path: Path, out: set[str]) -> bool:
+def _json_source_credentials(
+    path: Path,
+    out: set[str],
+    *,
+    max_bytes: int = JSON_SOURCE_LIMIT,
+) -> bool:
+    """Inventory a complete JSON source, never a truncated prefix.
+
+    A file may grow after stat(); bound the actual read too, and mark an
+    oversize/malformed source unavailable rather than trusting a partial scan.
+    """
     if not path.is_file():
         return True
     try:
-        if path.stat().st_size > JSON_SOURCE_LIMIT:
+        if path.stat().st_size > max_bytes:
             return False
-        value = json.loads(path.read_text(encoding="utf-8"))
+        with path.open("rb") as source:
+            payload = source.read(max_bytes + 1)
+        if len(payload) > max_bytes:
+            return False
+        value = json.loads(payload)
         _collect_sensitive_values(value, out)
         return True
-    except (OSError, UnicodeError, json.JSONDecodeError, UnsafeEvidence, RecursionError):
+    except (OSError, UnicodeError, ValueError, UnsafeEvidence, RecursionError):
         return False
 
 
@@ -205,6 +223,7 @@ class Sanitizer:
         *,
         json_sources: Iterable[Path] = (),
         database_sources: Iterable[Path] = (),
+        model_catalog_sources: Iterable[Path] = (),
     ) -> "Sanitizer":
         values: set[str] = set()
         for name, value in env.items():
@@ -214,6 +233,10 @@ class Sanitizer:
         complete = True
         for path in json_sources:
             complete = _json_source_credentials(path, values) and complete
+        for path in model_catalog_sources:
+            complete = _json_source_credentials(
+                path, values, max_bytes=MODEL_CATALOG_SOURCE_LIMIT
+            ) and complete
         for path in database_sources:
             complete = _database_credentials(path, values) and complete
         return cls(values, inventory_complete=complete)

@@ -10,11 +10,20 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from container.evidence_safety import OMITTED, REDACTED, Projection, Sanitizer
+from container.evidence_safety import (
+    JSON_SOURCE_LIMIT,
+    MODEL_CATALOG_SOURCE_LIMIT,
+    OMITTED,
+    REDACTED,
+    Projection,
+    Sanitizer,
+)
 from container.invoke import (
     emit_result,
     extract_tool_result_evidence,
     invoke_opencode,
+    runtime_sanitizer,
+    sanitize_result_for_output,
 )
 
 
@@ -156,6 +165,78 @@ class EvidenceSafetyTests(unittest.TestCase):
             "credential_inventory_unavailable",
         )
         self.assertNotIn("evidence_eligible", projection.summary())
+
+    def test_large_model_catalog_preserves_model_identity_and_redacts_secrets(self):
+        # OpenCode generated caches commonly exceed the 4 MB auth/config cap.
+        # A credential near the end must still be collected and never leak.
+        secret = "MODEL-CACHE-TAIL-SECRET"
+        with tempfile.TemporaryDirectory() as tmp:
+            catalog = Path(tmp) / "models.json"
+            catalog.write_text(
+                json.dumps({
+                    "openai": {
+                        "models": {
+                            "gpt-6-luna": {
+                                "description": "long-model-description-" * 210_000,
+                            },
+                        },
+                        "apiKey": secret,
+                    },
+                }),
+                encoding="utf-8",
+            )
+            self.assertGreater(catalog.stat().st_size, JSON_SOURCE_LIMIT)
+            self.assertLess(catalog.stat().st_size, MODEL_CATALOG_SOURCE_LIMIT)
+
+            sanitizer = Sanitizer.from_runtime(
+                {}, model_catalog_sources=(catalog,)
+            )
+            self.assertTrue(sanitizer.inventory_complete)
+            self.assertIn(secret, sanitizer.credentials)
+            self.assertEqual(sanitizer.output_value("openai/gpt-6-luna"), "openai/gpt-6-luna")
+            self.assertEqual(sanitizer.output_value(f"private {secret}"), f"private {REDACTED}")
+            self.assertEqual(Projection(sanitizer).field("output", f"{secret}"), REDACTED)
+
+            # Verify the actual runtime source wiring and result-sink behavior.
+            with (
+                patch("container.invoke.RUNTIME_JSON_CREDENTIAL_SOURCES", ()),
+                patch("container.invoke.RUNTIME_MODEL_CATALOG_CREDENTIAL_SOURCES", (catalog,)),
+                patch("container.invoke.RUNTIME_DATABASE_CREDENTIAL_SOURCES", ()),
+            ):
+                runtime = runtime_sanitizer({})
+                output = sanitize_result_for_output(
+                    {"model": "openai/gpt-6-luna", "text": secret},
+                    runtime,
+                )
+            self.assertTrue(runtime.inventory_complete)
+            self.assertEqual(output["model"], "openai/gpt-6-luna")
+            self.assertEqual(output["text"], REDACTED)
+
+    def test_large_auth_config_still_fails_closed_at_its_original_limit(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            auth = Path(tmp) / "auth.json"
+            auth.write_text(
+                json.dumps({"apiKey": "tail-secret", "filler": "a" * JSON_SOURCE_LIMIT}),
+                encoding="utf-8",
+            )
+            sanitizer = Sanitizer.from_runtime({}, json_sources=(auth,))
+            self.assertFalse(sanitizer.inventory_complete)
+            self.assertEqual(sanitizer.output_value("openai/gpt-6-luna"), REDACTED)
+            self.assertIs(Projection(sanitizer).field("output", "untrusted"), OMITTED)
+
+    def test_oversized_or_invalid_model_catalog_remains_fail_closed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            catalog = Path(tmp) / "models.json"
+            with catalog.open("wb") as stream:
+                stream.truncate(MODEL_CATALOG_SOURCE_LIMIT + 1)
+            oversized = Sanitizer.from_runtime({}, model_catalog_sources=(catalog,))
+            self.assertFalse(oversized.inventory_complete)
+            self.assertEqual(oversized.output_value("openai/gpt-6-luna"), REDACTED)
+
+            catalog.write_text("{invalid", encoding="utf-8")
+            invalid = Sanitizer.from_runtime({}, model_catalog_sources=(catalog,))
+            self.assertFalse(invalid.inventory_complete)
+            self.assertIs(Projection(invalid).field("output", "untrusted"), OMITTED)
 
     def test_success_failure_and_running_events_are_projected_without_invention(self):
         secret = "fixture-secret"
