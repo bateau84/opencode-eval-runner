@@ -403,7 +403,7 @@ def invoke(args: argparse.Namespace) -> int:
 
 
 def parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(description="Run one isolated model invocation in an OCI container.")
+    p = argparse.ArgumentParser(description="Run isolated invocations or generic eval profiles.")
     sub = p.add_subparsers(dest="command", required=True)
     run = sub.add_parser("invoke", help="Run one isolated target or judge invocation.")
     run.add_argument("--transport", choices=("opencode", "github-copilot-cli"), default="opencode")
@@ -450,6 +450,12 @@ def parser() -> argparse.ArgumentParser:
     run.add_argument("--timeout-seconds", type=int, default=240)
     run.add_argument("--container-timeout", type=int, default=300)
     run.add_argument("--print-result", action="store_true")
+
+    # Import lazily so eval_execute can continue reusing invoke() without a
+    # runner.cli <-> eval_cli import cycle.
+    from runner.eval_cli import add_eval_parser
+
+    add_eval_parser(sub)
     return p
 
 
@@ -458,6 +464,10 @@ def main() -> int:
     try:
         if args.command == "invoke":
             return invoke(args)
+        if args.command == "eval":
+            from runner.eval_cli import run_eval
+
+            return run_eval(args)
         raise RunnerError(f"unsupported command: {args.command}")
     except (RunnerError, subprocess.TimeoutExpired) as exc:
         print(f"opencode-eval-runner: {exc}", file=sys.stderr)

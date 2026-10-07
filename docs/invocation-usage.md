@@ -1,16 +1,30 @@
 # Invocation usage and interface reference
 
-This repository provides an isolated **invocation execution boundary** for eval harnesses. It does not own eval cases, suites, assertions, judging semantics, thresholds, or final PASS/FAIL policy.
-
-An eval harness uses this runner to execute one target or judge invocation at a time:
+This document is the reference for the **one-invocation** boundary:
 
 ~~~text
-eval harness
+opencode-eval-runner invoke ...
+~~~
+
+One <code>invoke</code> means exactly one isolated OpenCode or GitHub Copilot CLI invocation. It does not discover cases, run iterations, schedule suites, retry automatically, or decide behavioral PASS/FAIL.
+
+The repository also provides a separate public generic orchestration command:
+
+~~~text
+opencode-eval-runner eval ...
+~~~
+
+That command consumes project-supplied cases through the frozen <code>EvalProfile</code> contract while preserving <code>invoke</code> as the one-attempt primitive. See [Public eval CLI and profile reference](eval-usage.md) for the complete <code>eval</code> interface.
+
+An invocation path remains:
+
+~~~text
+generic eval or project harness
   -> invocation inputs
   -> opencode-eval-runner invoke
   -> isolated OpenCode or GitHub Copilot CLI process
   -> result/v1 + runtime-evidence/v1
-  -> eval harness assertions / judging / verdict
+  -> project/profile assertions and judging
 ~~~
 
 ## Input contract
@@ -45,7 +59,8 @@ The absence of an input JSON schema is intentional in the current interface. Do 
 | --- | --- | --- |
 | Local single OpenCode invocation | Host CLI | Debug or run one agent/tool-aware eval invocation with authoritative OpenCode runtime evidence. |
 | Local single Copilot invocation | Host CLI | Run a model/role/judge invocation that does not require OpenCode runtime evidence. |
-| Local eval suite | Repository-owned harness calling the CLI repeatedly | Compose cases, target/judge invocations, assertions, iterations, and verdicts outside the runner. |
+| Local generic eval | Public `eval` command + external `EvalProfile` | Use the runner's generic selection/iterations/concurrency/retry/artifact orchestration while project semantics remain in the profile. |
+| Local custom harness | Repository-owned harness calling `invoke` repeatedly | Keep fully custom orchestration while reusing the one-invocation boundary. |
 | GitHub Action direct invocation | Action inputs with <code>model</code> set and <code>command</code> empty | Run one isolated invocation directly from a workflow. |
 | GitHub Action repository harness | Action <code>command</code> input | Prepare the runner/images, then execute the repository's own eval harness. |
 | GitHub Action setup only | Leave both <code>model</code> and <code>command</code> empty | Pull/build selected images and put the runner on PATH for later workflow steps. |
@@ -54,11 +69,13 @@ Directly invoking the transport container entrypoint is an implementation detail
 
 ## Host CLI reference
 
-The only current subcommand is:
+The one-invocation subcommand is:
 
 ~~~text
 opencode-eval-runner invoke [options]
 ~~~
+
+The separate generic suite command is documented in [Public eval CLI and profile reference](eval-usage.md).
 
 ### Execution and transport
 
@@ -130,7 +147,7 @@ opencode-eval-runner invoke \
   --output /tmp/judgment.json
 ~~~
 
-A local eval harness simply invokes the CLI repeatedly for its target and judge calls. The harness, not this runner, owns case IDs, iterations, expected behavior, assertions, grading, and final verdicts.
+A project may either call `invoke` repeatedly from its own harness or implement the frozen `EvalProfile` contract and use the public `eval` command. In both cases, project code still owns expected behavior, assertions, judge meaning, and semantic grading.
 
 ## Environment-variable reference
 
@@ -270,18 +287,19 @@ Every official result includes <code>runtime_evidence</code>:
 
 For runtime assertions, follow the evidence-readiness decision procedure in [runtime-evidence-contract.md](runtime-evidence-contract.md). Diagnostic fields such as <code>tools</code>, <code>actions</code>, <code>tool_result_evidence</code>, stdout/stderr, and model text cannot substitute for missing authoritative evidence.
 
-## What belongs outside this runner
+## What remains project-owned
 
-An eval harness or repository remains responsible for:
+Even when using the public <code>eval</code> command, the project/profile remains responsible for:
 
-- case definitions and IDs;
-- iterations/repetitions;
-- target-versus-judge orchestration;
-- behavioral assertions;
-- rubrics and judge prompts;
-- expected results;
-- thresholds;
-- aggregation;
-- PASS/FAIL/non-evidence decisions.
+- case definitions and project-specific selector meaning;
+- fixture/workspace preparation;
+- target agent/skill/profile choice and prompts;
+- required runtime-evidence boundaries/fields;
+- behavioral assertions and deterministic checks;
+- judge prompt/rubric construction;
+- judge output parsing and validation;
+- semantic PASS/FAIL meaning;
+- project scores, thresholds, traps, and reporting metadata;
+- future ablation/baseline-candidate comparison semantics.
 
-This separation is deliberate: the runner provides faithful isolated invocations and runtime evidence; the consumer decides what those observations mean for the eval.
+The generic <code>eval</code> layer owns only reusable orchestration mechanics. It does not move project semantics into this runner. See [Public eval CLI and profile reference](eval-usage.md).
