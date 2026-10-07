@@ -1,51 +1,39 @@
 # opencode-eval-runner
 
-Reusable OCI execution boundary for isolated eval invocations using OpenCode or GitHub Copilot CLI.
+Reusable OCI execution boundary for isolated OpenCode or GitHub Copilot CLI invocations, plus generic eval orchestration over project-supplied profiles.
 
-The runner intentionally does **not** own an eval corpus, grading semantics, or agent policy. Those stay in the repository being evaluated. This project owns the execution boundary:
+The runner intentionally does **not** own an eval corpus, grading semantics, or agent policy. Those stay in the project being evaluated. This repository owns two boundaries:
 
-- one fresh container per model invocation;
-- separate target and judge containers;
-- fresh HOME/XDG/OpenCode state per invocation;
-- explicit provider configuration and authentication;
-- read-only workspace by default;
-- results emitted as JSON on container stdout, then written to host-owned artifact files by the harness;
-- the same invocation model locally and in GitHub Actions.
+- <code>invoke</code>: exactly one fresh isolated model invocation;
+- <code>eval</code>: generic selection, iterations, concurrency, attempts, evidence readiness, target/judge orchestration, classification, artifacts, summaries, and exit status over a project-supplied <code>EvalProfile</code>.
 
-## Why
+Each actual model invocation still gets a fresh container, fresh HOME/XDG/OpenCode state, explicit provider configuration/authentication, and a read-only workspace by default.
 
-Behavioral eval evidence becomes weak when the target or judge can inherit host sessions, plugins, global agents, caches, or mutable provider configuration.
+## Public interfaces
 
-The unit of isolation here is one invocation:
+~~~text
+opencode-eval-runner invoke ...
+opencode-eval-runner eval ...
+~~~
 
-```text
-eval harness
-  |
-  +-- target -> fresh OCI container -> result.json
-  |
-  +-- judge  -> different fresh OCI container -> judgment.json
-```
+<code>invoke</code> remains the one-invocation primitive and has no hidden retry loop.
 
-The caller may use the same model for both, but they do not share OpenCode session state or filesystem state.
+<code>eval</code> loads an initialized external profile through <code>--profile module:attribute</code>. The profile owns cases, fixtures, prompts, evidence requirements, deterministic checks, judge construction/parsing, semantic meaning, and project metadata. The runner supplies generic orchestration without adding a universal assertion DSL.
 
-## What this repository runs
-
-This project runs **one isolated invocation at a time**. It is not an eval-suite engine: the calling repository owns cases, iterations, assertions, target/judge orchestration, grading, and final PASS/FAIL policy.
-
-The current public input interface is CLI or GitHub Action arguments plus prompt/system files; there is **no input JSON request API**. Each invocation produces the documented JSON Result contract.
-
-Supported usage modes are:
+Supported usage modes include:
 
 | Mode | Interface |
 | --- | --- |
-| Local OpenCode invocation | `opencode-eval-runner invoke --transport opencode ...` |
-| Local Copilot invocation | `opencode-eval-runner invoke --transport github-copilot-cli ...` |
-| Local eval suite | Repository harness repeatedly calls the CLI |
-| GitHub Action direct invocation | Action inputs with `model` set |
-| GitHub Action repository harness | Action `command` mode |
-| GitHub Action setup only | Leave `model` and `command` empty, then call the CLI in a later step |
+| Local OpenCode invocation | <code>opencode-eval-runner invoke --transport opencode ...</code> |
+| Local Copilot invocation | <code>opencode-eval-runner invoke --transport github-copilot-cli ...</code> |
+| Local generic eval | <code>opencode-eval-runner eval --profile module:attribute ...</code> |
+| GitHub Action direct invocation | Action inputs with <code>model</code> set |
+| GitHub Action generic/project eval | Action <code>command</code> mode |
+| GitHub Action setup only | Leave <code>model</code> and <code>command</code> empty, then call the CLI later |
 
-See **[Invocation usage and interface reference](docs/invocation-usage.md)** for the complete input contract, all CLI options, environment variables, all GitHub Action inputs, direct-mode limitations, and execution examples.
+See **[Public eval CLI and profile reference](docs/eval-usage.md)** for selection safeguards, profile loading, iterations/concurrency, target/judge overrides, retries, artifacts, and exit codes.
+
+See **[Invocation usage and interface reference](docs/invocation-usage.md)** for the one-invocation contract, transport options, environment variables, GitHub Action inputs, and result behavior.
 
 ## Transports
 
@@ -114,7 +102,7 @@ This transport reuses the trust-boundary pattern already proven in `nrkno/mats-o
 
 ## Local usage
 
-For the full option/default/reference table, see [Invocation usage and interface reference](docs/invocation-usage.md).
+For the generic eval interface, see [Public eval CLI and profile reference](docs/eval-usage.md). For one-invocation options and defaults, see [Invocation usage and interface reference](docs/invocation-usage.md).
 
 Build the transport you need:
 
