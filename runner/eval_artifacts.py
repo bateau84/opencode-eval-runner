@@ -387,7 +387,12 @@ def serialize_eval_run(value: Any) -> bytes:
 
 
 def deserialize_eval_run(data: str | bytes) -> dict[str, Any]:
-    return validate_eval_run(_load_json(data, "eval run"))\n\n\n# Filesystem storage ---------------------------------------------------------\n\n_OWNER_FILE = ".eval-run-owner.json"
+    return validate_eval_run(_load_json(data, "eval run"))
+
+
+# Filesystem storage ---------------------------------------------------------
+
+_OWNER_FILE = ".eval-run-owner.json"
 _RUN_MANIFEST_FILE = "run.json"
 _JOBS_DIR = "jobs"
 _MAX_CASE_COMPONENT_BYTES = 200
