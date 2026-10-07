@@ -250,7 +250,7 @@ class EvalExecuteTests(unittest.TestCase):
         self.assertEqual(invoker.calls, 2)
         self.assertEqual([a.attempt for a in outcome.attempts], [1, 2])
         self.assertEqual(
-            outcome.attempts[0].failure.code, "provider_transient_unavailable"
+            outcome.attempts[0].failure.code, "invoke_host_error"
         )
         self.assertTrue(outcome.attempts[0].failure.retry_safe)
         self.assertIsNone(outcome.attempts[1].failure)
@@ -273,7 +273,29 @@ class EvalExecuteTests(unittest.TestCase):
         )
 
         self.assertEqual(invoker.calls, 1)
-        self.assertEqual(outcome.final_attempt.failure.code, "provider_transient_unavailable")
+        self.assertEqual(outcome.final_attempt.failure.code, "invoke_host_error")
+        self.assertFalse(outcome.final_attempt.failure.retry_safe)
+        self.assertIn("not replay-safe", outcome.retry_decisions[0].reason)
+
+    def test_transient_signature_does_not_promote_product_failure(self):
+        transient = valid_result(
+            self.spec,
+            exit_code=2,
+            stderr="provider.no-route: Model unavailable",
+            runtime_evidence=complete_empty_runtime_evidence(),
+        )
+        invoker = SequenceInvoker([(0, transient), (0, valid_result(self.spec))])
+
+        outcome = run_target_attempts(
+            self.spec,
+            invoker=invoker,
+            retry_policy=TransientProviderRetryPolicy(),
+            max_attempts=2,
+        )
+
+        self.assertEqual(invoker.calls, 1)
+        self.assertEqual(outcome.final_attempt.failure.plane, "product")
+        self.assertEqual(outcome.final_attempt.failure.code, "product_error")
         self.assertFalse(outcome.final_attempt.failure.retry_safe)
         self.assertIn("not replay-safe", outcome.retry_decisions[0].reason)
 
@@ -297,7 +319,7 @@ class EvalExecuteTests(unittest.TestCase):
         self.assertEqual(len(outcome.attempts), 2)
         self.assertEqual(
             [a.failure.code for a in outcome.attempts],
-            ["provider_transient_unavailable", "provider_transient_unavailable"],
+            ["invoke_host_error", "invoke_host_error"],
         )
         self.assertEqual(len(outcome.retry_decisions), 2)
         self.assertTrue(outcome.retry_decisions[0].retry)

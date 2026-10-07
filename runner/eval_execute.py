@@ -73,10 +73,10 @@ class NoRetryPolicy:
 class TransientProviderRetryPolicy:
     """Opt-in retry policy for the architecture-approved narrow provider case.
 
-    The classifier recognizes only the exact ``provider.no-route`` +
-    ``Model unavailable`` infrastructure class. Replay is still permitted only
-    when authoritative runtime evidence proves that no invocation was observed.
-    This policy cannot override that safety check.
+    This policy recognizes only the exact ``provider.no-route`` +
+    ``Model unavailable`` signature on a generic host/infrastructure failure.
+    Replay is still permitted only when authoritative runtime evidence proves that
+    no invocation was observed. The policy cannot override that safety check.
     """
 
     delay_seconds: float = 0.0
@@ -90,11 +90,16 @@ class TransientProviderRetryPolicy:
         latest: AttemptRecord,
     ) -> RetryDecision:
         failure = latest.failure
+        result = latest.result
         if (
             failure is not None
             and failure.plane == "infrastructure"
-            and failure.code == "provider_transient_unavailable"
+            and failure.code == "invoke_host_error"
             and failure.retry_safe
+            and result is not None
+            and _is_transient_provider_unavailable(
+                cast(Mapping[str, object], result)
+            )
         ):
             return RetryDecision(
                 True,
@@ -278,22 +283,6 @@ def _classify_result(
     result: dict[str, JsonValue],
     host_exit_code: int,
 ) -> AttemptFailure | None:
-    # The narrow provider.no-route signature is a transport availability
-    # failure even when the low-level result represents it as a non-zero model
-    # process exit. No other product failure is promoted to infrastructure.
-    if _is_transient_provider_unavailable(cast(Mapping[str, object], result)):
-        return _failure(
-            "infrastructure",
-            "provider_transient_unavailable",
-            _short_result_message(
-                cast(Mapping[str, object], result),
-                "provider route is temporarily unavailable",
-            ),
-            retry_safe=_runtime_evidence_proves_no_invocation(
-                cast(Mapping[str, object], result)
-            ),
-        )
-
     # The container wrapper uses a non-zero host exit for failures that occur
     # outside a normal product result. Product failures remain inside result/v1.
     if result.get("infrastructure_error") is True:
@@ -312,7 +301,9 @@ def _classify_result(
             "infrastructure",
             "invoke_host_error",
             f"invoke host process exited with code {host_exit_code}",
-            retry_safe=False,
+            retry_safe=_runtime_evidence_proves_no_invocation(
+                cast(Mapping[str, object], result)
+            ),
         )
 
     exit_code = cast(int, result["exit_code"])
