@@ -1,18 +1,26 @@
-"""Schema validation and integrity helpers for generic eval artifacts.
+"""Persistence, schema validation, and integrity for generic eval artifacts.
 
-This module owns only the versioned on-disk envelope and integrity rules. It
+This module owns the Task 3 artifact surface: run-directory ownership, stable
+paths, atomic persistence, versioned envelopes, and integrity verification. It
 must not interpret project metadata, behavioral checks, or runtime evidence.
 """
 from __future__ import annotations
 
+import errno
 import hashlib
 import json
 import math
+import os
 import re
+import tempfile
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 
 from container.runtime_evidence import RuntimeEvidenceError, validate_runtime_evidence
+from runner.eval_types import ArtifactIdentity, EvalJob, JsonValue, RunPlan
 
 
 EVAL_RUN_SCHEMA = "opencode-eval-runner/eval-run/v1"
