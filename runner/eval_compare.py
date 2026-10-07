@@ -194,6 +194,90 @@ def compare_completed_outcomes(
     )
 
 
+
+def validate_comparison_result_envelope(
+    value: object,
+    *,
+    baseline_classification: EvalClassification | None = None,
+    candidate_classification: EvalClassification | None = None,
+) -> dict[str, JsonValue]:
+    """Validate a versioned comparison without interpreting project meaning.
+
+    Expected side classifications are provided when checking a durable pair;
+    they must match the actual stored phase classifications exactly.
+    """
+
+    if type(value) is not dict:
+        raise TypeError("comparison envelope must be an object")
+    required = {
+        "schema",
+        "status",
+        "baseline_classification",
+        "candidate_classification",
+        "decision",
+        "failure",
+    }
+    if set(value) != required:
+        raise ValueError("comparison envelope must contain exactly the v1 fields")
+    _strict_json_value(value, "comparison envelope")
+    if value["schema"] != COMPARISON_RESULT_SCHEMA:
+        raise ValueError("unsupported comparison result schema")
+    status = value["status"]
+    if status not in {"compared", "non-evidence", "invalid"}:
+        raise ValueError("unsupported comparison status")
+
+    for side, expected in (
+        ("baseline", baseline_classification),
+        ("candidate", candidate_classification),
+    ):
+        classification = value[f"{side}_classification"]
+        if classification is not None and classification not in {
+            "pass", "fail", "non-evidence"
+        }:
+            raise ValueError(f"invalid comparison {side}_classification")
+        if expected is not None and classification != expected:
+            raise ValueError(f"comparison {side}_classification does not match side artifact")
+
+    decision = value["decision"]
+    failure = value["failure"]
+    if status == "compared":
+        if (
+            value["baseline_classification"] not in {"pass", "fail"}
+            or value["candidate_classification"] not in {"pass", "fail"}
+        ):
+            raise ValueError("comparison requires usable evidence from both sides")
+        if type(decision) is not dict or set(decision) != {
+            "classification", "summary", "data"
+        }:
+            raise ValueError("compared result requires a structured project decision")
+        if (
+            type(decision["classification"]) is not str
+            or not decision["classification"].strip()
+            or type(decision["summary"]) is not str
+        ):
+            raise ValueError("invalid project comparison decision")
+        if failure is not None:
+            raise ValueError("compared result must not have a failure")
+    else:
+        if decision is not None:
+            raise ValueError("non-compared result must not contain a decision")
+        if type(failure) is not dict or set(failure) != {"code", "message"}:
+            raise ValueError("non-compared result requires a structured failure")
+        if (
+            type(failure["code"]) is not str
+            or not failure["code"].strip()
+            or type(failure["message"]) is not str
+            or not failure["message"].strip()
+        ):
+            raise ValueError("invalid comparison failure")
+        if status == "non-evidence" and "non-evidence" not in {
+            value["baseline_classification"],
+            value["candidate_classification"],
+        }:
+            raise ValueError("non-evidence comparison requires a non-evidence side")
+    return value
+
+
 def comparison_result_envelope(result: ComparisonResult) -> dict[str, JsonValue]:
     """Serialize a comparison result for durable paired artifacts."""
 
@@ -223,8 +307,7 @@ def comparison_result_envelope(result: ComparisonResult) -> dict[str, JsonValue]
         "decision": decision,
         "failure": failure,
     }
-    _strict_json_value(envelope, "comparison result")
-    return envelope
+    return validate_comparison_result_envelope(envelope)
 
 
 __all__ = [
@@ -237,4 +320,5 @@ __all__ = [
     "EvalComparisonExtension",
     "compare_completed_outcomes",
     "comparison_result_envelope",
+    "validate_comparison_result_envelope",
 ]

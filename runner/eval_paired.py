@@ -18,6 +18,12 @@ from runner.eval_artifacts import (
     calculate_pair_id,
 )
 from runner.eval_classification import EvalProfileCallbacks
+from runner.eval_compare import (
+    ComparisonResult,
+    EvalComparisonExtension,
+    compare_completed_outcomes,
+    comparison_result_envelope,
+)
 from runner.eval_engine import (
     EvaluationResult,
     build_eval_artifact,
@@ -82,6 +88,7 @@ class PairedEvaluationResult:
     policy: PairedExecutionPolicy
     baseline: EvaluationResult
     candidate: EvaluationResult
+    comparison: ComparisonResult | None = None
 
     @property
     def pair_id(self) -> str:
@@ -147,6 +154,7 @@ def run_paired_evaluation(
     baseline: PairedSideExecution,
     candidate: PairedSideExecution,
     policy: PairedExecutionPolicy = PairedExecutionPolicy(),
+    comparison_extension: EvalComparisonExtension | None = None,
     target_invoker: InvokeAdapter = invoke_once,
     judge_invoker: InvokeAdapter = invoke_once,
     sleep: SleepFn = time.sleep,
@@ -188,6 +196,17 @@ def run_paired_evaluation(
             for side_name in policy.order:
                 outcomes[side_name] = futures[side_name].result()
 
+    # Compare the real, completed phases: never reconstruct side results from
+    # a partial artifact or substitute a score for non-evidence.
+    comparison = (
+        compare_completed_outcomes(
+            comparison_extension,
+            baseline=outcomes["baseline"],
+            candidate=outcomes["candidate"],
+        )
+        if comparison_extension is not None
+        else None
+    )
     return PairedEvaluationResult(
         run_id=run_id,
         case_id=case_id,
@@ -195,6 +214,7 @@ def run_paired_evaluation(
         policy=policy,
         baseline=outcomes["baseline"],
         candidate=outcomes["candidate"],
+        comparison=comparison,
     )
 
 
@@ -233,4 +253,7 @@ def build_paired_eval_artifact(result: PairedEvaluationResult) -> dict[str, Any]
             ),
         },
     }
+    if result.comparison is not None:
+        # Include the structured comparison before calculating the integrity ID.
+        artifact["comparison"] = comparison_result_envelope(result.comparison)
     return attach_paired_artifact_evidence_id(artifact)

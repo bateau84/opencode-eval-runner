@@ -283,12 +283,66 @@ opencode-eval-runner eval \
 
 Transport/model/reasoning controls change only the generic invocation fields. Project-specific agent, skill, fixture, evidence, assertion, rubric, threshold, and judge meaning remain profile-owned.
 
+## Optional paired baseline/candidate evaluations
+
+The generic Python API also supports paired execution. This is **opt-in** and
+does not change the public `eval` CLI, its profile requirements, its artifacts,
+or its exit codes. There is currently **no paired CLI flag**.
+
+- Build two `PairedSideExecution` inputs (one baseline, one candidate). Each
+  supplies its own target spec, prepared fixture, evidence requirements,
+  profile callbacks, and target/judge retry settings.
+- Call `run_paired_evaluation(..., policy=PairedExecutionPolicy(mode="sequential"))`
+  or select `mode="parallel"` for concurrent sides. Sequential mode uses
+  an explicit side order; both sides share one run/case/iteration identity.
+- Optionally pass `comparison_extension=project_profile`, where the extension
+  implements `compare_pair(baseline, candidate) -> ComparisonDecision`.
+  It receives the two **completed** `EvaluationResult` objects, including
+  target/judge attempts, readiness, checks, and their classifications.
+- Serialize with `build_paired_eval_artifact(result)` and persist via
+  `RunArtifactStore.write_paired_job_artifact(identity, artifact)`.
+  Use `read_paired_job_artifact` to verify durable round trips.
+
+Imports:
+
+~~~python
+from runner.eval_paired import (
+    PairedExecutionPolicy,
+    PairedSideExecution,
+    build_paired_eval_artifact,
+    run_paired_evaluation,
+)
+from runner.eval_compare import ComparisonDecision
+~~~
+
+The optional `comparison` field uses
+`opencode-eval-runner/eval-comparison/v1`. Its `status` is one of:
+
+- `compared`: a valid **project-owned** `classification`, summary, and JSON
+  data; the core does not choose scores or thresholds.
+- `non-evidence`: at least one side is ineligible; the callback is not run
+  and no numeric value is substituted for unavailable evidence.
+- `invalid`: missing callback or invalid/throwing project comparison code;
+  an explicit failure code is retained rather than a fabricated decision.
+
+When no comparison extension is passed, both sides still execute and their
+paired artifact intentionally omits `comparison`. The
+`eval-paired-artifact/v1` includes two complete `eval-artifact/v1` side
+envelopes and a stable pair identity. Any included comparison is validated
+against their real classifications and is **sealed in the paired integrity
+digest**. Normal single-case eval artifacts remain unchanged.
+
+Projects own baseline/candidate meaning, score interpretation, thresholds,
+trap rules, and any higher-level PASS/FAIL decision. The generic paired
+result does not define a final combined verdict. The caller owns any paired
+run scheduling, user-facing summary, or exit behavior beyond this API.
+
 ## Scope limits
 
 The public generic eval interface does not add:
 
 - Loom-specific cases, selectors, prompts, or verdict rules;
-- skill-ablation/baseline-candidate semantics;
+- Loom-specific ablation policies, skill loading, or scoring thresholds;
 - a universal assertion DSL;
 - a universal judge result schema;
 - an input JSON request API;

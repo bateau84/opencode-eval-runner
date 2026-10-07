@@ -20,6 +20,7 @@ from typing import Any
 from urllib.parse import quote
 
 from container.runtime_evidence import RuntimeEvidenceError, validate_runtime_evidence
+from runner.eval_compare import validate_comparison_result_envelope
 from runner.eval_types import ArtifactIdentity, EvalJob, JsonValue, RunPlan
 
 
@@ -405,6 +406,16 @@ def _validate_paired_eval_artifact_shape(
             actual_identity == expected_identity,
             f"paired eval artifact side {side!r} identity does not match pair identity",
         )
+
+    if "comparison" in artifact:
+        try:
+            validate_comparison_result_envelope(
+                artifact["comparison"],
+                baseline_classification=sides["baseline"]["classification"],
+                candidate_classification=sides["candidate"]["classification"],
+            )
+        except (TypeError, ValueError) as exc:
+            raise EvalArtifactError(f"paired eval artifact.comparison: {exc}") from exc
 
     if require_evidence_id:
         evidence_id = artifact["paired_artifact_evidence_id"]
