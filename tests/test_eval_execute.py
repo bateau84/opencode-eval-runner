@@ -5,10 +5,14 @@ import subprocess
 import tempfile
 import unittest
 from unittest.mock import patch
-from dataclasses import dataclass
 from pathlib import Path
 
-from container.runtime_evidence import build_runtime_evidence, unsupported_runtime_evidence
+from container.runtime_evidence import (
+    BOUNDARY_NATIVE,
+    build_runtime_evidence,
+    unsupported_runtime_evidence,
+)
+from runner.eval_evidence import EvidenceRequirement
 from runner.eval_execute import (
     RESULT_SCHEMA,
     TransientProviderRetryPolicy,
@@ -27,6 +31,19 @@ def complete_empty_runtime_evidence():
             "observer_failures": 0,
             "callback_failures": 0,
             "issues": [],
+        }
+    )
+
+
+def incomplete_runtime_evidence():
+    return build_runtime_evidence(
+        {
+            "capture_started": True,
+            "capture_ended": False,
+            "records": [],
+            "observer_failures": None,
+            "callback_failures": None,
+            "issues": ["missing_capture_end"],
         }
     )
 
@@ -106,12 +123,6 @@ class AlwaysRetryPolicy:
         return RetryDecision(True, "test requests retry", 0.0)
 
 
-@dataclass(frozen=True)
-class FakeReadiness:
-    status: str
-    reasons: tuple[str, ...]
-
-
 class EvalExecuteTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
@@ -127,6 +138,7 @@ class EvalExecuteTests(unittest.TestCase):
         outcome = run_target_attempts(self.spec, invoker=invoker)
 
         self.assertTrue(outcome.succeeded)
+        self.assertEqual(outcome.readiness.status, "ready")
         self.assertEqual(invoker.calls, 1)
         self.assertEqual(len(outcome.attempts), 1)
         attempt = outcome.final_attempt
@@ -175,6 +187,7 @@ class EvalExecuteTests(unittest.TestCase):
         self.assertEqual(failure.plane, "product")
         self.assertEqual(failure.code, "product_error")
         self.assertFalse(failure.retry_safe)
+        self.assertEqual(outcome.readiness.status, "ready")
         self.assertEqual(invoker.calls, 1)
         self.assertEqual(policy.calls, 0)
         self.assertFalse(outcome.retry_decisions[-1].retry)
@@ -306,27 +319,50 @@ class EvalExecuteTests(unittest.TestCase):
         self.assertEqual(policy.calls, 0)
         self.assertIn("not replay-safe", outcome.retry_decisions[0].reason)
 
-    def test_readiness_bridge_consumes_status_without_reimplementing_rules(self):
-        calls = []
+    def test_canonical_readiness_is_applied_and_not_retried(self):
+        policy = AlwaysRetryPolicy()
+        invoker = SequenceInvoker(
+            [(0, valid_result(self.spec, runtime_evidence=incomplete_runtime_evidence()))]
+        )
 
-        def readiness(runtime_evidence):
-            calls.append(runtime_evidence)
-            return FakeReadiness("incomplete", ("native boundary incomplete",))
-
-        invoker = SequenceInvoker([(0, valid_result(self.spec))])
         outcome = run_target_attempts(
             self.spec,
             invoker=invoker,
-            evidence_readiness=readiness,
+            evidence_requirement=EvidenceRequirement((BOUNDARY_NATIVE,)),
             max_attempts=2,
-            retry_policy=AlwaysRetryPolicy(),
+            retry_policy=policy,
         )
 
-        self.assertEqual(len(calls), 1)
         self.assertEqual(outcome.readiness.status, "incomplete")
         self.assertEqual(outcome.final_attempt.failure.plane, "evidence")
         self.assertEqual(outcome.final_attempt.failure.code, "evidence_incomplete")
         self.assertFalse(outcome.final_attempt.failure.retry_safe)
+        self.assertEqual(invoker.calls, 1)
+        self.assertEqual(policy.calls, 0)
+
+    def test_product_failure_keeps_nonready_evidence_separate(self):
+        invoker = SequenceInvoker(
+            [
+                (
+                    0,
+                    valid_result(
+                        self.spec,
+                        exit_code=7,
+                        runtime_evidence=incomplete_runtime_evidence(),
+                    ),
+                )
+            ]
+        )
+
+        outcome = run_target_attempts(
+            self.spec,
+            invoker=invoker,
+            evidence_requirement=EvidenceRequirement((BOUNDARY_NATIVE,)),
+        )
+
+        self.assertEqual(outcome.final_attempt.failure.plane, "product")
+        self.assertEqual(outcome.final_attempt.failure.code, "product_error")
+        self.assertEqual(outcome.readiness.status, "incomplete")
         self.assertEqual(invoker.calls, 1)
 
     def test_max_attempts_validation_rejects_unbounded_or_invalid_values(self):

@@ -1,8 +1,8 @@
 """Target attempt execution and explicit retry orchestration.
 
 This module deliberately stays above the existing host ``invoke`` boundary:
-one attempt calls ``runner.cli.invoke`` exactly once.  It does not construct
-OCI commands and it does not implement runtime-evidence readiness semantics.
+one attempt calls ``runner.cli.invoke`` exactly once. It does not construct
+OCI commands; runtime-evidence readiness is delegated to the canonical evaluator.
 """
 from __future__ import annotations
 
@@ -16,9 +16,10 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Protocol, TypeAlias, cast
+from typing import TypeAlias, cast
 
 from runner.cli import RunnerError, invoke, validate_container_result
+from runner.eval_evidence import EvidenceReadiness, EvidenceRequirement, check_evidence_readiness
 from runner.eval_types import (
     AttemptFailure,
     AttemptRecord,
@@ -36,22 +37,6 @@ InvokeAdapter: TypeAlias = Callable[[InvocationSpec], tuple[int, object]]
 SleepFn: TypeAlias = Callable[[float], None]
 
 
-class EvidenceReadinessResult(Protocol):
-    """Narrow bridge for the sibling canonical evidence-readiness API.
-
-    Reconciliation can pass the sibling ``EvidenceReadiness`` result directly;
-    this worker intentionally does not duplicate boundary/field semantics.
-    """
-
-    status: str
-    reasons: tuple[str, ...]
-
-
-EvidenceReadinessEvaluator: TypeAlias = Callable[
-    [Mapping[str, object]], EvidenceReadinessResult
-]
-
-
 @dataclass(frozen=True)
 class TargetExecutionOutcome:
     """Target attempt history plus explicit retry decisions and provenance."""
@@ -59,7 +44,7 @@ class TargetExecutionOutcome:
     spec: InvocationSpec
     attempts: tuple[AttemptRecord, ...]
     retry_decisions: tuple[RetryDecision, ...]
-    readiness: EvidenceReadinessResult | None
+    readiness: EvidenceReadiness | None
 
     @property
     def final_attempt(self) -> AttemptRecord:
@@ -356,7 +341,7 @@ def _classify_result(
 
 
 def _classify_readiness(
-    readiness: EvidenceReadinessResult,
+    readiness: EvidenceReadiness,
 ) -> AttemptFailure | None:
     status = readiness.status
     if status == "ready":
@@ -418,7 +403,7 @@ def run_target_attempts(
     retry_policy: RetryPolicy | None = None,
     max_attempts: int = 1,
     invoker: InvokeAdapter = invoke_once,
-    evidence_readiness: EvidenceReadinessEvaluator | None = None,
+    evidence_requirement: EvidenceRequirement = EvidenceRequirement(),
     sleep: SleepFn = time.sleep,
 ) -> TargetExecutionOutcome:
     """Run a target with explicit, bounded, replay-safe retry orchestration."""
@@ -426,7 +411,7 @@ def run_target_attempts(
     _validate_max_attempts(max_attempts)
     attempts: list[AttemptRecord] = []
     retry_decisions: list[RetryDecision] = []
-    final_readiness: EvidenceReadinessResult | None = None
+    final_readiness: EvidenceReadiness | None = None
 
     for attempt_number in range(1, max_attempts + 1):
         started_at = _utc_now()
@@ -434,7 +419,7 @@ def run_target_attempts(
         host_exit_code: int | None = None
         result: dict[str, JsonValue] | None = None
         failure: AttemptFailure | None = None
-        readiness: EvidenceReadinessResult | None = None
+        readiness: EvidenceReadiness | None = None
 
         try:
             host_exit_code, raw_result = invoker(spec)
@@ -449,11 +434,7 @@ def run_target_attempts(
                 result, failure = _validate_result_v1(raw_result, spec)
             if result is not None and failure is None:
                 failure = _classify_result(result, host_exit_code)
-            if (
-                result is not None
-                and failure is None
-                and evidence_readiness is not None
-            ):
+            if result is not None:
                 runtime_evidence = result.get("runtime_evidence")
                 if not isinstance(runtime_evidence, Mapping):
                     failure = _failure(
@@ -464,10 +445,10 @@ def run_target_attempts(
                     )
                 else:
                     try:
-                        readiness = evidence_readiness(
-                            cast(Mapping[str, object], runtime_evidence)
+                        readiness = check_evidence_readiness(
+                            cast(Mapping[str, object], runtime_evidence),
+                            evidence_requirement,
                         )
-                        failure = _classify_readiness(readiness)
                     except Exception as exc:
                         failure = _failure(
                             "infrastructure",
@@ -475,6 +456,9 @@ def run_target_attempts(
                             f"evidence readiness evaluation failed: {exc}",
                             retry_safe=False,
                         )
+                    else:
+                        if failure is None:
+                            failure = _classify_readiness(readiness)
         except subprocess.TimeoutExpired as exc:
             failure = _failure(
                 "infrastructure",
