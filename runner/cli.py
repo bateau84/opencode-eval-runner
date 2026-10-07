@@ -11,6 +11,10 @@ import sys
 import tempfile
 from pathlib import Path
 
+from container.evidence_safety import (
+    MODEL_CATALOG_SOURCE_LIMIT,
+    _json_source_credentials,
+)
 from container.runtime_evidence import RuntimeEvidenceError, validate_runtime_evidence
 
 DEFAULT_IMAGES = {
@@ -302,6 +306,17 @@ def build_container_command(
         "OPENCODE_EVAL_RUNNER_MODELS",
         default_models_path(),
     )
+    # Fail before spending model inference if a selected model cache cannot
+    # support a complete credential inventory. The container repeats this
+    # check before any observation is exported (including after seed copy).
+    if models and not _json_source_credentials(
+        models, set(), max_bytes=MODEL_CATALOG_SOURCE_LIMIT
+    ):
+        raise RunnerError(
+            "model catalog credential inventory unavailable: "
+            f"{models} must be valid JSON within {MODEL_CATALOG_SOURCE_LIMIT} bytes; "
+            "use --models-catalog with a provider-scoped cache or repair the source"
+        )
     if auth:
         command += bind_arg(auth, "/seed/auth.json", readonly=True)
     if config:
