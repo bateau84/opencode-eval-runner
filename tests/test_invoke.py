@@ -706,11 +706,11 @@ class OpenCodeTransportTests(unittest.TestCase):
         ):
             self.assertNotIn(mutable, ci + publish)
 
-    def test_container_pins_opencode_2_0_18(self):
+    def test_container_pins_stock_opencode_2_0_23(self):
         containerfile = (Path(__file__).resolve().parents[1] / "Containerfile").read_text(
             encoding="utf-8"
         )
-        self.assertIn("ARG OPENCODE_VERSION=2.0.18", containerfile)
+        self.assertIn("ARG OPENCODE_VERSION=2.0.23", containerfile)
         self.assertNotIn("ARG OPENCODE_VERSION=2.0.15", containerfile)
 
     def test_container_pins_base_images_and_copilot_release_asset(self):
@@ -748,6 +748,21 @@ class OpenCodeTransportTests(unittest.TestCase):
         ):
             self.assertIn(expected, containerfile)
 
+
+    def test_runtime_injects_canonical_observer_as_final_inline_plugin(self):
+        invoke = (Path(__file__).resolve().parents[1] / "container" / "invoke.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn('observer_root = config / "eval-runtime-observer"', invoke)
+        self.assertIn('Path(__file__).with_name("native_observer.ts")', invoke)
+        self.assertIn('observer_root / "server.ts"', invoke)
+        self.assertIn('"OPENCODE_CONFIG_CONTENT": json.dumps({"plugins": [observer_root.as_uri()]})', invoke)
+        self.assertIn("RuntimeObservationTransport()", invoke)
+        self.assertIn("env[OBSERVER_STREAM_ENV] = observer_transport.endpoint", invoke)
+        self.assertIn("finalize_runtime_observer(observer_transport, env)", invoke)
+        self.assertNotIn("runtime-observer.jsonl", invoke)
+        self.assertIn('"runtime_evidence": runtime_evidence', invoke)
+        self.assertNotIn('"native_tool_observations"', invoke)
 
     def test_runtime_exposes_seeded_global_plugins(self):
         invoke = (Path(__file__).resolve().parents[1] / "container" / "invoke.py").read_text(

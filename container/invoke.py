@@ -16,6 +16,23 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
+try:
+    from .evidence_safety import OMITTED, Projection, Sanitizer
+    from .native_observer import OBSERVER_STREAM_ENV, RuntimeObservationTransport
+    from .runtime_evidence import (
+        build_runtime_evidence,
+        unsupported_runtime_evidence,
+        validate_runtime_evidence,
+    )
+except ImportError:
+    from evidence_safety import OMITTED, Projection, Sanitizer
+    from native_observer import OBSERVER_STREAM_ENV, RuntimeObservationTransport
+    from runtime_evidence import (
+        build_runtime_evidence,
+        unsupported_runtime_evidence,
+        validate_runtime_evidence,
+    )
+
 RESULT_SCHEMA = "opencode-eval-runner/v1"
 OPENCODE_EVAL_TITLE = "opencode-eval-runner"
 COPILOT_AGENT_NAME = "eval-runner"
@@ -150,18 +167,13 @@ STDOUT_CAPTURE_LIMIT = 200000
 STDERR_CAPTURE_LIMIT = 20000
 
 
-def _tool_result_text(value: Any, limit: int) -> tuple[str, bool]:
-    text = value if isinstance(value, str) else json.dumps(value, ensure_ascii=False, sort_keys=True)
-    if len(text) <= limit:
-        return text, False
-    marker = "\n[... tool-result field truncated ...]\n"
-    retained = limit - len(marker)
-    head = retained // 2
-    return text[:head] + marker + text[-(retained - head):], True
-
-
-def extract_tool_result_evidence(events: list[dict[str, Any]]) -> dict[str, Any]:
-    """Bound tool results from the full structured event stream before stdout clipping."""
+def extract_tool_result_evidence(
+    events: list[dict[str, Any]],
+    sanitizer: Sanitizer | None = None,
+) -> dict[str, Any]:
+    """Project tool evidence safely before any field or total-size decision."""
+    sanitizer = sanitizer or Sanitizer()
+    projection = Projection(sanitizer, stage="before_evidence_size")
     evidence: dict[str, Any] = {
         "schema": "opencode-eval-runner/tool-results/v1",
         "source": "opencode.event-stream.full",
@@ -170,44 +182,142 @@ def extract_tool_result_evidence(events: list[dict[str, Any]]) -> dict[str, Any]
         "events": [],
     }
     recent: list[dict[str, Any]] = []
+
+    def project(
+        item: dict[str, Any],
+        event_index: int,
+        field: str,
+        value: Any = OMITTED,
+        *,
+        limit: int,
+        protocol: bool = False,
+    ) -> None:
+        safe = projection.field(
+            field,
+            value,
+            event=event_index,
+            limit=limit,
+            protocol=protocol,
+        )
+        if safe is not OMITTED:
+            item[field] = safe
+
+    def drop_event_fields(sequence: int) -> None:
+        event_index = sequence - 1
+        projection.fields = [
+            field
+            for field in projection.fields
+            if field.get("event") != event_index
+        ]
+
     for event in events:
         if event.get("type") != "tool_use":
             continue
-        part = event.get("part")
-        if not isinstance(part, dict) or part.get("type") != "tool" or not isinstance(part.get("tool"), str):
-            continue
-        state = part.get("state")
-        if not isinstance(state, dict):
-            continue
+
         evidence["observed_events"] += 1
-        item: dict[str, Any] = {
-            "sequence": evidence["observed_events"],
-            "truncated_fields": [],
-        }
-        fields: dict[str, tuple[Any, int]] = {
-            "tool": (part["tool"], 256),
-            "status": (state.get("status", "unknown"), 256),
-            "input": (state.get("input", {}), 2000),
-        }
-        for key, value in (("call_id", part.get("callID")), ("session_id", event.get("sessionID"))):
-            if value is not None:
-                fields[key] = (value, 256)
-        for key in ("output", "error"):
-            if key in state:
-                fields[key] = (state[key], TOOL_RESULT_FIELD_LIMIT)
-        for key, (value, limit) in fields.items():
-            item[key], clipped = _tool_result_text(value, limit)
-            if clipped:
-                item["truncated_fields"].append(key)
+        sequence = evidence["observed_events"]
+        event_index = sequence - 1
+        item: dict[str, Any] = {"sequence": sequence}
+        part = event.get("part")
+
+        if not isinstance(part, dict):
+            reason = "missing" if part is None else "unsupported_representation"
+            for field in ("tool", "status", "input", "call_id", "session_id"):
+                projection.omit(field, reason, event=event_index)
+        else:
+            project(item, event_index, "tool", part.get("tool", OMITTED), limit=256)
+            project(
+                item,
+                event_index,
+                "call_id",
+                part.get("callID", part.get("id", OMITTED)),
+                limit=256,
+            )
+            project(
+                item,
+                event_index,
+                "session_id",
+                event.get("sessionID", event.get("sessionId", OMITTED)),
+                limit=256,
+            )
+
+            state = part.get("state", OMITTED)
+            if not isinstance(state, dict):
+                reason = "missing" if state is OMITTED else "unsupported_representation"
+                projection.omit("status", reason, event=event_index)
+                projection.omit("input", reason, event=event_index)
+            else:
+                status = state.get("status", OMITTED)
+                project(
+                    item,
+                    event_index,
+                    "status",
+                    status,
+                    limit=256,
+                    protocol=True,
+                )
+                project(
+                    item,
+                    event_index,
+                    "input",
+                    state.get("input", OMITTED),
+                    limit=2000,
+                )
+                if status == "completed":
+                    project(
+                        item,
+                        event_index,
+                        "output",
+                        state.get("output", OMITTED),
+                        limit=TOOL_RESULT_FIELD_LIMIT,
+                    )
+                elif status in {"error", "failed"}:
+                    project(
+                        item,
+                        event_index,
+                        "error",
+                        state.get("error", OMITTED),
+                        limit=TOOL_RESULT_FIELD_LIMIT,
+                    )
+                else:
+                    if "output" in state:
+                        project(
+                            item,
+                            event_index,
+                            "output",
+                            state["output"],
+                            limit=TOOL_RESULT_FIELD_LIMIT,
+                        )
+                    if "error" in state:
+                        project(
+                            item,
+                            event_index,
+                            "error",
+                            state["error"],
+                            limit=TOOL_RESULT_FIELD_LIMIT,
+                        )
+
         recent.append(item)
         if len(recent) > TOOL_RESULT_EVENT_LIMIT:
-            recent.pop(0)
+            dropped = recent.pop(0)
+            drop_event_fields(dropped["sequence"])
+            evidence["omitted_events"] += 1
+            projection.loss("event_limit")
 
     evidence["events"] = recent
-    evidence["omitted_events"] = evidence["observed_events"] - len(recent)
-    while len(json.dumps(evidence, ensure_ascii=False)) > TOOL_RESULT_TOTAL_LIMIT and evidence["events"]:
-        evidence["events"].pop(0)
+    evidence["safety"] = projection.summary()
+
+    while (
+        len(json.dumps(evidence, ensure_ascii=False, separators=(",", ":")))
+        > TOOL_RESULT_TOTAL_LIMIT
+        and evidence["events"]
+    ):
+        dropped = evidence["events"].pop(0)
+        drop_event_fields(dropped["sequence"])
         evidence["omitted_events"] += 1
+        projection.loss("size_limit")
+        evidence["safety"] = projection.summary()
+
     return evidence
 
 
@@ -304,6 +414,10 @@ def prepare_opencode_env() -> dict[str, str]:
             json.dumps({"$schema": "https://opencode.ai/config.json"}) + "\n",
             encoding="utf-8",
         )
+    observer_root = config / "eval-runtime-observer"
+    observer_root.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(Path(__file__).with_name("native_observer.ts"), observer_root / "server.ts")
+
     if seed_config_root.is_dir():
         # Loom itself can be an OpenCode global config root. OpenCode 2.0.11's
         # packaged runtime can fail to register directory plugins even when
@@ -345,6 +459,9 @@ def prepare_opencode_env() -> dict[str, str]:
         "XDG_CACHE_HOME": str(cache),
         "XDG_STATE_HOME": str(state),
         "OPENCODE_CONFIG_DIR": str(config),
+        # Stock 2.0.23 inline config has highest local priority. Register the
+        # runner-owned observer last so it sees the effective transformed tools.
+        "OPENCODE_CONFIG_CONTENT": json.dumps({"plugins": [observer_root.as_uri()]}),
         "OPENCODE_DB": "opencode.db",
         "OPENCODE_DISABLE_AUTOUPDATE": "1",
     })
@@ -641,6 +758,7 @@ def plugin_diagnostic(env: dict[str, str]) -> dict[str, Any]:
     loom_root = plugins_root / "loom"
     loom_flat = plugins_root / "loom.ts"
     loom_module_root = config_root / "loom-plugin"
+    observer_root = config_root / "eval-runtime-observer"
     return {
         "config_root": str(config_root),
         "config_root_exists": config_root.exists(),
@@ -654,6 +772,8 @@ def plugin_diagnostic(env: dict[str, str]) -> dict[str, Any]:
         "loom_index_exists": (loom_root / "index.ts").is_file(),
         "loom_flat_exists": loom_flat.is_file(),
         "loom_module_index_exists": (loom_module_root / "index.ts").is_file(),
+        "runtime_observer_exists": (observer_root / "server.ts").is_file(),
+        "runtime_observer_inline_configured": "eval-runtime-observer" in env.get("OPENCODE_CONFIG_CONTENT", ""),
     }
 
 
@@ -674,6 +794,76 @@ def resolve_opencode_reasoning(model: str, reasoning: str) -> tuple[str, str, st
     return model, "provider-default", "provider-default"
 
 
+RUNTIME_JSON_CREDENTIAL_SOURCES = (
+    Path("/seed/auth.json"),
+    Path("/seed/opencode.json"),
+    Path("/seed/models.json"),
+)
+RUNTIME_DATABASE_CREDENTIAL_SOURCES = (Path("/seed/opencode.db"),)
+SAFE_RESULT_PROTOCOL_FIELDS = frozenset({
+    "schema",
+    "transport",
+    "reasoning_source",
+    "exit_code",
+    "timed_out",
+    "infrastructure_error",
+    "timing",
+    "stdout_truncated",
+    "stderr_truncated",
+    "stdout_total_chars",
+    "stderr_total_chars",
+    "tool_result_evidence",
+    "runtime_evidence",
+})
+
+
+def runtime_sanitizer(env: dict[str, str]) -> Sanitizer:
+    return Sanitizer.from_runtime(
+        env,
+        json_sources=RUNTIME_JSON_CREDENTIAL_SOURCES,
+        database_sources=RUNTIME_DATABASE_CREDENTIAL_SOURCES,
+    )
+
+
+def configure_runtime_observer_env(env: dict[str, str], sanitizer: Sanitizer) -> None:
+    # The same inventory used by the Python pre-sink guard is supplied to the
+    # in-process observer so no raw dynamic credential value reaches the
+    # runner-owned capture stream before projection.
+    env["OPENCODE_EVAL_OBSERVER_CREDENTIALS"] = json.dumps(
+        list(sanitizer.credentials),
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
+    env["OPENCODE_EVAL_OBSERVER_CREDENTIALS_COMPLETE"] = (
+        "1" if sanitizer.inventory_complete else "0"
+    )
+
+
+def finalize_runtime_observer(
+    transport: RuntimeObservationTransport,
+    env: dict[str, str],
+) -> dict[str, Any]:
+    """Drain and close the runner-owned observer stream exactly once."""
+    try:
+        return transport.finish()
+    finally:
+        env.pop(OBSERVER_STREAM_ENV, None)
+
+
+def sanitize_result_for_output(
+    result: dict[str, Any],
+    sanitizer: Sanitizer,
+) -> dict[str, Any]:
+    """Final sink guard; product status stays separate from evidence eligibility."""
+    safe: dict[str, Any] = {}
+    for key, value in result.items():
+        if key in SAFE_RESULT_PROTOCOL_FIELDS:
+            safe[key] = value
+        else:
+            safe[key] = sanitizer.output_value(value)
+    return safe
+
+
 def invoke_opencode(
     model: str,
     agent: str,
@@ -683,6 +873,8 @@ def invoke_opencode(
     reasoning: str = "",
 ) -> dict[str, Any]:
     env = prepare_opencode_env()
+    sanitizer = runtime_sanitizer(env)
+    configure_runtime_observer_env(env, sanitizer)
     plugins = plugin_diagnostic(env)
     expected_plugin = os.environ.get("EVAL_EXPECT_PLUGIN", "").strip()
     plugin_preflight = verify_expected_plugin(env, agent, model, expected_plugin, timeout)
@@ -710,24 +902,37 @@ def invoke_opencode(
     if agent:
         command += ["--agent", agent]
     command += ["--model", invoked_model, prompt]
+
+    # Preflight intentionally receives no observer endpoint. Create a
+    # one-connection runner-owned stream only for the real invocation.
+    observer_transport = RuntimeObservationTransport()
+    env[OBSERVER_STREAM_ENV] = observer_transport.endpoint
     run_started = time.perf_counter()
     try:
         proc = run(command, Path("/workspace"), env, timeout)
     except subprocess.TimeoutExpired as exc:
         run_seconds = time.perf_counter() - run_started
-        stdout = timeout_output(exc.stdout)
-        stderr = timeout_output(exc.stderr)
-        events = parse_events(stdout)
+        raw_stdout = timeout_output(exc.stdout)
+        raw_stderr = timeout_output(exc.stderr)
+        events = parse_events(raw_stdout)
+        safe_stdout, _ = sanitizer.json_lines(raw_stdout)
         sid = session_id(events)
+        capture = finalize_runtime_observer(observer_transport, env)
+        runtime_evidence = build_runtime_evidence(
+            capture,
+            sanitizer,
+            process_state="timeout",
+        )
         summary = last_event_summary(events)
         detail = (
             f"opencode run timed out after {timeout}s; "
             f"partial_events={len(events)}"
             + (f"; last_event={json.dumps(summary, sort_keys=True)}" if summary else "")
         )
-        if stderr.strip():
-            detail += "\n" + stderr.strip()
-        return {
+        if raw_stderr.strip():
+            detail += "\n" + raw_stderr.strip()
+        safe_detail, _ = sanitizer.json_lines(detail)
+        result = {
             "schema": RESULT_SCHEMA,
             "transport": "opencode",
             "model": model,
@@ -748,23 +953,37 @@ def invoke_opencode(
                 "export_exit_code": None,
                 "total_seconds": round(run_seconds, 3),
             },
-            "stderr": detail[:STDERR_CAPTURE_LIMIT],
-            "stderr_truncated": len(detail) > STDERR_CAPTURE_LIMIT,
-            "stderr_total_chars": len(detail),
-            "stdout": stdout[:STDOUT_CAPTURE_LIMIT],
-            "stdout_truncated": len(stdout) > STDOUT_CAPTURE_LIMIT,
-            "stdout_total_chars": len(stdout),
-            "tool_result_evidence": extract_tool_result_evidence(events),
+            "stderr": safe_detail[:STDERR_CAPTURE_LIMIT],
+            "stderr_truncated": len(safe_detail) > STDERR_CAPTURE_LIMIT,
+            "stderr_total_chars": len(safe_detail),
+            "stdout": safe_stdout[:STDOUT_CAPTURE_LIMIT],
+            "stdout_truncated": len(safe_stdout) > STDOUT_CAPTURE_LIMIT,
+            "stdout_total_chars": len(safe_stdout),
+            "tool_result_evidence": extract_tool_result_evidence(events, sanitizer),
+            "runtime_evidence": runtime_evidence,
             "plugin_diagnostic": plugins,
             "plugin_preflight": plugin_preflight,
         }
+        return sanitize_result_for_output(result, sanitizer)
+    except BaseException:
+        finalize_runtime_observer(observer_transport, env)
+        raise
 
     run_seconds = time.perf_counter() - run_started
     events = parse_events(proc.stdout)
+    safe_stdout, _ = sanitizer.json_lines(proc.stdout)
+    safe_stderr, _ = sanitizer.json_lines(proc.stderr)
     sid = session_id(events)
+    capture = finalize_runtime_observer(observer_transport, env)
+    runtime_evidence = build_runtime_evidence(
+        capture,
+        sanitizer,
+        process_state="completed" if capture.get("capture_ended") is True else "interrupted",
+    )
 
-    # The structured `opencode run --format json` event stream is the
-    # authoritative evidence source. Starting a second OpenCode process to
+    # The structured `opencode run --format json` event stream is product and
+    # convenience data only. Authoritative observations come from runtime_evidence.
+    # Starting a second OpenCode process to
     # export the just-created session is redundant and can add a full timeout
     # per invocation when export/session bootstrap fails. Keep eval latency
     # bound to the requested target/judge execution only.
@@ -775,7 +994,7 @@ def invoke_opencode(
     export_seconds = 0.0
     export_exit_code: int | None = None
 
-    return {
+    result = {
         "schema": RESULT_SCHEMA,
         "transport": "opencode",
         "model": model,
@@ -795,16 +1014,18 @@ def invoke_opencode(
             "export_exit_code": export_exit_code,
             "total_seconds": round(run_seconds + export_seconds, 3),
         },
-        "stderr": proc.stderr[:STDERR_CAPTURE_LIMIT],
-        "stderr_truncated": len(proc.stderr) > STDERR_CAPTURE_LIMIT,
-        "stderr_total_chars": len(proc.stderr),
-        "stdout": proc.stdout[:STDOUT_CAPTURE_LIMIT],
-        "stdout_truncated": len(proc.stdout) > STDOUT_CAPTURE_LIMIT,
-        "stdout_total_chars": len(proc.stdout),
-        "tool_result_evidence": extract_tool_result_evidence(events),
+        "stderr": safe_stderr[:STDERR_CAPTURE_LIMIT],
+        "stderr_truncated": len(safe_stderr) > STDERR_CAPTURE_LIMIT,
+        "stderr_total_chars": len(safe_stderr),
+        "stdout": safe_stdout[:STDOUT_CAPTURE_LIMIT],
+        "stdout_truncated": len(safe_stdout) > STDOUT_CAPTURE_LIMIT,
+        "stdout_total_chars": len(safe_stdout),
+        "tool_result_evidence": extract_tool_result_evidence(events, sanitizer),
+        "runtime_evidence": runtime_evidence,
         "plugin_diagnostic": plugins,
         "plugin_preflight": plugin_preflight,
     }
+    return sanitize_result_for_output(result, sanitizer)
 
 
 def copilot_auth_source(env: dict[str, str]) -> str | None:
@@ -834,9 +1055,10 @@ def invoke_copilot(
     reasoning: str = "",
 ) -> dict[str, Any]:
     env = dict(os.environ)
+    sanitizer = runtime_sanitizer(env)
     auth_source = copilot_auth_source(env)
     if not auth_source:
-        return {
+        return sanitize_result_for_output({
             "schema": RESULT_SCHEMA,
             "transport": "github-copilot-cli",
             "model": model,
@@ -852,7 +1074,10 @@ def invoke_copilot(
             "skills_loaded": [],
             "stderr": "github-copilot-cli requires COPILOT_GITHUB_TOKEN, GH_TOKEN, or GITHUB_TOKEN",
             "stdout": "",
-        }
+            "runtime_evidence": unsupported_runtime_evidence(
+                "opencode_runtime_observer_unavailable_for_transport"
+            ),
+        }, sanitizer)
 
     root = Path("/tmp/copilot")
     work = root / "work"
@@ -862,7 +1087,10 @@ def invoke_copilot(
     for path in (agent_dir, home, cache):
         path.mkdir(parents=True, exist_ok=True)
 
-    (agent_dir / f"{COPILOT_AGENT_NAME}.agent.md").write_text(copilot_profile(system), encoding="utf-8")
+    (agent_dir / f"{COPILOT_AGENT_NAME}.agent.md").write_text(
+        copilot_profile(system),
+        encoding="utf-8",
+    )
     env["COPILOT_HOME"] = str(home)
     env["COPILOT_CACHE_HOME"] = str(cache)
     env["COPILOT_AUTO_UPDATE"] = "false"
@@ -885,7 +1113,9 @@ def invoke_copilot(
         "--deny-tool", ",".join(COPILOT_DENIED_PERMISSIONS),
     ]
     proc = run(command, work, env, timeout)
-    return {
+    safe_stdout, _ = sanitizer.json_lines(proc.stdout)
+    safe_stderr, _ = sanitizer.json_lines(proc.stderr)
+    result = {
         "schema": RESULT_SCHEMA,
         "transport": "github-copilot-cli",
         "model": model,
@@ -896,21 +1126,29 @@ def invoke_copilot(
         "credential_source": auth_source,
         "exit_code": proc.returncode,
         "session_id": None,
-        "text": proc.stdout.strip() if proc.returncode == 0 else "",
+        "text": safe_stdout.strip() if proc.returncode == 0 else "",
         "tools": [],
         "actions": [],
         "skills_loaded": [],
-        "stderr": proc.stderr[:STDERR_CAPTURE_LIMIT],
-        "stderr_truncated": len(proc.stderr) > STDERR_CAPTURE_LIMIT,
-        "stderr_total_chars": len(proc.stderr),
-        "stdout": proc.stdout[:STDOUT_CAPTURE_LIMIT],
-        "stdout_truncated": len(proc.stdout) > STDOUT_CAPTURE_LIMIT,
-        "stdout_total_chars": len(proc.stdout),
+        "stderr": safe_stderr[:STDERR_CAPTURE_LIMIT],
+        "stderr_truncated": len(safe_stderr) > STDERR_CAPTURE_LIMIT,
+        "stderr_total_chars": len(safe_stderr),
+        "stdout": safe_stdout[:STDOUT_CAPTURE_LIMIT],
+        "stdout_truncated": len(safe_stdout) > STDOUT_CAPTURE_LIMIT,
+        "stdout_total_chars": len(safe_stdout),
+        "runtime_evidence": unsupported_runtime_evidence(
+            "opencode_runtime_observer_unavailable_for_transport"
+        ),
     }
+    return sanitize_result_for_output(result, sanitizer)
 
 
 def emit_result(result: dict[str, Any]) -> None:
-    sys.stdout.write(json.dumps(result, separators=(",", ":")) + "\n")
+    # Validate before the first result/stdout serialization sink.
+    validate_runtime_evidence(result.get("runtime_evidence"))
+    sanitizer = runtime_sanitizer(dict(os.environ))
+    safe = sanitize_result_for_output(result, sanitizer)
+    sys.stdout.write(json.dumps(safe, separators=(",", ":")) + "\n")
     sys.stdout.flush()
 
 
@@ -951,6 +1189,9 @@ def main() -> int:
             "skills_loaded": [],
             "stderr": f"{type(exc).__name__}: {exc}",
             "stdout": "",
+            "runtime_evidence": unsupported_runtime_evidence(
+                "runtime_observer_unavailable_after_infrastructure_error"
+            ),
             "infrastructure_error": True,
         }
         emit_result(result)

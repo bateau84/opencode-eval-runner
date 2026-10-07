@@ -1,6 +1,6 @@
 # opencode-eval-runner
 
-Reusable OCI isolation for behavioral evals that invoke OpenCode or GitHub Copilot CLI.
+Reusable OCI execution boundary for isolated eval invocations using OpenCode or GitHub Copilot CLI.
 
 The runner intentionally does **not** own an eval corpus, grading semantics, or agent policy. Those stay in the repository being evaluated. This project owns the execution boundary:
 
@@ -27,6 +27,25 @@ eval harness
 ```
 
 The caller may use the same model for both, but they do not share OpenCode session state or filesystem state.
+
+## What this repository runs
+
+This project runs **one isolated invocation at a time**. It is not an eval-suite engine: the calling repository owns cases, iterations, assertions, target/judge orchestration, grading, and final PASS/FAIL policy.
+
+The current public input interface is CLI or GitHub Action arguments plus prompt/system files; there is **no input JSON request API**. Each invocation produces the documented JSON Result contract.
+
+Supported usage modes are:
+
+| Mode | Interface |
+| --- | --- |
+| Local OpenCode invocation | `opencode-eval-runner invoke --transport opencode ...` |
+| Local Copilot invocation | `opencode-eval-runner invoke --transport github-copilot-cli ...` |
+| Local eval suite | Repository harness repeatedly calls the CLI |
+| GitHub Action direct invocation | Action inputs with `model` set |
+| GitHub Action repository harness | Action `command` mode |
+| GitHub Action setup only | Leave `model` and `command` empty, then call the CLI in a later step |
+
+See **[Invocation usage and interface reference](docs/invocation-usage.md)** for the complete input contract, all CLI options, environment variables, all GitHub Action inputs, direct-mode limitations, and execution examples.
 
 ## Transports
 
@@ -72,7 +91,7 @@ Known API-key environment variables are passed when present:
 
 Additional variables require explicit `--env NAME`.
 
-Reasoning can be pinned explicitly with `--reasoning LEVEL`. The pinned OpenCode 2.0.18 CLI represents a model variant in the model reference, so the runner maps `--model provider/model --reasoning LEVEL` to `opencode run --model provider/model#LEVEL`. Supplying both a `#variant` in `--model` and `--reasoning` is rejected as ambiguous. If the model reference already contains a variant and `--reasoning` is omitted, the result records that variant with `"reasoning_source": "model-variant"`. If neither form supplies a level, the runner leaves OpenCode's provider/model default untouched and records `"reasoning": "provider-default"`.
+Reasoning can be pinned explicitly with `--reasoning LEVEL`. The pinned stock OpenCode 2.0.23 CLI represents a model variant in the model reference, so the runner maps `--model provider/model --reasoning LEVEL` to `opencode run --model provider/model#LEVEL`. Supplying both a `#variant` in `--model` and `--reasoning` is rejected as ambiguous. If the model reference already contains a variant and `--reasoning` is omitted, the result records that variant with `"reasoning_source": "model-variant"`. If neither form supplies a level, the runner leaves OpenCode's provider/model default untouched and records `"reasoning": "provider-default"`.
 
 ### `github-copilot-cli`
 
@@ -94,6 +113,8 @@ Reasoning can be pinned with the same `--reasoning LEVEL` runner option. Copilot
 This transport reuses the trust-boundary pattern already proven in `nrkno/mats-opencode-setup`.
 
 ## Local usage
+
+For the full option/default/reference table, see [Invocation usage and interface reference](docs/invocation-usage.md).
 
 Build the transport you need:
 
@@ -173,7 +194,7 @@ opencode-eval-runner invoke \
   ...
 ```
 
-OpenCode 2.0.18 does not expose the old singular `debug agent <id>` command that returned a resolved tool map. The runner therefore performs the strongest supported zero-inference preflight: it requires the expected plugin entrypoint to be materialized in the isolated OpenCode config, runs `opencode debug agents` to prove the configured location starts successfully with plugins active, and requires the selected agent to resolve. Missing plugin materialization, plugin/startup failure, or missing agent is infrastructure/non-evidence, never a behavioral FAIL. Actual tool use remains a repository-owned behavioral assertion in the eval corpus.
+The expected-plugin preflight is zero-inference. The runner requires the plugin entrypoint to be materialized in the isolated config, starts a private stock OpenCode 2.0.23 server, creates a non-resuming Session prompt so plugin activation reaches its barrier without model inference, and verifies that the named plugin is present and active in the runtime plugin inventory. Agent resolution remains part of the real `opencode run --agent` invocation. Missing materialization, activation failure, or later agent resolution failure is infrastructure/non-evidence, never a behavioral FAIL. Actual tool use remains a repository-owned behavioral assertion in the eval corpus.
 
 ### Evaluating a skill
 
@@ -215,6 +236,8 @@ PYTHONPATH=. python3 bin/opencode-eval-runner invoke \
 The token value is not placed on the container command line.
 
 ## GitHub Actions
+
+For all 21 Action inputs, defaults, execution-mode precedence, and CLI-only capabilities, see [Invocation usage and interface reference](docs/invocation-usage.md#github-action-interface).
 
 The repository is a composite GitHub Action. It supports either a single direct invocation or setup plus a repository-owned eval harness.
 
@@ -285,7 +308,7 @@ Example:
 
 ## Result contract
 
-Each invocation writes one JSON document:
+Each invocation writes one `opencode-eval-runner/v1` JSON document. Every official result includes the canonical `runtime_evidence` object.
 
 ```json
 {
@@ -299,23 +322,72 @@ Each invocation writes one JSON document:
   "exit_code": 0,
   "session_id": "...",
   "text": "...",
-  "tools": ["skill"],
-  "actions": [{"tool": "skill", "args": {"id": "architectural-design"}}],
-  "skills_loaded": ["architectural-design"],
+  "tools": [],
+  "actions": [],
+  "skills_loaded": [],
   "stderr": "",
-  "stdout": "..."
+  "stdout": "...",
+  "runtime_evidence": {
+    "schema": "opencode-eval-runner/runtime-evidence/v1",
+    "status": "complete",
+    "evidence_eligible": true,
+    "observations": [],
+    "coverage": {
+      "observation_closed": {"state": "available", "value": true},
+      "process_state": "completed",
+      "starts": {"state": "available", "value": 0},
+      "terminals": {"state": "available", "value": 0},
+      "missing_terminals": {"state": "available", "value": 0},
+      "observer_failures": {"state": "available", "value": 0},
+      "callback_failures": {"state": "available", "value": 0},
+      "losses": [],
+      "unsupported": ["stock_codemode_final_boundary_not_exposed"],
+      "boundaries": {
+        "native": {
+          "status": "complete",
+          "evidence_eligible": true,
+          "starts": {"state": "available", "value": 0},
+          "terminals": {"state": "available", "value": 0},
+          "missing_terminals": {"state": "available", "value": 0},
+          "issues": []
+        },
+        "code_mode_execution": {
+          "status": "complete",
+          "evidence_eligible": true,
+          "starts": {"state": "available", "value": 0},
+          "terminals": {"state": "available", "value": 0},
+          "missing_terminals": {"state": "available", "value": 0},
+          "issues": []
+        },
+        "code_mode_finality": {
+          "status": "unsupported",
+          "evidence_eligible": false,
+          "starts": {"state": "unsupported", "reason": "stock_codemode_final_boundary_not_exposed"},
+          "terminals": {"state": "unsupported", "reason": "stock_codemode_final_boundary_not_exposed"},
+          "missing_terminals": {"state": "unsupported", "reason": "stock_codemode_final_boundary_not_exposed"},
+          "issues": ["stock_codemode_final_boundary_not_exposed"]
+        }
+      }
+    }
+  }
 }
 ```
 
-The container emits this object as a single JSON line on stdout. The host harness writes artifact files itself, so no writable bind mount is required for result transport.
+The container emits this object as a single JSON line on stdout. The host harness re-validates `runtime_evidence` before it writes the result artifact, so a missing or malformed runtime-evidence object is rejected rather than silently downgraded.
 
-The eval repository decides whether that observed behavior is PASS, FAIL, or non-evidence.
+`runtime_evidence` is required for every official transport result. `github-copilot-cli` also emits the canonical object, but with `status: "unsupported"` because it has no OpenCode runtime observer.
+
+If you override `--image`, treat the host runner and image as one compatibility pair. Legacy or custom images that do not emit a valid `opencode-eval-runner/runtime-evidence/v1` object are rejected by this host version; upgrade the host executable and image together.
+
+For runtime verdicts, do not use top-level `evidence_eligible` by itself. An assertion may use evidence only when every boundary it requires is `complete` and every exact field it requires is `available`. `redacted`, `omitted`, or `unsupported` required fields are not PASS evidence. Existing `tools`, `actions`, `tool_result_evidence`, stdout/stderr, and model text are diagnostic/convenience data and must not fill an authoritative-evidence gap. See [Runtime evidence contract v1](docs/runtime-evidence-contract.md).
+
+The eval repository still owns the assertion semantics and decides PASS, FAIL, or non-evidence after applying those eligibility rules.
 
 ## Image versions
 
 The transport images currently pin:
 
-- OpenCode CLI `2.0.18`
+- OpenCode CLI `2.0.23`
 - GitHub Copilot CLI `1.0.83`
 
 The two CLIs are not bundled together. OpenCode's npm package is used only as a build-time native-binary selector; GitHub Copilot CLI is installed from its native release installer. Node/npm are absent from the final runtime images.
@@ -339,6 +411,26 @@ OPENCODE_EVAL_RUNNER_COPILOT_IMAGE=...
 ```
 
 Tags matching `v*` are published with `opencode-` and `copilot-` prefixes.
+
+## Evaluation trust model
+
+The normal evaluation profile is a **trusted-checkout** profile. It assumes the runner, pinned stock OpenCode runtime, reviewed instrumentation, and explicitly selected evaluated checkout/dependencies are trusted components of the evaluation environment.
+
+They are not trusted merely because they produce data that looks like evidence. Model prose, tool-returned collector-shaped JSON, target-writable files, requested actions, inferred identities, and reconstructed results do not establish that an event occurred.
+
+Authoritative runtime observations must come from reviewed instrumentation observing actual execution. Missing, partial, ambiguous, or unsupported required observations are non-evidence and must fail closed for the affected assertion.
+
+This profile does **not** claim resistance to an evaluated plugin that deliberately compromises the trusted runtime or instrumentation. Hostile-plugin isolation is a separate optional profile, not a prerequisite for normal Loom evaluation.
+
+See [Trusted-checkout runtime evidence](docs/trusted-checkout-evidence.md) and the [versioned runtime-evidence result contract](docs/runtime-evidence-contract.md).
+
+OpenCode results now expose `opencode-eval-runner/runtime-evidence/v1` as the single authoritative runtime-evidence object. Native calls are observed through the stock-2.0.23 decoded-execution and Session terminal boundaries. Code Mode inner identity/input/ordering is observable, while exact final script-visible value/error remains explicitly `unsupported`. Existing `tools`, `actions`, `tool_result_evidence`, stdout/stderr, and model text remain convenience/diagnostic data only; they do not expose runtime-evidence eligibility and are never substitutes for `runtime_evidence`.
+
+Overall evidence eligibility is separate from assertion eligibility: an unsupported Code Mode finality boundary does not invalidate an unrelated complete native assertion, and redacted/omitted fields only block assertions that require those exact values.
+
+The `github-copilot-cli` transport has no OpenCode runtime observer. It still emits the canonical `runtime_evidence` object, but with status `unsupported`.
+
+> Stock OpenCode 2.0.23 does not expose a supported boundary that proves the exact final value/error seen by a Code Mode script for each inner call. That assertion is reported as unsupported.
 
 ## Security boundary
 

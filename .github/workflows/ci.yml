@@ -16,14 +16,14 @@ jobs:
 
       - name: Python checks
         run: |
-          python3 -m py_compile runner/cli.py container/invoke.py
+          python3 -m py_compile runner/cli.py container/invoke.py container/evidence_safety.py container/native_observer.py container/runtime_evidence.py tests/integration/run_code_mode_observer_probe.py tests/integration/run_runtime_evidence_acceptance.py
           python3 -m unittest discover -s tests -p 'test_*.py'
 
       - name: Build fake Copilot transport for action smoke test
         run: |
           cat > /tmp/Containerfile.fake-copilot <<'EOF'
           FROM alpine:3.22
-          ENTRYPOINT ["/bin/sh", "-c", "if [ -z \"$GITHUB_TOKEN\" ] || [ -n \"$COPILOT_GITHUB_TOKEN\" ] || [ -n \"$GH_TOKEN\" ] || [ \"$EVAL_REASONING\" != \"medium\" ]; then exit 42; fi; printf '%s\\n' '{\"schema\":\"opencode-eval-runner/v1\",\"transport\":\"github-copilot-cli\",\"model\":\"fake\",\"reasoning\":\"medium\",\"reasoning_source\":\"explicit\",\"agent\":\"eval-runner\",\"skill\":null,\"exit_code\":0,\"session_id\":null,\"text\":\"fake action smoke\",\"tools\":[],\"actions\":[],\"skills_loaded\":[],\"stderr\":\"\",\"stdout\":\"\"}'"]
+          ENTRYPOINT ["/bin/sh", "-c", "if [ -z \"$GITHUB_TOKEN\" ] || [ -n \"$COPILOT_GITHUB_TOKEN\" ] || [ -n \"$GH_TOKEN\" ] || [ \"$EVAL_REASONING\" != \"medium\" ]; then exit 42; fi; printf '%s\\n' '{\"schema\":\"opencode-eval-runner/v1\",\"transport\":\"github-copilot-cli\",\"model\":\"fake\",\"reasoning\":\"medium\",\"reasoning_source\":\"explicit\",\"agent\":\"eval-runner\",\"skill\":null,\"exit_code\":0,\"session_id\":null,\"text\":\"fake action smoke\",\"tools\":[],\"actions\":[],\"skills_loaded\":[],\"stderr\":\"\",\"stdout\":\"\",\"runtime_evidence\":{\"schema\":\"opencode-eval-runner/runtime-evidence/v1\",\"status\":\"unsupported\",\"evidence_eligible\":false,\"observations\":[],\"coverage\":{\"observation_closed\":{\"state\":\"unsupported\",\"reason\":\"observer_not_implemented\"},\"process_state\":\"unsupported\",\"starts\":{\"state\":\"unsupported\",\"reason\":\"observer_not_implemented\"},\"terminals\":{\"state\":\"unsupported\",\"reason\":\"observer_not_implemented\"},\"missing_terminals\":{\"state\":\"unsupported\",\"reason\":\"observer_not_implemented\"},\"observer_failures\":{\"state\":\"unsupported\",\"reason\":\"observer_not_implemented\"},\"callback_failures\":{\"state\":\"unsupported\",\"reason\":\"observer_not_implemented\"},\"losses\":[],\"unsupported\":[\"observer_not_implemented\"],\"boundaries\":{\"native\":{\"status\":\"unsupported\",\"evidence_eligible\":false,\"starts\":{\"state\":\"unsupported\",\"reason\":\"observer_not_implemented\"},\"terminals\":{\"state\":\"unsupported\",\"reason\":\"observer_not_implemented\"},\"missing_terminals\":{\"state\":\"unsupported\",\"reason\":\"observer_not_implemented\"},\"issues\":[\"observer_not_implemented\"]},\"code_mode_execution\":{\"status\":\"unsupported\",\"evidence_eligible\":false,\"starts\":{\"state\":\"unsupported\",\"reason\":\"observer_not_implemented\"},\"terminals\":{\"state\":\"unsupported\",\"reason\":\"observer_not_implemented\"},\"missing_terminals\":{\"state\":\"unsupported\",\"reason\":\"observer_not_implemented\"},\"issues\":[\"observer_not_implemented\"]},\"code_mode_finality\":{\"status\":\"unsupported\",\"evidence_eligible\":false,\"starts\":{\"state\":\"unsupported\",\"reason\":\"observer_not_implemented\"},\"terminals\":{\"state\":\"unsupported\",\"reason\":\"observer_not_implemented\"},\"missing_terminals\":{\"state\":\"unsupported\",\"reason\":\"observer_not_implemented\"},\"issues\":[\"observer_not_implemented\"]}}}}}'"]
           EOF
           docker build -f /tmp/Containerfile.fake-copilot -t opencode-eval-runner:fake-copilot /tmp
           printf '%s\n' 'action smoke prompt' > /tmp/action-smoke-prompt.txt
@@ -64,10 +64,18 @@ jobs:
           assert result["reasoning"] == "medium"
           assert result["reasoning_source"] == "explicit"
           assert result["text"] == "fake action smoke"
+          assert result["runtime_evidence"]["status"] == "unsupported"
+          assert result["runtime_evidence"]["evidence_eligible"] is False
           PY
 
       - name: Build OpenCode transport image
         run: docker build -f Containerfile --target opencode -t opencode-eval-runner:opencode-test .
+
+      - name: Probe stock Code Mode inner observation boundary
+        run: |
+          python3 tests/integration/run_code_mode_observer_probe.py \
+            --image opencode-eval-runner:opencode-test \
+            --output /tmp/code-mode-observer-probe
 
       - name: Build Copilot transport image
         run: docker build -f Containerfile --target copilot -t opencode-eval-runner:copilot-test .
