@@ -6,7 +6,8 @@ artifact storage, and artifact integrity policy live in their owning modules.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal, TypeAlias, Union
+from pathlib import Path
+from typing import Literal, Protocol, TypeAlias, Union
 
 
 JsonValue: TypeAlias = Union[
@@ -20,6 +21,9 @@ JsonValue: TypeAlias = Union[
 ]
 
 ExecutionLane: TypeAlias = Literal["standard", "runtime"]
+FailurePlane: TypeAlias = Literal["infrastructure", "product", "evidence"]
+InvocationTransport: TypeAlias = Literal["opencode", "github-copilot-cli"]
+WorkspaceMode: TypeAlias = Literal["ro", "rw"]
 
 
 @dataclass(frozen=True)
@@ -63,3 +67,71 @@ class ArtifactIdentity:
     run_id: str
     case_id: str
     iteration: int
+
+
+@dataclass(frozen=True)
+class InvocationSpec:
+    """Logical invocation request consumed by eval orchestration."""
+
+    transport: InvocationTransport
+    model: str
+    reasoning: str | None
+    agent: str | None
+    skill: str | None
+    workspace: Path
+    workspace_mode: WorkspaceMode
+    prompt: str
+    system: str | None
+    expected_plugin: str | None
+    engine: str
+    network: str | None
+    image: str | None
+    auth: Path | None
+    database: Path | None
+    models_catalog: Path | None
+    config: Path | None
+    config_root: Path | None
+    env_names: tuple[str, ...]
+    timeout_seconds: int
+    container_timeout: int
+
+
+@dataclass(frozen=True)
+class AttemptFailure:
+    """One attempt failure, separated by infrastructure/product/evidence plane."""
+
+    plane: FailurePlane
+    code: str
+    message: str
+    retry_safe: bool
+
+
+@dataclass(frozen=True)
+class AttemptRecord:
+    """Durable record for exactly one actual low-level invoke call."""
+
+    attempt: int
+    started_at: str
+    duration_seconds: float
+    host_exit_code: int | None
+    result: dict[str, JsonValue] | None
+    failure: AttemptFailure | None
+
+
+@dataclass(frozen=True)
+class RetryDecision:
+    """Explicit orchestration decision made after a failed attempt."""
+
+    retry: bool
+    reason: str
+    delay_seconds: float
+
+
+class RetryPolicy(Protocol):
+    """Policy decides permission to retry; orchestration enforces safety/bounds."""
+
+    def decide(
+        self,
+        attempts: tuple[AttemptRecord, ...],
+        latest: AttemptRecord,
+    ) -> RetryDecision: ...
