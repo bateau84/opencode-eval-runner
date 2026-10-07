@@ -25,7 +25,7 @@ from runner.eval_engine import (
 )
 from runner.eval_evidence import EvidenceRequirement
 from runner.eval_execute import InvokeAdapter, SleepFn, invoke_once
-from runner.eval_types import InvocationSpec, JsonValue, RetryPolicy
+from runner.eval_types import InvocationSpec, JsonValue, NormalizedCase, RetryPolicy
 
 
 PairedSideName: TypeAlias = Literal["baseline", "candidate"]
@@ -60,7 +60,7 @@ class PairedExecutionPolicy:
 class PairedSideExecution:
     """Inputs for one normal evaluation phase inside a pair."""
 
-    case: Any
+    case: NormalizedCase
     prepared: Any
     target_spec: InvocationSpec
     evidence_requirement: EvidenceRequirement
@@ -100,9 +100,13 @@ def _validate_pair_inputs(
     if isinstance(iteration, bool) or not isinstance(iteration, int) or iteration < 1:
         raise ValueError("iteration must be an integer >= 1")
 
-    baseline_case = getattr(baseline.case, "id", None)
-    candidate_case = getattr(candidate.case, "id", None)
-    if not isinstance(baseline_case, str) or not baseline_case:
+    if not isinstance(baseline.case, NormalizedCase) or not isinstance(
+        candidate.case, NormalizedCase
+    ):
+        raise TypeError("paired side case must be a NormalizedCase")
+    baseline_case = baseline.case.id
+    candidate_case = candidate.case.id
+    if not baseline_case:
         raise ValueError("baseline case must have a non-empty id")
     if candidate_case != baseline_case:
         raise ValueError(
