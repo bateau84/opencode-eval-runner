@@ -10,6 +10,7 @@ from runner.eval_compare import (
     ComparisonDecision,
     compare_completed_outcomes,
     comparison_result_envelope,
+    validate_comparison_result_envelope,
 )
 
 
@@ -163,6 +164,27 @@ class EvalComparisonTests(unittest.TestCase):
         self.assertIsNone(envelope["decision"])
         self.assertNotIn("score", envelope)
         self.assertNotIn("value", envelope)
+
+
+    def test_comparison_envelope_contract_rejects_inconsistent_fields(self):
+        valid = comparison_result_envelope(compare_completed_outcomes(
+            RecordingExtension(),
+            baseline=FakeCompletedOutcome("pass"),
+            candidate=FakeCompletedOutcome("fail"),
+        ))
+        self.assertIs(validate_comparison_result_envelope(valid), valid)
+        with self.assertRaisesRegex(ValueError, "candidate_classification"):
+            validate_comparison_result_envelope(
+                valid, candidate_classification="pass"
+            )
+        invalid = dict(valid)
+        invalid["status"] = "non-evidence"
+        with self.assertRaisesRegex(ValueError, "non-compared"):
+            validate_comparison_result_envelope(invalid)
+        invalid = dict(valid)
+        invalid["schema"] = "unknown/v1"
+        with self.assertRaisesRegex(ValueError, "schema"):
+            validate_comparison_result_envelope(invalid)
 
     def test_normal_profile_contract_does_not_require_comparison_extension(self):
         profile = NormalProfileWithoutComparison()

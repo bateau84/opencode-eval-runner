@@ -18,6 +18,8 @@ from runner.eval_artifacts import (
     claim_run_artifact_directory,
     validate_paired_eval_artifact,
 )
+from runner.eval_compare import ComparisonDecision
+from runner.eval_engine import EvaluationResult
 from runner.eval_evidence import EvidenceRequirement
 from runner.eval_execute import RESULT_SCHEMA, TransientProviderRetryPolicy
 from runner.eval_paired import (
@@ -147,6 +149,42 @@ class RecordingInvoker:
         return 0, valid_result(spec)
 
 
+
+class ProjectPairComparison:
+    """Test project meaning; no classification meaning is owned by the runner."""
+
+    def __init__(self):
+        self.calls = []
+
+    def compare_pair(self, baseline, candidate):
+        self.calls.append((baseline, candidate))
+        if (baseline.classification, candidate.classification) == ("fail", "pass"):
+            label = "improvement"
+        elif (baseline.classification, candidate.classification) == ("pass", "fail"):
+            label = "regression"
+        else:
+            label = "equivalent"
+        return ComparisonDecision(
+            classification=label,
+            summary=f"project: {label}",
+            data={
+                "baseline_target_attempts": len(baseline.target.attempts),
+                "candidate_target_attempts": len(candidate.target.attempts),
+                "baseline_judge_attempts": (
+                    len(baseline.judge.attempts) if baseline.judge is not None else 0
+                ),
+                "candidate_judge_attempts": (
+                    len(candidate.judge.attempts) if candidate.judge is not None else 0
+                ),
+            },
+        )
+
+
+class InvalidProjectComparison:
+    def compare_pair(self, baseline, candidate):
+        return {"unexpected": "not a ComparisonDecision"}
+
+
 class PairedExecutionTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
@@ -170,6 +208,7 @@ class PairedExecutionTests(unittest.TestCase):
         evidence_requirement=EvidenceRequirement(),
         target_retry_policy=None,
         target_max_attempts=1,
+        check_status="pass",
     ):
         target_spec = make_spec(self.workspace, f"fixture/{name}/target")
         judge_spec = make_spec(self.workspace, f"fixture/{name}/judge") if judge else None
@@ -178,7 +217,7 @@ class PairedExecutionTests(unittest.TestCase):
             prepared={"side": name},
             target_spec=target_spec,
             evidence_requirement=evidence_requirement,
-            profile=FakeProfile(judge_spec),
+            profile=FakeProfile(judge_spec, check_status=check_status),
             project_metadata={"side": name},
             target_retry_policy=target_retry_policy,
             target_max_attempts=target_max_attempts,
@@ -388,6 +427,229 @@ class PairedExecutionTests(unittest.TestCase):
             "paired_artifact_evidence_id mismatch",
         ):
             validate_paired_eval_artifact(tampered)
+
+
+    def test_comparison_uses_actual_completed_sides_and_sealed_durable_artifact(self):
+        extension = ProjectPairComparison()
+        invoker = RecordingInvoker()
+        result = run_paired_evaluation(
+            run_id="run-compared",
+            iteration=1,
+            baseline=self.side("baseline"),
+            candidate=self.side("candidate"),
+            comparison_extension=extension,
+            target_invoker=invoker,
+            judge_invoker=invoker,
+        )
+        self.assertEqual(result.comparison.status, "compared")
+        self.assertEqual(result.comparison.decision.classification, "equivalent")
+        self.assertEqual(len(extension.calls), 1)
+        self.assertIs(extension.calls[0][0], result.baseline)
+        self.assertIs(extension.calls[0][1], result.candidate)
+        self.assertIsInstance(extension.calls[0][0], EvaluationResult)
+        self.assertEqual(len(result.baseline.judge.attempts), 1)
+        self.assertEqual(len(result.candidate.judge.attempts), 1)
+        self.assertEqual(invoker.counts["fixture/baseline/judge"], 1)
+        self.assertEqual(invoker.counts["fixture/candidate/judge"], 1)
+
+        artifact = build_paired_eval_artifact(result)
+        self.assertIs(validate_paired_eval_artifact(artifact), artifact)
+        self.assertEqual(artifact["comparison"]["decision"]["data"][
+            "baseline_judge_attempts"
+        ], 1)
+        self.assertEqual(artifact["comparison"]["status"], "compared")
+        self.assertEqual(artifact["sides"]["baseline"]["classification"], "pass")
+        self.assertEqual(artifact["sides"]["candidate"]["classification"], "pass")
+
+        identity = ArtifactIdentity("run-compared", "PAIR-1", 1)
+        with tempfile.TemporaryDirectory() as temp:
+            store = claim_run_artifact_directory(Path(temp) / "store", "run-compared")
+            store.write_paired_job_artifact(identity, artifact)
+            durable = store.read_paired_job_artifact(identity)
+        self.assertEqual(durable, artifact)
+
+        tampered = copy.deepcopy(durable)
+        tampered["comparison"]["decision"]["summary"] = "altered comparison"
+        with self.assertRaisesRegex(
+            EvalArtifactError, "paired_artifact_evidence_id mismatch"
+        ):
+            validate_paired_eval_artifact(tampered)
+
+    def test_real_paired_improvement_and_regression_are_project_decisions(self):
+        for baseline_status, candidate_status, expected in (
+            ("fail", "pass", "improvement"),
+            ("pass", "fail", "regression"),
+        ):
+            with self.subTest(expected=expected):
+                extension = ProjectPairComparison()
+                invoker = RecordingInvoker()
+                result = run_paired_evaluation(
+                    run_id="run-" + expected,
+                    iteration=1,
+                    baseline=self.side("baseline", check_status=baseline_status),
+                    candidate=self.side("candidate", check_status=candidate_status),
+                    comparison_extension=extension,
+                    target_invoker=invoker,
+                    judge_invoker=invoker,
+                )
+                self.assertEqual(result.baseline.classification, baseline_status)
+                self.assertEqual(result.candidate.classification, candidate_status)
+                self.assertEqual(result.comparison.decision.classification, expected)
+                self.assertEqual(len(extension.calls), 1)
+                artifact = build_paired_eval_artifact(result)
+                self.assertEqual(
+                    artifact["comparison"]["decision"]["classification"], expected
+                )
+                validate_paired_eval_artifact(artifact)
+
+    def test_real_one_side_non_evidence_blocks_project_comparison(self):
+        extension = ProjectPairComparison()
+        invoker = RecordingInvoker()
+        result = run_paired_evaluation(
+            run_id="run-comparison-no-evidence",
+            iteration=1,
+            baseline=self.side(
+                "baseline",
+                judge=False,
+                evidence_requirement=EvidenceRequirement((BOUNDARY_NATIVE,)),
+            ),
+            candidate=self.side("candidate", judge=False),
+            comparison_extension=extension,
+            target_invoker=invoker,
+            judge_invoker=invoker,
+        )
+        self.assertEqual(result.baseline.classification, "non-evidence")
+        self.assertEqual(result.candidate.classification, "pass")
+        self.assertEqual(extension.calls, [])
+        self.assertEqual(result.comparison.status, "non-evidence")
+        artifact = build_paired_eval_artifact(result)
+        self.assertEqual(artifact["comparison"]["failure"]["code"],
+                         "comparison_side_non_evidence")
+        self.assertIsNone(artifact["comparison"]["decision"])
+        self.assertNotIn("score", artifact["comparison"])
+        self.assertNotIn("delta", artifact["comparison"])
+        validate_paired_eval_artifact(artifact)
+
+    def test_one_sided_judge_failure_blocks_comparison_preserving_other_side(self):
+        def callback(spec, number):
+            output = valid_result(spec)
+            if spec.model == "fixture/candidate/judge":
+                output["schema"] = "invalid/transport"
+            return 0, output
+
+        extension = ProjectPairComparison()
+        invoker = RecordingInvoker(callback)
+        result = run_paired_evaluation(
+            run_id="run-comparison-judge-failure",
+            iteration=1,
+            baseline=self.side("baseline"),
+            candidate=self.side("candidate"),
+            comparison_extension=extension,
+            target_invoker=invoker,
+            judge_invoker=invoker,
+        )
+        self.assertEqual(result.baseline.classification, "pass")
+        self.assertEqual(result.candidate.classification, "non-evidence")
+        self.assertEqual(result.comparison.status, "non-evidence")
+        self.assertEqual(extension.calls, [])
+        artifact = build_paired_eval_artifact(result)
+        self.assertIsNone(artifact["sides"]["baseline"]["judge"].get(
+            "contract_failure"
+        ))
+        self.assertEqual(
+            artifact["sides"]["candidate"]["judge"]["attempts"][0]["failure"]["code"],
+            "invoke_invalid_result",
+        )
+        validate_paired_eval_artifact(artifact)
+
+    def test_retried_one_side_is_visible_to_real_comparison_callback(self):
+        transient_evidence = complete_empty_runtime_evidence()
+        def callback(spec, number):
+            if spec.model == "fixture/baseline/target" and number == 1:
+                return (2, valid_result(
+                    spec,
+                    exit_code=2,
+                    stderr="ProviderError: provider.no-route: Model unavailable",
+                    runtime_evidence=transient_evidence,
+                ))
+            return 0, valid_result(spec)
+
+        extension = ProjectPairComparison()
+        invoker = RecordingInvoker(callback)
+        result = run_paired_evaluation(
+            run_id="run-comparison-retry",
+            iteration=1,
+            baseline=self.side(
+                "baseline", judge=False,
+                target_retry_policy=TransientProviderRetryPolicy(),
+                target_max_attempts=2,
+            ),
+            candidate=self.side("candidate", judge=False),
+            comparison_extension=extension,
+            target_invoker=invoker,
+            judge_invoker=invoker,
+            sleep=lambda _: None,
+        )
+        self.assertEqual(result.comparison.status, "compared")
+        self.assertEqual(len(extension.calls), 1)
+        self.assertEqual(len(extension.calls[0][0].target.attempts), 2)
+        self.assertEqual(len(extension.calls[0][1].target.attempts), 1)
+        artifact = build_paired_eval_artifact(result)
+        self.assertEqual(artifact["comparison"]["decision"]["data"][
+            "baseline_target_attempts"
+        ], 2)
+        self.assertEqual(artifact["comparison"]["decision"]["data"][
+            "candidate_target_attempts"
+        ], 1)
+        self.assertEqual(len(artifact["sides"]["baseline"]["target"]["attempts"]), 2)
+        self.assertEqual(len(artifact["sides"]["candidate"]["target"]["attempts"]), 1)
+        validate_paired_eval_artifact(artifact)
+
+    def test_invalid_real_comparison_is_explicit_not_a_combined_verdict(self):
+        invoker = RecordingInvoker()
+        result = run_paired_evaluation(
+            run_id="run-comparison-invalid",
+            iteration=1,
+            baseline=self.side("baseline", judge=False),
+            candidate=self.side("candidate", judge=False),
+            comparison_extension=InvalidProjectComparison(),
+            target_invoker=invoker,
+            judge_invoker=invoker,
+        )
+        self.assertEqual(result.comparison.status, "invalid")
+        self.assertIsNone(result.comparison.decision)
+        artifact = build_paired_eval_artifact(result)
+        self.assertEqual(artifact["comparison"]["status"], "invalid")
+        self.assertEqual(artifact["comparison"]["failure"]["code"],
+                         "comparison_output_invalid")
+        self.assertEqual(artifact["sides"]["baseline"]["classification"], "pass")
+        self.assertEqual(artifact["sides"]["candidate"]["classification"], "pass")
+        validate_paired_eval_artifact(artifact)
+
+    def test_comparison_label_in_artifact_must_match_real_side_even_when_resealed(self):
+        extension = ProjectPairComparison()
+        invoker = RecordingInvoker()
+        result = run_paired_evaluation(
+            run_id="run-compared-label",
+            iteration=1,
+            baseline=self.side("baseline", judge=False),
+            candidate=self.side("candidate", judge=False),
+            comparison_extension=extension,
+            target_invoker=invoker,
+            judge_invoker=invoker,
+        )
+        artifact = build_paired_eval_artifact(result)
+        bad = copy.deepcopy(artifact)
+        bad["comparison"]["candidate_classification"] = "fail"
+        with self.assertRaisesRegex(EvalArtifactError,
+                                    "candidate_classification does not match"):
+            validate_paired_eval_artifact(bad)
+
+        impossible = copy.deepcopy(artifact)
+        impossible["comparison"]["status"] = "non-evidence"
+        with self.assertRaisesRegex(EvalArtifactError,
+                                    "non-compared result"):
+            validate_paired_eval_artifact(impossible)
 
     def test_invalid_policy_and_mismatched_case_identity_fail_closed(self):
         with self.assertRaisesRegex(ValueError, "exactly once"):
