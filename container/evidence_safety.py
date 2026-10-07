@@ -158,7 +158,7 @@ def _json_source_credentials(
         value = json.loads(payload)
         _collect_sensitive_values(value, out)
         return True
-    except (OSError, UnicodeError, json.JSONDecodeError, UnsafeEvidence, RecursionError):
+    except (OSError, UnicodeError, ValueError, UnsafeEvidence, RecursionError):
         return False
 
 
