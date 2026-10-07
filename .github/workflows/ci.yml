@@ -10,14 +10,15 @@ permissions:
 
 jobs:
   test:
+    name: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
 
       - name: Python checks
         run: |
-          python3 -m py_compile runner/cli.py container/invoke.py container/evidence_safety.py container/native_observer.py container/runtime_evidence.py tests/integration/run_code_mode_observer_probe.py tests/integration/run_runtime_evidence_acceptance.py
-          python3 -m unittest discover -s tests -p 'test_*.py'
+          python3 -m compileall -q runner container tests
+          python3 -m unittest discover -s tests -p 'test_*.py' -v
 
       - name: Build fake Copilot transport for action smoke test
         run: |
@@ -68,19 +69,91 @@ jobs:
           assert result["runtime_evidence"]["evidence_eligible"] is False
           PY
 
-      - name: Build OpenCode transport image
+  runtime-integration:
+    name: runtime-integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Decide runtime integration applicability
+        id: changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.event_name }}" != "pull_request" ]]; then
+            echo "runtime=true" >> "$GITHUB_OUTPUT"
+            echo "copilot=true" >> "$GITHUB_OUTPUT"
+            echo "Non-PR event: run full runtime integration."
+            exit 0
+          fi
+
+          base="${{ github.event.pull_request.base.sha }}"
+          head="${{ github.event.pull_request.head.sha }}"
+          runtime=false
+          copilot=false
+
+          while IFS= read -r path; do
+            [[ -z "$path" ]] && continue
+            printf 'changed: %s\n' "$path"
+
+            case "$path" in
+              Containerfile|action.yml|bin/*|container/*|runner/*|tests/integration/*|tests/test_invoke.py|tests/test_evidence_safety.py|tests/test_native_observer.py|tests/test_runtime_evidence.py|tests/test_runtime_evidence_acceptance.py|.github/workflows/ci.yml)
+                runtime=true
+                ;;
+            esac
+
+            case "$path" in
+              Containerfile|action.yml|bin/*|container/*|runner/*|.github/workflows/ci.yml)
+                copilot=true
+                ;;
+            esac
+          done < <(git diff --name-only "$base" "$head")
+
+          echo "runtime=$runtime" >> "$GITHUB_OUTPUT"
+          echo "copilot=$copilot" >> "$GITHUB_OUTPUT"
+
+      - name: Runtime integration not applicable
+        if: steps.changes.outputs.runtime != 'true'
+        run: echo "No runtime-relevant files changed; runtime integration is not applicable."
+
+      - name: Prepare integration artifacts
+        if: steps.changes.outputs.runtime == 'true'
+        run: mkdir -p runtime-integration-artifacts
+
+      - name: Build stock OpenCode 2.0.23 image
+        if: steps.changes.outputs.runtime == 'true'
         run: docker build -f Containerfile --target opencode -t opencode-eval-runner:opencode-test .
 
-      - name: Probe stock Code Mode inner observation boundary
+      - name: Verify pinned OpenCode runtime
+        if: steps.changes.outputs.runtime == 'true'
         run: |
-          python3 tests/integration/run_code_mode_observer_probe.py \
-            --image opencode-eval-runner:opencode-test \
-            --output /tmp/code-mode-observer-probe
+          version="$(docker run --rm --entrypoint opencode opencode-eval-runner:opencode-test --version)"
+          printf 'OpenCode version: %s\n' "$version"
+          test "${version#opencode v}" = "2.0.23"
+          docker run --rm --entrypoint opencode opencode-eval-runner:opencode-test run --help             | grep -F -- 'provider/model#variant'
 
-      - name: Build Copilot transport image
-        run: docker build -f Containerfile --target copilot -t opencode-eval-runner:copilot-test .
+      - name: Run provider-free native observer probe
+        if: steps.changes.outputs.runtime == 'true'
+        run: |
+          docker run --rm             --network none             --tmpfs /tmp:rw,exec,nosuid,nodev,size=1g,mode=1777             --tmpfs /workspace:rw,nosuid,nodev,size=64m,mode=1777             --volume "$PWD:/probe-repo:ro"             --entrypoint python3             opencode-eval-runner:opencode-test             /probe-repo/tests/integration/run_native_observer_probe.py             > runtime-integration-artifacts/native-observer-probe.json
+          cat runtime-integration-artifacts/native-observer-probe.json
+
+      - name: Run stock Code Mode capability probe
+        if: steps.changes.outputs.runtime == 'true'
+        run: |
+          python3 tests/integration/run_code_mode_observer_probe.py             --image opencode-eval-runner:opencode-test             --output runtime-integration-artifacts/code-mode-observer-probe
+
+      - name: Run provider-free runtime evidence acceptance
+        if: steps.changes.outputs.runtime == 'true'
+        run: |
+          python3 tests/integration/run_runtime_evidence_acceptance.py             --image opencode-eval-runner:opencode-test             --output runtime-integration-artifacts/runtime-evidence-acceptance
 
       - name: Smoke test OpenCode plugin activation preflight
+        if: steps.changes.outputs.runtime == 'true'
         run: |
           rm -rf /tmp/preflight-workspace /tmp/preflight-config-root
           mkdir -p /tmp/preflight-workspace
@@ -92,12 +165,7 @@ jobs:
           }
           EOF
 
-          docker run --rm \
-            --workdir /workspace \
-            --volume /tmp/preflight-workspace:/workspace:ro \
-            --volume /tmp/preflight-config-root:/seed/opencode-config:ro \
-            --entrypoint python3 \
-            opencode-eval-runner:opencode-test - <<'PY'
+          docker run --rm             --workdir /workspace             --volume /tmp/preflight-workspace:/workspace:ro             --volume /tmp/preflight-config-root:/seed/opencode-config:ro             --entrypoint python3             opencode-eval-runner:opencode-test - <<'PY'
           import sys
 
           sys.path.insert(0, "/opt/opencode-eval-runner")
@@ -118,6 +186,7 @@ jobs:
           PY
 
       - name: Smoke test config plugin workspace dependency resolution
+        if: steps.changes.outputs.runtime == 'true'
         run: |
           rm -rf /tmp/plugin-workspace /tmp/plugin-config-root
           mkdir -p /tmp/plugin-workspace/node_modules/fixture-dep
@@ -142,11 +211,7 @@ jobs:
           export default async () => ({})
           EOF
 
-          docker run --rm \
-            --volume /tmp/plugin-workspace:/workspace:ro \
-            --volume /tmp/plugin-config-root:/seed/opencode-config:ro \
-            --entrypoint python3 \
-            opencode-eval-runner:opencode-test - <<'PY'
+          docker run --rm             --volume /tmp/plugin-workspace:/workspace:ro             --volume /tmp/plugin-config-root:/seed/opencode-config:ro             --entrypoint python3             opencode-eval-runner:opencode-test - <<'PY'
           from pathlib import Path
           import subprocess
           import sys
@@ -180,18 +245,29 @@ jobs:
           print("PASS config-root plugin dependency bridge")
           PY
 
-      - name: Verify pinned tools
-        run: |
-          docker run --rm --entrypoint opencode opencode-eval-runner:opencode-test --version
-          docker run --rm --entrypoint copilot opencode-eval-runner:copilot-test --version
+      - name: Build real Copilot image
+        if: steps.changes.outputs.runtime == 'true' && steps.changes.outputs.copilot == 'true'
+        run: docker build -f Containerfile --target copilot -t opencode-eval-runner:copilot-test .
 
-      - name: Verify pinned reasoning controls
+      - name: Verify pinned Copilot runtime
+        if: steps.changes.outputs.runtime == 'true' && steps.changes.outputs.copilot == 'true'
         run: |
-          docker run --rm --entrypoint opencode opencode-eval-runner:opencode-test run --help \
-            | grep -F -- 'provider/model#variant'
+          docker run --rm --entrypoint copilot opencode-eval-runner:copilot-test --version
           docker run --rm --entrypoint copilot opencode-eval-runner:copilot-test --help             | grep -F -- '--effort'
 
       - name: Report image sizes
+        if: steps.changes.outputs.runtime == 'true'
         run: |
           docker image inspect opencode-eval-runner:opencode-test --format 'OpenCode image: {{.Size}} bytes'
-          docker image inspect opencode-eval-runner:copilot-test --format 'Copilot image: {{.Size}} bytes'
+          if [[ "${{ steps.changes.outputs.copilot }}" == "true" ]]; then
+            docker image inspect opencode-eval-runner:copilot-test --format 'Copilot image: {{.Size}} bytes'
+          fi
+
+      - name: Preserve runtime integration reports
+        if: always() && steps.changes.outputs.runtime == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: runtime-integration-${{ github.event.pull_request.head.sha || github.sha }}
+          path: runtime-integration-artifacts/
+          if-no-files-found: warn
+          retention-days: 14
