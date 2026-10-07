@@ -1,4 +1,4 @@
-"""Target attempt execution and explicit retry orchestration.
+"""Target/judge attempt execution and explicit retry orchestration.
 
 This module deliberately stays above the existing host ``invoke`` boundary:
 one attempt calls ``runner.cli.invoke`` exactly once. It does not construct
@@ -35,6 +35,9 @@ RESULT_SCHEMA = "opencode-eval-runner/v1"
 
 InvokeAdapter: TypeAlias = Callable[[InvocationSpec], tuple[int, object]]
 SleepFn: TypeAlias = Callable[[float], None]
+AttemptPostprocessor: TypeAlias = Callable[
+    [dict[str, JsonValue], AttemptFailure | None], AttemptFailure | None
+]
 
 
 @dataclass(frozen=True)
@@ -50,6 +53,25 @@ class TargetExecutionOutcome:
     def final_attempt(self) -> AttemptRecord:
         if not self.attempts:
             raise RuntimeError("target execution has no attempts")
+        return self.attempts[-1]
+
+    @property
+    def succeeded(self) -> bool:
+        return self.final_attempt.failure is None
+
+
+@dataclass(frozen=True)
+class JudgeExecutionOutcome:
+    """Normalized judge attempt history for one profile-produced InvocationSpec."""
+
+    spec: InvocationSpec
+    attempts: tuple[AttemptRecord, ...]
+    retry_decisions: tuple[RetryDecision, ...]
+
+    @property
+    def final_attempt(self) -> AttemptRecord:
+        if not self.attempts:
+            raise RuntimeError("judge execution has no attempts")
         return self.attempts[-1]
 
     @property
@@ -314,7 +336,7 @@ def _classify_result(
             "product_timeout",
             _short_result_message(
                 cast(Mapping[str, object], result),
-                "target invocation reached its inner timeout",
+                "invocation reached its inner timeout",
             ),
             retry_safe=False,
         )
@@ -324,7 +346,7 @@ def _classify_result(
             "product_error",
             _short_result_message(
                 cast(Mapping[str, object], result),
-                f"target invocation exited with code {exit_code}",
+                f"invocation exited with code {exit_code}",
             ),
             retry_safe=False,
         )
@@ -388,21 +410,20 @@ def _safe_policy_decision(
     return decision
 
 
-def run_target_attempts(
+def _run_attempts(
     spec: InvocationSpec,
     *,
-    retry_policy: RetryPolicy | None = None,
-    max_attempts: int = 1,
-    invoker: InvokeAdapter = invoke_once,
-    evidence_requirement: EvidenceRequirement = EvidenceRequirement(),
-    sleep: SleepFn = time.sleep,
-) -> TargetExecutionOutcome:
-    """Run a target with explicit, bounded, replay-safe retry orchestration."""
+    retry_policy: RetryPolicy | None,
+    max_attempts: int,
+    invoker: InvokeAdapter,
+    sleep: SleepFn,
+    postprocess_result: AttemptPostprocessor | None = None,
+) -> tuple[tuple[AttemptRecord, ...], tuple[RetryDecision, ...]]:
+    """Run one invocation per attempt with shared validation and retry plumbing."""
 
     _validate_max_attempts(max_attempts)
     attempts: list[AttemptRecord] = []
     retry_decisions: list[RetryDecision] = []
-    final_readiness: EvidenceReadiness | None = None
 
     for attempt_number in range(1, max_attempts + 1):
         started_at = _utc_now()
@@ -410,7 +431,6 @@ def run_target_attempts(
         host_exit_code: int | None = None
         result: dict[str, JsonValue] | None = None
         failure: AttemptFailure | None = None
-        readiness: EvidenceReadiness | None = None
 
         try:
             host_exit_code, raw_result = invoker(spec)
@@ -425,31 +445,8 @@ def run_target_attempts(
                 result, failure = _validate_result_v1(raw_result, spec)
             if result is not None and failure is None:
                 failure = _classify_result(result, host_exit_code)
-            if result is not None:
-                runtime_evidence = result.get("runtime_evidence")
-                if not isinstance(runtime_evidence, Mapping):
-                    failure = _failure(
-                        "infrastructure",
-                        "invoke_invalid_result",
-                        "validated result has no runtime_evidence mapping",
-                        retry_safe=False,
-                    )
-                else:
-                    try:
-                        readiness = check_evidence_readiness(
-                            cast(Mapping[str, object], runtime_evidence),
-                            evidence_requirement,
-                        )
-                    except Exception as exc:
-                        failure = _failure(
-                            "infrastructure",
-                            "evidence_readiness_check_failed",
-                            f"evidence readiness evaluation failed: {exc}",
-                            retry_safe=False,
-                        )
-                    else:
-                        if failure is None:
-                            failure = _classify_readiness(readiness)
+            if result is not None and postprocess_result is not None:
+                failure = postprocess_result(result, failure)
         except subprocess.TimeoutExpired as exc:
             failure = _failure(
                 "infrastructure",
@@ -488,8 +485,6 @@ def run_target_attempts(
             failure=failure,
         )
         attempts.append(record)
-        if readiness is not None:
-            final_readiness = readiness
 
         if failure is None:
             break
@@ -525,9 +520,87 @@ def run_target_attempts(
         if decision.delay_seconds:
             sleep(decision.delay_seconds)
 
+    return tuple(attempts), tuple(retry_decisions)
+
+
+def run_target_attempts(
+    spec: InvocationSpec,
+    *,
+    retry_policy: RetryPolicy | None = None,
+    max_attempts: int = 1,
+    invoker: InvokeAdapter = invoke_once,
+    evidence_requirement: EvidenceRequirement = EvidenceRequirement(),
+    sleep: SleepFn = time.sleep,
+) -> TargetExecutionOutcome:
+    """Run a target with explicit, bounded, replay-safe retry orchestration."""
+
+    final_readiness: EvidenceReadiness | None = None
+
+    def apply_evidence_readiness(
+        result: dict[str, JsonValue],
+        failure: AttemptFailure | None,
+    ) -> AttemptFailure | None:
+        nonlocal final_readiness
+        runtime_evidence = result.get("runtime_evidence")
+        if not isinstance(runtime_evidence, Mapping):
+            return _failure(
+                "infrastructure",
+                "invoke_invalid_result",
+                "validated result has no runtime_evidence mapping",
+                retry_safe=False,
+            )
+        try:
+            readiness = check_evidence_readiness(
+                cast(Mapping[str, object], runtime_evidence),
+                evidence_requirement,
+            )
+        except Exception as exc:
+            return _failure(
+                "infrastructure",
+                "evidence_readiness_check_failed",
+                f"evidence readiness evaluation failed: {exc}",
+                retry_safe=False,
+            )
+        final_readiness = readiness
+        if failure is None:
+            return _classify_readiness(readiness)
+        return failure
+
+    attempts, retry_decisions = _run_attempts(
+        spec,
+        retry_policy=retry_policy,
+        max_attempts=max_attempts,
+        invoker=invoker,
+        sleep=sleep,
+        postprocess_result=apply_evidence_readiness,
+    )
     return TargetExecutionOutcome(
         spec=spec,
-        attempts=tuple(attempts),
-        retry_decisions=tuple(retry_decisions),
+        attempts=attempts,
+        retry_decisions=retry_decisions,
         readiness=final_readiness,
+    )
+
+
+def run_judge_attempts(
+    spec: InvocationSpec,
+    *,
+    retry_policy: RetryPolicy | None = None,
+    max_attempts: int = 1,
+    invoker: InvokeAdapter = invoke_once,
+    sleep: SleepFn = time.sleep,
+) -> JudgeExecutionOutcome:
+    """Execute a profile-produced judge spec through the shared attempt lifecycle."""
+
+    attempts, retry_decisions = _run_attempts(
+        spec,
+        retry_policy=retry_policy,
+        max_attempts=max_attempts,
+        invoker=invoker,
+        sleep=sleep,
+    )
+    return JudgeExecutionOutcome(
+        spec=spec,
+        attempts=attempts,
+        retry_decisions=retry_decisions,
     )
