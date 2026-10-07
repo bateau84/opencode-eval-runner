@@ -15,6 +15,17 @@ from collections.abc import Mapping, Sequence
 from contextlib import AbstractContextManager
 from typing import Any, Protocol, cast, runtime_checkable
 
+from runner.eval_compare import (
+    COMPARISON_RESULT_SCHEMA,
+    ComparisonDecision,
+    ComparisonFailure,
+    ComparisonResult,
+    ComparisonStatus,
+    CompletedEvaluationOutcome,
+    EvalComparisonExtension,
+    compare_completed_outcomes,
+    comparison_result_envelope,
+)
 from runner.eval_evidence import EvidenceReadiness, EvidenceRequirement
 from runner.eval_types import (
     AttemptRecord,
@@ -171,6 +182,13 @@ def load_eval_profile(reference: str) -> EvalProfile:
 
 
 __all__ = [
+    "COMPARISON_RESULT_SCHEMA",
+    "ComparisonDecision",
+    "ComparisonFailure",
+    "ComparisonResult",
+    "ComparisonStatus",
+    "CompletedEvaluationOutcome",
+    "EvalComparisonExtension",
     "AttemptRecord",
     "CheckOutcome",
     "EVAL_COMMAND",
@@ -185,6 +203,8 @@ __all__ = [
     "JsonValue",
     "NormalizedCase",
     "SemanticDecision",
+    "compare_completed_outcomes",
+    "comparison_result_envelope",
     "load_eval_profile",
     "validate_eval_profile",
 ]
