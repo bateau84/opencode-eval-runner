@@ -133,7 +133,7 @@ jobs:
         run: |
           version="$(docker run --rm --entrypoint opencode opencode-eval-runner:opencode-test --version)"
           printf 'OpenCode version: %s\n' "$version"
-          test "$version" = "2.0.23"
+          test "${version#opencode v}" = "2.0.23"
           docker run --rm --entrypoint opencode opencode-eval-runner:opencode-test run --help             | grep -F -- 'provider/model#variant'
 
       - name: Run provider-free native observer probe
