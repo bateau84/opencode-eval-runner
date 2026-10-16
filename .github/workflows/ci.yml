@@ -17,6 +17,7 @@ jobs:
 
       - name: Python checks
         run: |
+          python3 -m pip install -r requirements-test.txt
           python3 -m compileall -q runner container tests
           python3 -m unittest discover -s tests -p 'test_*.py' -v
 
