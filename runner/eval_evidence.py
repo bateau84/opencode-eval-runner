@@ -43,6 +43,7 @@ class EvidenceRequirement:
     """Runtime boundaries required by one project assertion/check."""
 
     boundaries: tuple[EvidenceBoundary, ...] = ()
+    observation_fields: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -154,7 +155,7 @@ def _capture_reasons(
     return _dedupe(reasons)
 
 
-def check_evidence_readiness(
+def _check_boundary_readiness(
     runtime_evidence: Mapping[str, Any],
     requirement: EvidenceRequirement,
 ) -> EvidenceReadiness:
@@ -221,6 +222,51 @@ def check_evidence_readiness(
         status = "ready"
 
     return _readiness(status, _dedupe(reasons), required_boundaries)
+
+
+def check_evidence_readiness(
+    runtime_evidence: Mapping[str, Any],
+    requirement: EvidenceRequirement,
+) -> EvidenceReadiness:
+    """Check required capture boundaries and exact observation-field readiness."""
+    readiness = _check_boundary_readiness(runtime_evidence, requirement)
+    fields = getattr(requirement, "observation_fields", ())
+    if not isinstance(fields, tuple) or any(not isinstance(field, str) or not field for field in fields):
+        return _readiness("invalid", readiness.reasons + ("requirement_invalid_observation_fields",), readiness.required_boundaries)
+    if readiness.status != "ready" or not fields:
+        return readiness
+    try:
+        evidence = validate_runtime_evidence(runtime_evidence)
+    except (RuntimeEvidenceError, TypeError, ValueError):
+        return readiness
+    observations = evidence.get("observations", [])
+    statuses: list[str] = []
+    reasons: list[str] = []
+    for index, observation in enumerate(observations):
+        for name in fields:
+            if name == "result_or_error":
+                outcome = observation.get("outcome")
+                if outcome == "missing":
+                    field_readiness = _readiness("incomplete", ("field_missing_terminal_outcome",), ())
+                elif outcome in {"success", "error"}:
+                    value_name = "result" if outcome == "success" else "error"
+                    field_readiness = check_field_readiness(observation.get(value_name))
+                else:
+                    field_readiness = _readiness("invalid", ("field_invalid_terminal_outcome",), ())
+            else:
+                field_readiness = check_field_readiness(observation.get(name))
+            if field_readiness.status != "ready":
+                statuses.append(field_readiness.status)
+                reasons.extend(f"required_field_{reason}:{index}:{name}" for reason in field_readiness.reasons)
+    if not statuses:
+        return readiness
+    if "invalid" in statuses:
+        status: EvidenceReadinessStatus = "invalid"
+    elif "incomplete" in statuses:
+        status = "incomplete"
+    else:
+        status = "unsupported"
+    return _readiness(status, _dedupe(tuple(reasons)), readiness.required_boundaries)
 
 
 def check_field_readiness(field: Mapping[str, Any]) -> EvidenceReadiness:

@@ -1,6 +1,8 @@
 # Loom eval runner responsibility inventory
 
-Status: research inventory for issue #58, parallel worker A.
+Status: historical research inventory for issue #58, parallel worker A; current runner-owned built-in behavior is additionally governed by [ARD-001](architecture/eval-format-ownership/design/ard-001-runner-owned-input-and-output-contracts.md) and [ARS-001](architecture/eval-format-ownership/specifications/ars-001-runner-eval-contract.md).
+
+**Current-scope qualification (2026-10-15):** This inventory describes the pinned Loom harness and its earlier extraction proposal. It is not a restriction on the later approved runner-owned built-in families. Built-in `eval` accepts the specified agent/runtime and skill inputs, owns their adapters and output representations, and uses OpenCode for every target and judge phase. Existing `--profile` mode remains separately available with its transport flexibility. `invoke` remains one isolated call; built-in retries default to zero. Four output formats are projections of verified persisted results, not provider/spend compatibility claims or a polished report. A conforming output requires a completed verified result for every planned job; terminal pre-result errors/not-run jobs have no fabricated family result.
 
 This document is intentionally not the final generic eval-engine architecture. It records what the current Loom harness does, classifies ownership, and identifies behavior that must not be copied into the future engine. The integration owner can use this inventory together with the runner-contract inventory to synthesize the architecture.
 
@@ -42,7 +44,7 @@ For a normal non-ablation case, scripts/run-evals.py currently performs this seq
 8. Apply Loom-side transport projection and historical observer/evidence processing.
 9. Apply a Loom-side target evidence gate.
 10. Run deterministic Loom assertions.
-11. Build and invoke the semantic judge when the target is usable.
+11. Apply the family-specific judge gate: the normal agent/runtime judge runs only when the target is usable and every deterministic check passes; the skill-ablation judge is skipped for non-evidence checks, but a behavioral fail alone does not suppress it.
 12. Parse and validate the Loom judge response.
 13. Classify the run as pass, behavioral-fail, or non-evidence.
 14. Write one per-case/per-iteration artifact, hash it, and verify the durable artifact before counting it.
@@ -429,7 +431,7 @@ Therefore the Loom observer/evidence stack is reference history for behavior and
 
 ### Judge construction and parsing
 
-run_case invokes the judge whenever the target is usable, even if deterministic assertions have already found behavioral failures.
+Historical statement corrected: the runner-owned normal agent/runtime judge is constructed only when the target is usable and **all** deterministic checks pass. Any `fail` or `non-evidence` check suppresses that judge. Skill ablation has a different gate: only a `non-evidence` check suppresses a side's judge; behavioral failure alone does not. See ARS-001 §§102, 116.
 
 The judge sees:
 
@@ -653,6 +655,8 @@ Post-#45 explicitly reports:
 The project must not fill those gaps from model text or diagnostic result fields.
 
 ## Extraction facts for the integration owner
+
+The historical Loom findings below are context, not the current built-in ownership boundary. The runner now owns the two accepted family adapters and their semantic outcomes; the profile API continues to expose project-owned hooks in its separate mode. Do not infer provider compatibility, spend compatibility, historical input migration, or a polished report from this inventory.
 
 These are inventory conclusions, not final module/API design:
 

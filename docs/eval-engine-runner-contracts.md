@@ -1,5 +1,7 @@
 # Eval-engine runner contract and invariant matrix
 
+> **Status and precedence (2026-10-15):** This is a historical post-PR-#45 runner constraint inventory, not a complete description of today's public `eval` modes. The approved [ARD-001](architecture/eval-format-ownership/design/ard-001-runner-owned-input-and-output-contracts.md) and [ARS-001](architecture/eval-format-ownership/specifications/ars-001-runner-eval-contract.md) add runner-owned built-in `agent-runtime` and `skill` inputs plus JSON/YAML/Markdown/HTML outputs. They supersede the inventory's “no public eval CLI” and profile-only assumptions for built-in mode, while retaining the existing profile path. Built-in target/judge transport is OpenCode-only; profile mode retains its existing transport flexibility. `invoke` remains one isolated call with no retries; built-in retries default to zero. The image remains invocation-only.
+
 Issue: #58 — Task 1 worker B  
 Scope: runner-contract inventory only; no eval-engine implementation or final architecture selection.
 
@@ -20,6 +22,8 @@ PR #45 is merged. The integration branch `eval-engine/01-architecture` matches `
 ## Boundary in one sentence
 
 `opencode-eval-runner invoke` is a **single isolated invocation boundary**. It executes one target or judge call and returns one validated `opencode-eval-runner/v1` result containing the authoritative `runtime_evidence/v1` object. Cases, retries, iterations, target/judge sequencing, assertions, semantic grading, thresholds, aggregation, and final `pass | fail | non-evidence` policy belong above this boundary.
+
+The built-in `eval` command is a host-side orchestration surface for two explicit runner-owned families and selectable output views. This does not make `invoke` multi-case, add suite work to the image, or change `--profile` behavior. Output views derive from verified persisted runs and are eligible only when every planned job has a family-owned result; pre-result errors and not-run jobs cannot be reported as conforming output.
 
 ## Contract / invariant matrix
 

@@ -9,7 +9,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, Protocol, TypeAlias, Union
 
-
 JsonValue: TypeAlias = Union[
     None,
     bool,
@@ -97,6 +96,7 @@ class InvocationSpec:
     env_names: tuple[str, ...]
     timeout_seconds: int
     container_timeout: int
+    require_local_image: bool = False
 
 
 @dataclass(frozen=True)

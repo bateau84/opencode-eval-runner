@@ -415,6 +415,8 @@ OPENCODE_EVAL_RUNNER_OPENCODE_IMAGE=...
 OPENCODE_EVAL_RUNNER_COPILOT_IMAGE=...
 ```
 
+Built-in `eval --input ...` execution is stricter: `OPENCODE_EVAL_RUNNER_OPENCODE_IMAGE` is required and must name a full local image ID or digest-qualified identity. The runner checks its OpenCode version and invocation-adapter labels using local engine metadata only; it does not pull or contact a registry, and each target/judge run uses pull-never. Tags and missing/incompatible local images are rejected. Existing `--profile` image resolution remains unchanged.
+
 Tags matching `v*` are published with `opencode-` and `copilot-` prefixes.
 
 ## Evaluation trust model

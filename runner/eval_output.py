@@ -1,0 +1,446 @@
+"""Verified public projections of durable eval/v1 records."""
+from __future__ import annotations
+
+import html
+import json
+import math
+import os
+import re
+import tempfile
+from pathlib import Path
+from typing import Any
+
+from runner.eval_artifacts import (
+    EVAL_ARTIFACT_SCHEMA,
+    EVAL_PAIRED_ARTIFACT_SCHEMA,
+    EvalArtifactError,
+    RunArtifactStore,
+)
+from runner.eval_types import ArtifactIdentity
+
+EVAL_OUTPUT_SCHEMA = "opencode-eval-runner/eval-output/v1"
+FORMATS = ("json", "yaml", "markdown", "html")
+
+
+class EvalOutputError(RuntimeError):
+    """A durable run cannot safely be projected or written."""
+
+
+def _require(condition: bool, message: str) -> None:
+    if not condition:
+        raise EvalOutputError(message)
+
+
+def _artifact_ref(schema: str, path: str, evidence_id: str) -> dict[str, str]:
+    return {"schema": schema, "relative_path": path, "evidence_id": evidence_id}
+
+
+def _invocation(metadata: dict[str, Any]) -> dict[str, Any]:
+    required = {"transport", "model", "reasoning", "agent", "skill", "workspace_mode", "timeout_seconds", "container_timeout", "engine", "network", "image", "expected_plugin"}
+    _exact_keys(metadata, required, "invocation provenance")
+    _require(metadata["transport"] == "opencode" and type(metadata["model"]) is str and bool(metadata["model"]), "invocation transport/model provenance is invalid")
+    _require(metadata["reasoning"] is None or type(metadata["reasoning"]) is str, "invocation reasoning is invalid")
+    _require(all(metadata[key] is None or type(metadata[key]) is str for key in ("agent", "skill", "network", "image", "expected_plugin")), "invocation optional provenance is invalid")
+    _require(metadata["workspace_mode"] in {"ro", "rw"} and all(type(metadata[key]) is int and metadata[key] >= 1 for key in ("timeout_seconds", "container_timeout")), "invocation workspace/timeout provenance is invalid")
+    _require(metadata["engine"] in {"auto", "podman", "docker"}, "invocation engine provenance is invalid")
+    return {
+        "transport": metadata["transport"], "model": metadata["model"],
+        "reasoning": metadata["reasoning"], "agent": metadata["agent"],
+        "skill": metadata["skill"], "workspace_mode": metadata["workspace_mode"],
+        "timeout_seconds": metadata["timeout_seconds"],
+        "container_timeout": metadata["container_timeout"], "engine": metadata["engine"],
+        "network": metadata["network"], "image": metadata["image"],
+        "expected_plugin": metadata["expected_plugin"],
+    }
+
+
+def _attempts(attempts: list[dict[str, Any]], invocations: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    _require(len(attempts) == len(invocations), "artifact attempts lack complete invocation provenance")
+    values = []
+    for expected, item in enumerate(attempts, 1):
+        _require(item.get("attempt") == expected, "artifact attempt numbering is not contiguous")
+        values.append({
+            "number": item["attempt"], "started_at": item["started_at"],
+            "duration_seconds": item["duration_seconds"], "invocation": _invocation(invocations[expected - 1]),
+            "host_exit_code": item["host_exit_code"], "result": item["result"],
+            "failure": item["failure"], "retry_decision": item.get("retry_decision"),
+        })
+    return values
+
+
+def _readiness(artifact: dict[str, Any]) -> dict[str, Any]:
+    value = artifact["target"]["evidence_readiness"]
+    attempts = artifact["target"]["attempts"]
+    runtime = []
+    for attempt in attempts:
+        result = attempt.get("result")
+        evidence = result.get("runtime_evidence") if isinstance(result, dict) else None
+        if isinstance(evidence, dict):
+            runtime.append(evidence)
+    return {
+        "status": value.get("status"), "reasons": value.get("reasons", []),
+        "required_boundaries": value.get("required_boundaries", []),
+        "runtime_evidence": runtime,
+    }
+
+
+def _groups(artifact: dict[str, Any], paired_side: str | None = None) -> list[dict[str, Any]]:
+    phases = []
+    target_name = f"{paired_side}-target" if paired_side else "target"
+    judge_name = f"{paired_side}-judge" if paired_side else "judge"
+    specs = artifact["project_metadata"].get("runner_eval_invocations", [])
+    target_count = len(artifact["target"]["attempts"])
+    judge_count = len(artifact["judge"]["attempts"])
+    _require(isinstance(specs, list), "artifact lacks invocation provenance")
+    _require(len(specs) == target_count + judge_count, "artifact invocation provenance count does not match attempts")
+    target_specs = specs[:target_count]
+    judge_specs = specs[target_count:]
+    phases.append({"phase": target_name, "attempts": _attempts(artifact["target"]["attempts"], target_specs)})
+    phases.append({"phase": judge_name, "attempts": _attempts(artifact["judge"]["attempts"], judge_specs)})
+    return phases
+
+
+def _agent_result(artifact: dict[str, Any], ref: dict[str, str]) -> dict[str, Any]:
+    meta = artifact["project_metadata"].get("runner_eval")
+    _require(isinstance(meta, dict) and isinstance(meta.get("family_result"), dict), "agent artifact lacks runner family result")
+    family_result = meta["family_result"]
+    _exact_keys(family_result, {"kind", "suite", "case", "assertions", "semantic_judge"}, "agent family result")
+    _require(family_result["kind"] == "agent-runtime/v1", "agent family result kind mismatch")
+    _exact_keys(family_result["suite"], {"name", "version", "default"}, "agent suite result")
+    _exact_keys(family_result["case"], {"default", "agent", "skill", "execution", "target_timeout_seconds", "requirements", "prompt", "trap", "expectations", "must_not", "fixture_files"}, "agent case result")
+    _require(type(family_result["assertions"]) is list, "agent assertions are invalid")
+    for assertion in family_result["assertions"]:
+        _exact_keys(assertion, {"kind", "authored", "status", "reason", "observed", "evidence_refs"}, "agent assertion result")
+        _require(assertion["kind"] in {"tools", "actions", "tool_results", "output"} and assertion["status"] in {"pass", "fail", "non-evidence"}, "agent assertion kind/status is invalid")
+    if family_result["semantic_judge"] is not None:
+        _exact_keys(family_result["semantic_judge"], {"passed", "expectations", "violations", "trap_observed", "trap_evidence", "summary"}, "agent semantic judge")
+    return {
+        "id": artifact["case"], "family": "agent-runtime", "contract": meta["contract"],
+        "iteration": artifact["iteration"], "execution_status": "complete",
+        "classification": artifact["classification"], "error": None,
+        "attempts": _groups(artifact), "evidence": _readiness(artifact),
+        "checks": artifact["deterministic_checks"], "semantic": artifact["judge"]["semantic"],
+        "family_result": family_result, "source_artifacts": [ref],
+    }
+
+
+def _skill_result(pair: dict[str, Any], ref: dict[str, str]) -> dict[str, Any]:
+    meta = pair["project_metadata"].get("runner_eval")
+    _require(isinstance(meta, dict), "paired artifact lacks runner family result")
+    family_result = meta["family_result"]
+    _require(isinstance(family_result, dict) and family_result.get("kind") == "skill/v1", "paired artifact lacks complete skill payload")
+    _exact_keys(family_result, {"kind", "skill", "case_identity", "prompt", "fixture_files", "expectations", "negative_expectations", "trap", "ablation"}, "skill family result")
+    _exact_keys(family_result["case_identity"], {"case_id", "source_id", "authored_id", "source_index", "display_name"}, "skill case identity")
+    _exact_keys(family_result["trap"], {"declared", "text"}, "skill trap")
+    _exact_keys(family_result["ablation"], {"baseline", "candidate", "comparison"}, "skill ablation")
+    _require(type(family_result["expectations"]) is list and type(family_result["negative_expectations"]) is list, "skill expectation payload is invalid")
+    _require(family_result["ablation"]["comparison"] == pair.get("comparison"), "paired family comparison does not match verified pair envelope")
+    attempts = []
+    refs = [ref]
+    for name in ("baseline", "candidate"):
+        side = family_result["ablation"][name]
+        _exact_keys(side, {"case_id", "run_id", "iteration", "classification", "attempts", "evidence", "checks", "skill_outcome", "source_artifact"}, f"skill {name} result")
+        _exact_keys(side["skill_outcome"], {"expectations", "negative_expectations", "trap", "semantic_judge"}, f"skill {name} outcome")
+        _exact_keys(side["evidence"], {"status", "reasons", "required_boundaries", "runtime_evidence"}, f"skill {name} evidence")
+        _require(type(side["checks"]) is list and type(side["attempts"]) is list, f"skill {name} outcomes are invalid")
+        for check in side["checks"]:
+            _exact_keys(check, {"name", "status", "reason", "metadata"}, f"skill {name} check")
+        for group in side["attempts"]:
+            _exact_keys(group, {"phase", "attempts"}, f"skill {name} attempt group")
+            for attempt in group["attempts"]:
+                _exact_keys(attempt, {"number", "started_at", "duration_seconds", "invocation", "host_exit_code", "result", "failure", "retry_decision"}, f"skill {name} attempt")
+                _invocation(attempt["invocation"])
+        for result in side["skill_outcome"]["expectations"]:
+            _exact_keys(result, {"text", "met", "reason"}, f"skill {name} expectation")
+        for result in side["skill_outcome"]["negative_expectations"]:
+            _exact_keys(result, {"text", "violated", "reason"}, f"skill {name} negative expectation")
+        _exact_keys(side["skill_outcome"]["trap"], {"declared", "text", "observed", "evidence"}, f"skill {name} trap outcome")
+        if side["skill_outcome"]["semantic_judge"] is not None:
+            _exact_keys(side["skill_outcome"]["semantic_judge"], {"passed", "summary", "behavior_score"}, f"skill {name} semantic judge")
+        _exact_keys(side["source_artifact"], {"schema", "relative_path", "evidence_id"}, f"skill {name} artifact reference")
+        attempts.extend(side["attempts"])
+        side_ref = side["source_artifact"]
+        paired_side = pair["sides"][name]
+        _require(
+            side["case_id"] == pair["case"] and side["run_id"] == pair["run_id"] and side["iteration"] == pair["iteration"]
+            and side_ref.get("schema") == EVAL_ARTIFACT_SCHEMA
+            and side_ref.get("relative_path") == ref["relative_path"] + f"#/sides/{name}"
+            and side_ref.get("evidence_id") == paired_side["artifact_evidence_id"],
+            f"skill {name} payload identity/source reference mismatch",
+        )
+        refs.append({"schema": side_ref["schema"], "relative_path": side_ref["relative_path"], "evidence_id": side_ref["evidence_id"]})
+    return {
+        "id": pair["case"], "family": "skill", "contract": meta["contract"],
+        "iteration": pair["iteration"], "execution_status": "complete",
+        "classification": pair["comparison"]["decision"]["classification"] if pair["comparison"]["status"] == "compared" else "non-evidence" if pair["comparison"]["status"] == "non-evidence" else None,
+        "error": None, "attempts": attempts,
+        "evidence": family_result["ablation"]["candidate"]["evidence"],
+        "checks": family_result["ablation"]["candidate"]["checks"],
+        "semantic": None, "family_result": family_result, "source_artifacts": refs,
+    }
+
+
+def load_verified_output(run_directory: str | os.PathLike[str]) -> dict[str, Any]:
+    """Re-read and verify the terminal manifest and every referenced v1 record."""
+    root = Path(run_directory).resolve(strict=True)
+    try:
+        owner = json.loads((root / ".eval-run-owner.json").read_text(encoding="utf-8"))
+        _require(isinstance(owner, dict) and type(owner.get("run_id")) is str and bool(owner["run_id"]), "run directory ownership record is invalid")
+        store = RunArtifactStore(root, owner["run_id"])
+        manifest = store.read_run_manifest()
+        _require(manifest["summary"].get("status") != "running", "run is not terminal")
+        input_meta = manifest.get("project_metadata", {}).get("runner_eval_input")
+        _require(isinstance(input_meta, dict), "run manifest lacks built-in input identity")
+        family = input_meta.get("family")
+        _require(family in {"agent-runtime", "skill"}, "run input family is invalid")
+        _require(input_meta.get("contract") == ("agent-runtime/v1" if family == "agent-runtime" else "skill-cases/v1"), "run input contract does not match family")
+        _require(type(input_meta.get("sha256")) is str and re.fullmatch(r"[0-9a-f]{64}", input_meta["sha256"]) is not None, "run input digest is invalid")
+        jobs = []
+        counts = {"pass": 0, "fail": 0, "non-evidence": 0, "error": 0, "not-run": 0}
+        for item in manifest["jobs"]:
+            status = item.get("status")
+            _require(status in counts, "manifest contains an unresolved planned job")
+            counts[status] += 1
+        _require(
+            counts["error"] == 0 and counts["not-run"] == 0,
+            "run is ineligible for conforming output: a planned job has no family-owned result",
+        )
+        for item in manifest["jobs"]:
+            status = item["status"]
+            identity = ArtifactIdentity(manifest["run_id"], item["case"], item["iteration"])
+            if family == "skill":
+                pair = store.read_paired_job_artifact(identity)
+                _require(pair["schema"] == EVAL_PAIRED_ARTIFACT_SCHEMA, "skill job must use paired artifact")
+                meta = pair["project_metadata"].get("runner_eval", {})
+                _require(meta.get("schema") == "opencode-eval-runner/eval-family-result/v1" and meta.get("family") == family and meta.get("case_id") == item["case"] and meta.get("contract") == "skill-cases/v1", "paired family identity mismatch")
+                ref = _artifact_ref(EVAL_PAIRED_ARTIFACT_SCHEMA, item["artifact"], pair["paired_artifact_evidence_id"])
+                job = _skill_result(pair, ref)
+            else:
+                artifact = store.read_job_artifact(identity)
+                _require(artifact["schema"] == EVAL_ARTIFACT_SCHEMA, "agent job must use eval-artifact/v1")
+                meta = artifact["project_metadata"].get("runner_eval", {})
+                _require(meta.get("schema") == "opencode-eval-runner/eval-family-result/v1" and meta.get("family") == family and meta.get("case_id") == item["case"] and meta.get("contract") == "agent-runtime/v1", "artifact family identity mismatch")
+                ref = _artifact_ref(EVAL_ARTIFACT_SCHEMA, item["artifact"], artifact["artifact_evidence_id"])
+                job = _agent_result(artifact, ref)
+            _require(job["classification"] == status, "manifest/artifact classification mismatch")
+            jobs.append(job)
+        summary = manifest["summary"]
+        expected = {"pass": counts["pass"], "fail": counts["fail"], "non_evidence": counts["non-evidence"], "errors": counts["error"], "not_run": counts["not-run"], "total": len(manifest["jobs"])}
+        for key, value in expected.items():
+            _require(summary.get("non-evidence" if key == "non_evidence" else key) == value, "manifest summary does not match terminal jobs")
+        expected_status = "error" if expected["errors"] or expected["not_run"] else "verdict" if expected["fail"] or expected["non_evidence"] else "pass"
+        _require(summary.get("status") == expected_status, "manifest summary status does not match terminal jobs")
+        execution = {
+            "mode": "skill-ablation" if family == "skill" else "agent-runtime",
+            "selection": {"all": manifest["selection"].get("all", False), "selectors": manifest["selection"].get("selectors", []), "case_ids": manifest["selection"].get("cases", [])},
+            "iterations": manifest["iterations"],
+            "concurrency": manifest["concurrency"],
+        }
+        return {
+            "schema": EVAL_OUTPUT_SCHEMA,
+            "run": {"id": manifest["run_id"], "created_at": manifest["created_at"],
+                    "input": {"family": family, "contract": "agent-runtime/v1" if family == "agent-runtime" else "skill-cases/v1", "sha256": input_meta["sha256"]},
+                    "execution": execution,
+                    "summary": {"status": summary["status"], **expected}},
+            "cases": jobs,
+        }
+    except (EvalArtifactError, OSError, KeyError, TypeError, ValueError) as exc:
+        raise EvalOutputError(f"cannot render verified run {root}: {exc}") from exc
+
+
+def _json_tree(value: Any) -> None:
+    if value is None or type(value) in {str, bool, int}:
+        return
+    if type(value) is float:
+        _require(math.isfinite(value), "output contains a non-finite number")
+    elif type(value) is list:
+        for item in value:
+            _json_tree(item)
+    elif type(value) is dict:
+        _require(all(type(key) is str for key in value), "output object keys must be strings")
+        for item in value.values():
+            _json_tree(item)
+    else:
+        raise EvalOutputError("output contains a non-JSON value")
+
+
+def _exact_keys(value: Any, keys: set[str], where: str) -> None:
+    _require(type(value) is dict and set(value) == keys, f"{where} does not match eval-output/v1 fields")
+
+
+def validate_output_model(model: dict[str, Any]) -> None:
+    """Fail closed if the canonical projection drifts from the public v1 shape."""
+    _json_tree(model)
+    _exact_keys(model, {"schema", "run", "cases"}, "output")
+    _require(model["schema"] == EVAL_OUTPUT_SCHEMA and type(model["cases"]) is list, "unsupported output schema or cases type")
+    run = model["run"]
+    _exact_keys(run, {"id", "created_at", "input", "execution", "summary"}, "run")
+    _exact_keys(run["input"], {"family", "contract", "sha256"}, "run.input")
+    _exact_keys(run["execution"], {"mode", "selection", "iterations", "concurrency"}, "run.execution")
+    _exact_keys(run["execution"]["selection"], {"all", "selectors", "case_ids"}, "run.execution.selection")
+    _exact_keys(run["execution"]["concurrency"], {"standard", "runtime"}, "run.execution.concurrency")
+    _exact_keys(run["summary"], {"status", "pass", "fail", "non_evidence", "errors", "not_run", "total"}, "run.summary")
+    _require(type(run["id"]) is str and bool(run["id"]) and type(run["created_at"]) is str, "run identity or timestamp is invalid")
+    _require(run["input"]["family"] in {"agent-runtime", "skill"}, "run input family is invalid")
+    _require(run["input"]["contract"] == ("agent-runtime/v1" if run["input"]["family"] == "agent-runtime" else "skill-cases/v1"), "run input contract is invalid")
+    _require(type(run["input"]["sha256"]) is str and re.fullmatch(r"[0-9a-f]{64}", run["input"]["sha256"]) is not None, "run input digest is invalid")
+    execution = run["execution"]
+    _require(execution["mode"] == ("agent-runtime" if run["input"]["family"] == "agent-runtime" else "skill-ablation"), "run execution mode does not match family")
+    _require(type(execution["selection"]["all"]) is bool and type(execution["selection"]["selectors"]) is list and type(execution["selection"]["case_ids"]) is list, "run selection is invalid")
+    _require(type(execution["iterations"]) is int and execution["iterations"] >= 1, "run iterations is invalid")
+    _require(all(type(n) is int and n >= 0 for n in execution["concurrency"].values()), "run concurrency is invalid")
+    summary = run["summary"]
+    _require(summary["status"] in {"pass", "verdict", "error"} and all(type(summary[k]) is int and summary[k] >= 0 for k in summary if k != "status"), "run summary is invalid")
+    _require(summary["total"] == sum(summary[k] for k in ("pass", "fail", "non_evidence", "errors", "not_run")), "run summary counts are inconsistent")
+    case_keys = {"id", "family", "contract", "iteration", "execution_status", "classification", "error", "attempts", "evidence", "checks", "semantic", "family_result", "source_artifacts"}
+    for index, case in enumerate(model["cases"]):
+        _exact_keys(case, case_keys, f"cases[{index}]")
+        _require(case["family"] in {"agent-runtime", "skill"}, f"cases[{index}].family is invalid")
+        _require(case["execution_status"] in {"complete", "error", "not-run"}, f"cases[{index}].execution_status is invalid")
+        _require(case["classification"] in {"pass", "fail", "non-evidence", None}, f"cases[{index}].classification is invalid")
+        _require(case["execution_status"] == "complete" and case["classification"] is not None and case["error"] is None and case["family_result"] is not None, f"cases[{index}] is not an eligible completed family result")
+        _require(case["family"] == run["input"]["family"] and case["contract"] == run["input"]["contract"], f"cases[{index}] family/contract does not match run")
+        _require(case["family_result"].get("kind") == ("agent-runtime/v1" if case["family"] == "agent-runtime" else "skill/v1"), f"cases[{index}] family payload is missing or mismatched")
+        for group in case["attempts"]:
+            _exact_keys(group, {"phase", "attempts"}, f"cases[{index}].attempt group")
+            for attempt in group["attempts"]:
+                _exact_keys(attempt, {"number", "started_at", "duration_seconds", "invocation", "host_exit_code", "result", "failure", "retry_decision"}, f"cases[{index}].attempt")
+                _exact_keys(attempt["invocation"], {"transport", "model", "reasoning", "agent", "skill", "workspace_mode", "timeout_seconds", "container_timeout", "engine", "network", "image", "expected_plugin"}, f"cases[{index}].invocation")
+        _exact_keys(case["evidence"], {"status", "reasons", "required_boundaries", "runtime_evidence"}, f"cases[{index}].evidence")
+        for check in case["checks"]:
+            _exact_keys(check, {"name", "status", "reason", "metadata"}, f"cases[{index}].check")
+        if case["semantic"] is not None:
+            _exact_keys(case["semantic"], {"status", "summary", "data"}, f"cases[{index}].semantic")
+        for ref in case["source_artifacts"]:
+            _exact_keys(ref, {"schema", "relative_path", "evidence_id"}, f"cases[{index}].source artifact")
+            _require(ref["schema"] in {EVAL_ARTIFACT_SCHEMA, EVAL_PAIRED_ARTIFACT_SCHEMA} and type(ref["relative_path"]) is str and bool(ref["relative_path"]) and type(ref["evidence_id"]) is str and re.fullmatch(r"[0-9a-f]{64}", ref["evidence_id"]) is not None, f"cases[{index}] source artifact reference is invalid")
+
+
+def _pretty(value: Any, depth: int = 0) -> str:
+    """Readable Markdown tree that preserves every value and labels each field."""
+    indent = "  " * depth
+    if isinstance(value, dict):
+        return "\n".join(f"{indent}- **{k}:**\n{_pretty(v, depth + 1)}" for k, v in value.items()) or f"{indent}- *(none)*"
+    if isinstance(value, list):
+        if not value:
+            return f"{indent}- *(none)*"
+        lines = []
+        for item in value:
+            if isinstance(item, (dict, list)):
+                lines.extend((f"{indent}-", _pretty(item, depth + 1)))
+            else:
+                lines.append(f"{indent}- {json.dumps(item, ensure_ascii=False, allow_nan=False)}")
+        return "\n".join(lines)
+    text = json.dumps(value, ensure_ascii=False, allow_nan=False)
+    return f"{indent}{text}"
+
+
+def _html_tree(value: Any) -> str:
+    if isinstance(value, dict):
+        if not value:
+            return "<p>None.</p>"
+        return "<dl>" + "".join(f"<dt>{html.escape(str(k))}</dt><dd>{_html_tree(v)}</dd>" for k, v in value.items()) + "</dl>"
+    if isinstance(value, list):
+        return "<ul>" + ("".join(f"<li>{_html_tree(v)}</li>" for v in value) if value else "<li>None.</li>") + "</ul>"
+    return f"<p>{html.escape(json.dumps(value, ensure_ascii=False, allow_nan=False))}</p>"
+
+
+def _yaml_scalar(value: Any) -> str:
+    if value is None:
+        return "null"
+    if type(value) is bool:
+        return "true" if value else "false"
+    if type(value) is str:
+        return json.dumps(value, ensure_ascii=False)
+    if type(value) in {int, float}:
+        return json.dumps(value, allow_nan=False)
+    raise EvalOutputError("YAML scalar is not JSON-compatible")
+
+
+def _yaml_tree(value: Any, indent: int = 0) -> str:
+    prefix = " " * indent
+    if isinstance(value, dict):
+        if not value:
+            return prefix + "{}"
+        lines = []
+        for key, item in value.items():
+            label = json.dumps(key, ensure_ascii=False)
+            if isinstance(item, (dict, list)) and item:
+                lines.extend((prefix + label + ":", _yaml_tree(item, indent + 2)))
+            else:
+                lines.append(prefix + label + ": " + (_yaml_tree(item, 0).strip() if isinstance(item, (dict, list)) else _yaml_scalar(item)))
+        return "\n".join(lines)
+    if isinstance(value, list):
+        if not value:
+            return prefix + "[]"
+        lines = []
+        for item in value:
+            if isinstance(item, (dict, list)) and item:
+                lines.extend((prefix + "-", _yaml_tree(item, indent + 2)))
+            else:
+                lines.append(prefix + "- " + (_yaml_tree(item, 0).strip() if isinstance(item, (dict, list)) else _yaml_scalar(item)))
+        return "\n".join(lines)
+    return prefix + _yaml_scalar(value)
+
+
+def serialize_output(model: dict[str, Any], format: str) -> bytes:
+    _require(format in FORMATS, f"unsupported output format: {format}")
+    validate_output_model(model)
+    if format == "json":
+        text = json.dumps(model, ensure_ascii=False, indent=2, allow_nan=False) + "\n"
+    elif format == "yaml":
+        text = _yaml_tree(model) + "\n"
+    elif format == "markdown":
+        sections = ["# Evaluation run", "", f"## Run {model['run']['id']}", "", _pretty(model["run"])]
+        for case in model["cases"]:
+            sections.extend(("", f"### Case {case['id']} — {case['family']} iteration {case['iteration']}", "", _pretty(case)))
+        text = "\n".join(sections) + "\n"
+    else:
+        sections = [f"<section><h2>Run {html.escape(model['run']['id'])}</h2>{_html_tree(model['run'])}"]
+        for case in model["cases"]:
+            heading = f"Case {case['id']} — {case['family']} iteration {case['iteration']}"
+            sections.append(f"<section><h3>{html.escape(heading)}</h3>{_html_tree(case)}</section>")
+        sections.append("</section>")
+        text = "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><title>Evaluation run</title></head><body><main><h1>Evaluation run</h1><p>Schema: {}</p>{}</main></body></html>\n".format(html.escape(model["schema"]), "".join(sections))
+    return text.encode("utf-8")
+
+
+def write_output(model: dict[str, Any], format: str, destination: str | os.PathLike[str] | None, stdout: Any, *, run_directory: str | os.PathLike[str] | None = None) -> None:
+    payload = serialize_output(model, format)
+    if destination is None:
+        try:
+            stdout.write(payload.decode("utf-8"))
+            stdout.flush()
+        except (OSError, UnicodeError) as exc:
+            raise EvalOutputError(f"cannot write output to stdout: {exc}") from exc
+        return
+    path = Path(destination)
+    temp: Path | None = None
+    try:
+        run_root = Path(run_directory).resolve() if run_directory is not None else None
+        resolved = path.resolve()
+        if run_root is not None and (resolved == run_root or run_root in resolved.parents):
+            raise EvalOutputError("output destination must not be inside the durable run directory")
+        if path.exists() and path.is_dir():
+            raise EvalOutputError("output destination is a directory")
+        if path.exists():
+            try:
+                existing = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, UnicodeError, json.JSONDecodeError):
+                existing = None
+            if isinstance(existing, dict) and existing.get("schema") in {"opencode-eval-runner/eval-run/v1", EVAL_ARTIFACT_SCHEMA, EVAL_PAIRED_ARTIFACT_SCHEMA}:
+                raise EvalOutputError("output destination is an existing v1 record")
+        with tempfile.NamedTemporaryFile(dir=path.parent or Path("."), prefix=f".{path.name}.", suffix=".tmp", delete=False) as stream:
+            temp = Path(stream.name)
+            stream.write(payload)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temp, resolved)
+        temp = None
+    except EvalOutputError:
+        raise
+    except OSError as exc:
+        raise EvalOutputError(f"cannot write output destination {path}: {exc}") from exc
+    finally:
+        if temp is not None:
+            temp.unlink(missing_ok=True)

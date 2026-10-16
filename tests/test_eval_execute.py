@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import tempfile
 import unittest
-from unittest.mock import patch
+from dataclasses import replace
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
 
 from container.runtime_evidence import (
     BOUNDARY_NATIVE,
@@ -20,6 +23,12 @@ from runner.eval_execute import (
     run_target_attempts,
 )
 from runner.eval_types import InvocationSpec, RetryDecision
+from runner.oci_image import (
+    IMAGE_ADAPTER_LABEL,
+    IMAGE_VERSION_LABEL,
+    SUPPORTED_INVOKE_ADAPTER_ID,
+    SUPPORTED_OPENCODE_VERSION,
+)
 
 
 def complete_empty_runtime_evidence():
@@ -165,6 +174,52 @@ class EvalExecuteTests(unittest.TestCase):
         self.assertEqual(mocked.call_count, 1)
         self.assertEqual(host_exit, 0)
         self.assertEqual(result, expected)
+
+    def test_builtin_invoke_command_verifies_selected_image_and_uses_pull_never(self):
+        expected = valid_result(self.spec)
+        calls = []
+        image = "a" * 64
+
+        def fake_run(command, **kwargs):
+            calls.append(command)
+            if "inspect" in command:
+                return SimpleNamespace(
+                    returncode=0,
+                    stdout=json.dumps({
+                        "Id": "sha256:" + image,
+                        "RepoDigests": [],
+                        "Config": {"Labels": {
+                            IMAGE_VERSION_LABEL: SUPPORTED_OPENCODE_VERSION,
+                            IMAGE_ADAPTER_LABEL: SUPPORTED_INVOKE_ADAPTER_ID,
+                        }},
+                    }),
+                    stderr="",
+                )
+            return SimpleNamespace(returncode=0, stdout=json.dumps(expected), stderr="")
+
+        builtin_spec = replace(
+            self.spec,
+            image=image,
+            require_local_image=True,
+        )
+        with (
+            patch.dict(
+                os.environ,
+                {"OPENCODE_EVAL_RUNNER_OPENCODE_IMAGE": builtin_spec.image},
+                clear=True,
+            ),
+            patch("runner.cli.shutil.which", return_value="/usr/bin/docker"),
+            patch("runner.cli.subprocess.run", side_effect=fake_run),
+        ):
+            host_exit, result = invoke_once(builtin_spec)
+
+        self.assertEqual(host_exit, 0)
+        self.assertEqual(result, expected)
+        self.assertEqual(len(calls), 2)
+        self.assertIn("image", calls[0])
+        self.assertIn("inspect", calls[0])
+        self.assertEqual(calls[1][-1], builtin_spec.image)
+        self.assertIn("--pull=never", calls[1])
 
     def test_product_failure_is_not_infrastructure_or_retryable(self):
         policy = AlwaysRetryPolicy()

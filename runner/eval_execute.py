@@ -19,7 +19,11 @@ from pathlib import Path
 from typing import TypeAlias, cast
 
 from runner.cli import RunnerError, invoke, validate_container_result
-from runner.eval_evidence import EvidenceReadiness, EvidenceRequirement, check_evidence_readiness
+from runner.eval_evidence import (
+    EvidenceReadiness,
+    EvidenceRequirement,
+    check_evidence_readiness,
+)
 from runner.eval_types import (
     AttemptFailure,
     AttemptRecord,
@@ -29,7 +33,6 @@ from runner.eval_types import (
     RetryDecision,
     RetryPolicy,
 )
-
 
 RESULT_SCHEMA = "opencode-eval-runner/v1"
 
@@ -163,6 +166,7 @@ def invoke_once(spec: InvocationSpec) -> tuple[int, object]:
             engine=spec.engine,
             network=spec.network,
             image=spec.image,
+            require_local_opencode_image=spec.require_local_image,
             workspace=str(spec.workspace),
             workspace_mode=spec.workspace_mode,
             mount=[],

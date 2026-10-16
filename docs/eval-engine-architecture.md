@@ -1,5 +1,9 @@
 # Generic eval-engine extraction architecture
 
+> **Current contract note (2026-10-15):** This document is the historical generic-engine design for issue #58, not the complete current built-in eval contract. For built-in runner-owned input families, output modes, and normative phase semantics, see [ARD-001](architecture/eval-format-ownership/design/ard-001-runner-owned-input-and-output-contracts.md) and [ARS-001](architecture/eval-format-ownership/specifications/ars-001-runner-eval-contract.md). In a conflict, those approved documents govern. Built-in target and judge invocations use OpenCode only; this restriction does not remove transport flexibility from existing `--profile` mode. The host owns family parsing, orchestration, persistence verification, and JSON/YAML/Markdown/HTML output; each image invocation remains exactly one isolated call, and retries default to zero.
+
+The profile-owned discovery/normalization and input-JSON exclusion below describe the earlier extraction boundary and are superseded for the two explicitly selected built-in families. The profile API remains available as a separate additive mode.
+
 Issue: #58 — Task 1 of 9  
 Status: architecture/extraction contract; no eval-engine implementation in this task.
 
@@ -33,6 +37,8 @@ invoke
 opencode-eval-runner/v1
   + authoritative runtime_evidence/v1
 ```
+
+For the subsequent built-in modes, the runner also owns adapters for the accepted `agent-runtime/v1` and `skill-cases/v1` input contracts, plus a verified-result projection layer. These are additive to, not replacements for, profile mode. See ARS-001 for exact forms, family-specific judge gates, OpenCode-only invocation settings, and output eligibility. A public-format success requires a completed verified run with a family result for every planned job; errors/not-run jobs are not fabricated into case results.
 
 ## 2. Non-negotiable invariants
 

@@ -92,6 +92,19 @@ class EvidenceReadinessTests(unittest.TestCase):
         self.assertEqual(readiness.reasons, ())
         self.assertEqual(readiness.required_boundaries, (BOUNDARY_NATIVE,))
 
+    def test_action_field_requirements_distinguish_incomplete_observation(self):
+        raw = capture(native_start(), native_terminal())
+        raw["records"][0]["input"] = field_unavailable("omitted", "capture policy")
+        evidence = build_runtime_evidence(raw)
+
+        readiness = check_evidence_readiness(
+            evidence,
+            EvidenceRequirement(observation_fields=("tool", "input")),
+        )
+
+        self.assertEqual(readiness.status, "incomplete")
+        self.assertTrue(any("required_field_field_omitted" in reason for reason in readiness.reasons))
+
     def test_code_mode_execution_boundary_can_be_ready(self):
         readiness = check_evidence_readiness(
             complete_evidence(),

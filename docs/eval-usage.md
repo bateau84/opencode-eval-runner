@@ -1,5 +1,25 @@
 # Public eval CLI and profile reference
 
+> **Current interface:** `eval` has three mutually exclusive modes: the existing `--profile MODULE:ATTRIBUTE` mode, built-in execution with `--input PATH --family agent-runtime|skill`, and persisted-run rendering with `--render-run RUN_DIRECTORY`. Built-in target and judge transport is OpenCode-only; existing profile mode keeps its transport flexibility. Use [ARS-001](architecture/eval-format-ownership/specifications/ars-001-runner-eval-contract.md) for the normative accepted input fields and family semantics. Built-in output is one selected JSON, YAML, Markdown, or HTML view rendered from verified persisted records—not a polished report or a provider/spend compatibility guarantee.
+
+## Built-in runner-owned inputs and output
+
+Built-in mode does not load an external `EvalProfile`. It reads one explicit JSON input file and requires an explicit `--family`; it does not discover directories or infer family from file shape/name. The supported families are the `agent-runtime/v1` suite and the specified `skill-cases/v1` shapes only. Invalid or ambiguous input is rejected before invocation. For skill-family inputs, the runner uses the baseline-target, baseline-judge, candidate-target, candidate-judge paired ablation lifecycle; expectations, negative expectations and trap semantics remain skill-owned.
+
+```bash
+opencode-eval-runner eval --input cases.json --family agent-runtime \
+  --target-model openai/gpt-5.6 --cases CASE-01 --format markdown
+
+# Render a previously completed run without invoking a model:
+opencode-eval-runner eval --render-run .opencode-evals/RUN_ID --format html
+```
+
+Built-in mode requires `--target-model`, uses OpenCode for every target/judge phase, and rejects a non-OpenCode transport request before invocation. Live built-in execution also requires `OPENCODE_EVAL_RUNNER_OPENCODE_IMAGE` to select a full local image ID or digest-qualified image identity. The runner checks that identity and the OpenCode-version/invocation-adapter labels against the selected local engine's metadata without pulling or contacting a registry; tags, absent local images, incompatible metadata, and remote engine endpoints fail closed. The exact selection is preserved for every target and judge OCI run, which uses pull-never. Existing `--profile` image resolution is unchanged. OpenCode provider/model configuration continues through the existing `invoke` path; the built-in interface does not claim cross-provider transport compatibility. `--transport-retries` defaults to `0`; retries are opt-in and each permitted attempt is a separate `invoke`. One `invoke` and its image still perform exactly one isolated invocation.
+
+Each invocation selects one format (`json`, `yaml`, `markdown`, or `html`; default JSON). `--output PATH` writes the representation, otherwise it is written to stdout; progress and diagnostics are separated from built-in representation output. `--render-run` verifies the persisted manifest/artifacts and never evaluates or invokes a model. A conforming output can be reported only for a completed, verified run where every planned case-iteration job has a family result. Pre-result orchestration/preparation errors and not-run jobs retain their terminal state without fabricated family results or classifications, and make the run ineligible for successful conforming output. Formats are functional views of one result, not a polished report. Historical input aliases/migration and external v1 consumer compatibility are not promised.
+
+Family-specific judge gates differ: agent/runtime judging runs only if the target is usable and every deterministic check passes; a deterministic fail or non-evidence check suppresses that judge. In skill ablation, a side judge is suppressed by non-evidence checks, but a behavioral fail alone does not suppress it. Classification and skill comparison rules are specified in ARS-001.
+
 <code>opencode-eval-runner</code> has two public execution boundaries:
 
 ~~~text
@@ -9,9 +29,13 @@ opencode-eval-runner eval ...
 
 <code>invoke</code> still means **exactly one isolated model invocation**. It has no hidden retry loop.
 
-<code>eval</code> is generic orchestration over one or more <code>invoke</code> attempts. A project supplies cases, fixtures, prompts, evidence requirements, deterministic checks, judge construction/parsing, semantic meaning, and opaque metadata through the frozen <code>EvalProfile</code> interface in <code>runner.eval_api</code>.
+In profile mode, <code>eval</code> is generic orchestration over one or more <code>invoke</code> attempts. The project supplies cases, fixtures, prompts, evidence requirements, deterministic checks, judge construction/parsing, semantic meaning, and opaque metadata through the frozen <code>EvalProfile</code> interface in <code>runner.eval_api</code>. Built-in modes instead use runner-owned family contracts and adapters described above.
 
-The generic runner owns selection, iterations, standard/runtime scheduling, explicit retry attempts, evidence readiness, target-to-judge execution, tri-state classification, durable artifacts, summaries, and process exit status.
+The shared orchestration layer owns common selection, iterations, scheduling, attempts, evidence readiness, durable artifacts, summaries, and process exit status. Profile mode retains project-owned target/judge semantics; built-in family adapters own the accepted family-specific evaluation semantics.
+
+## Existing profile mode
+
+The existing `--profile` interface remains available, separately from the built-in modes. It preserves the profile's external case semantics and its existing transport flexibility; built-in OpenCode-only restrictions do not apply to it. New built-in-only controls (`--input`, `--family`, `--skill`, `--ablation`, `--format`, `--output`, `--render-run`) cannot be combined with profile mode.
 
 ## Profile loading
 
@@ -93,7 +117,7 @@ A live command with neither <code>--cases</code> nor <code>--all</code> is rejec
 
 | Option | Default | Meaning |
 | --- | --- | --- |
-| <code>--profile MODULE:ATTRIBUTE</code> | **Required** | Initialized external <code>EvalProfile</code> export. |
+| <code>--profile MODULE:ATTRIBUTE</code> | Required in profile mode | Initialized external <code>EvalProfile</code> export. |
 | <code>--list</code> | Off | List normalized cases and exit without provider calls. |
 | <code>--all</code> | Off | Explicitly select all discovered cases. |
 | <code>--cases SELECTOR[,SELECTOR...]</code> | None | Explicit case/alias selection. Repeatable. |
