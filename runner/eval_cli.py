@@ -35,7 +35,7 @@ from runner.eval_execute import (
     TransientProviderRetryPolicy,
     invoke_once,
 )
-from runner.eval_input import InputContractError, load_evaluation_input
+from runner.eval_input import InputContractError, load_evaluation_inputs
 from runner.eval_output import EvalOutputError, load_verified_output, write_output
 from runner.eval_plan import EvalPlanningError, build_run_plan, list_cases
 from runner.eval_types import EvalJob, InvocationSpec, JsonValue, RunPlan
@@ -63,10 +63,10 @@ def add_eval_parser(subparsers: Any) -> argparse.ArgumentParser:
     )
     mode = run.add_mutually_exclusive_group(required=True)
     mode.add_argument("--profile", metavar="MODULE:ATTRIBUTE", help="Initialized EvalProfile export to load.")
-    mode.add_argument("--input", metavar="PATH", help="JSON input file for a built-in evaluation family.")
+    mode.add_argument("--input", action="append", metavar="PATH", help="JSON input file for a built-in evaluation family; repeat for combined skill runs.")
     mode.add_argument("--render-run", metavar="RUN_DIRECTORY", help="Render a completed verified run without invoking a model.")
     run.add_argument("--family", choices=("agent-runtime", "skill"), help="Input contract family for --input.")
-    run.add_argument("--skill", metavar="NAME", help="Skill identity for top-level skill-case arrays.")
+    run.add_argument("--skill", action="append", metavar="NAME", help="Skill identity; repeat once per input for combined skill runs.")
     run.add_argument("--ablation", action="store_true", help="Run the skill baseline/candidate paired lifecycle.")
     run.add_argument(
         "--list",
@@ -634,7 +634,7 @@ def run_eval(
         if getattr(args, "render_run", None) is not None:
             prohibited = (
                 args.profile is not None or args.input is not None or args.family is not None
-                or args.skill is not None or args.ablation or args.list or args.all or bool(args.cases)
+                or args.skill or args.ablation or args.list or args.all or bool(args.cases)
                 or args.target_model is not None or args.judge_model is not None
                 or args.target_transport is not None or args.judge_transport is not None
                 or args.reasoning is not None or args.target_reasoning is not None or args.judge_reasoning is not None
@@ -652,7 +652,7 @@ def run_eval(
         if args.input is None:
             built_in_controls = (
                 args.family is not None
-                or args.skill is not None
+                or args.skill
                 or args.ablation
                 or args.format is not None
                 or args.output is not None
@@ -668,7 +668,9 @@ def run_eval(
                 raise EvalCommandError("--family is required with --input")
             if args.list:
                 raise EvalCommandError("--list is available only with --profile")
-            if args.skill is not None and args.family != "skill":
+            input_paths = args.input if isinstance(args.input, list) else [args.input]
+            skill_bindings = args.skill or []
+            if skill_bindings and args.family != "skill":
                 raise EvalCommandError("--skill is only valid with --family skill")
             if args.ablation and args.family != "skill":
                 raise EvalCommandError("--ablation is only valid with --family skill")
@@ -687,14 +689,21 @@ def run_eval(
             except ImageSelectionError as exc:
                 raise EvalCommandError(str(exc)) from exc
             args.judge_model = args.judge_model or args.target_model
-            source = load_evaluation_input(args.input, family=args.family, skill=args.skill)
-            input_metadata = {
-                "runner_eval_input": {
-                    "family": source.family,
+            if args.family == "agent-runtime" and len(input_paths) != 1:
+                raise EvalCommandError("multiple inputs are supported only for --family skill")
+            source = load_evaluation_inputs(input_paths, family=args.family, skills=skill_bindings)
+            if len(source.inputs) > 1:
+                input_metadata = {"runner_eval_input": {
+                    "schema": "opencode-eval-runner/eval-input-set/v2", "family": source.family,
                     "contract": source.contract,
-                    "sha256": source.sha256,
-                }
-            }
+                    "inputs": [{"ordinal": i, "path": item.submitted_path, "skill": item.skill,
+                                "contract": item.contract, "sha256": item.sha256}
+                               for i, item in enumerate(source.inputs, 1)],
+                }}
+            else:
+                input_metadata = {"runner_eval_input": {
+                    "family": source.family, "contract": source.contract, "sha256": source.sha256,
+                }}
             cases = normalized_cases(source)
             profile = (
                 AgentRuntimeAdapter(cases, args, Path.cwd())

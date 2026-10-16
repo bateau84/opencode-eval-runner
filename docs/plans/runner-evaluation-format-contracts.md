@@ -9,7 +9,7 @@ tags: [active, plan:runner-evaluation-format-contracts, evaluation, contracts]
 
 Deliver runner-owned contracts for agent/runtime suites and skill-owned cases, and JSON, YAML, Markdown, and HTML results, through one public `eval` interface. Preserve family semantics and existing integrity-checked JSON artifact guarantees. Built-in target and judge invocations are OpenCode-only; existing `--profile` mode remains unchanged and transport-flexible. Keep evaluation orchestration and parsing/rendering host-owned; `invoke` and its image continue to perform exactly one isolated invocation per call. Built-in retry default is zero. A conforming format is rendered from verified persisted results and requires a family-owned result for every planned job; pre-result errors/not-run jobs are not fabricated into results.
 
-**Execution-plan alignment:** This document's original task numbering and phase prose predate the current Loom Plan revision 6. The Loom Plan is the executable task graph; use its stable task IDs rather than this document's legacy numeric labels. The current graph separates `assembled-e2e`, `renderer-heading-fix`, and `design-check`, and then requires `egress-history-audit`, `docs-repair`, `html-browser-check`, and `cleanup-network` before `independent-review`, followed by `final-critic`. This local plan records scope and acceptance context, not a competing schedule or task assignment.
+**Execution-plan alignment:** This document's original task numbering and phase prose predate the current Loom Plan revision 13. The Loom Plan is the executable task graph; use its stable task IDs rather than this document's legacy numeric labels. The current graph includes the completed base contract work and combined-skill follow-up (`multiskill-architecture`, `multiskill-inputs`, `multiskill-renderers`, `multiskill-e2e`, `multiskill-renderer-responsive-fix`, `multiskill-design-validation`, and `multiskill-user-docs`), followed by final review and `commit-multiskill-followup`. The historical `docs-repair` task is closed; current README, eval-usage, and local-plan edits belong to `multiskill-user-docs`. This local plan records scope and evidence, not a competing schedule or task assignment.
 
 ## Current evidence and remaining gates
 
@@ -18,11 +18,13 @@ This status snapshot reconciles the plan with evidence available on 2026-10-16; 
 | Work/evidence | Current disposition |
 | --- | --- |
 | Provider-free assembled E2E | Evidence at `/tmp/opencode/assembled-e2e-no-db-20261016T093439` records successful, same-run four-format results for agent/runtime run `4a7930d9847049cea88d364f003722a9` and skill run `ff52fc71eb2c498d8c4edd16f7fa0015`. The local deterministic provider was substituted; this proves those provider-free runs, not whole-workflow absence of network egress. |
+| Combined-skill E2E | Public built-in skill eval run `bd56d8fa2e6b420fb44c764462097bfd` used explicit inputs `skills/python-testing/evals/evals.json` and `skills/python-error-handling/evals/evals.json`; each had five iterations (10 case-iteration jobs), all passed, and comparisons were reported as compared/pass. The real runner path and renderers were used; a deterministic local provider was the external substitution. JSON/YAML/Markdown/HTML were derived from the same verified run. Evidence is recorded under `/tmp/opencode/combined-skill-e2e-rerun-20261016T213217/`. This is provider-free, not proof of whole-workflow no-egress. |
 | Safety preflight | Preflight evidence records the approved immutable local image and an inspected internal Podman network before E2E. This is bounded to the tested setup and does not resolve historical registry-transfer activity. |
 | Renderer correction | Case headings were nested beneath run headings, and both saved runs were rerendered from their existing verified results at `/tmp/opencode/renderer-heading-fix-20261016T`; no evaluation rerun was needed. |
-| Design validation | Static inspection of the generated Markdown/HTML passed applicable content/structure checks. Offline real-browser inspection of both HTML artifacts passed; the skill stdout view has minor horizontal overflow, but its content remains present and is not clipped. |
+| Combined report/browser validation | The combined renderer was corrected and the same saved run rerendered. Offline browser checks of the final HTML at 1440, 390, and 320 CSS-pixel widths found no horizontal overflow; skill/case/iteration hierarchy, all 10 iteration entries, comparisons and expanded evidence remained present. The final inspected report is `/tmp/opencode/multiskill-responsive-fix-bd56d8fa-rerender/report.html`; supporting evidence is under `/tmp/opencode/multiskill-rerender-browser-check/` and `/tmp/opencode/multiskill-responsive-fix-bd56d8fa-rerender/`. This is bounded browser evidence, not a WCAG or assistive-technology conformance claim. |
+| Combined-skill automated tests | Implementer-reported `PYTHONPATH=. pytest -q` completed with 297 passed and 123 subtests passed; targeted ruff, format, compileall, and diff checks were also reported passing. These are recorded implementation reports, not rerun as part of this documentation-only update. |
 | Historical GHCR activity | Audit evidence confirms that two earlier GHCR pull attempts transferred nine blobs plus config and manifest. Whether transferred layers remain in local cache/storage and the amount of data transferred are unknown. The user explicitly accepts this confirmed historical egress as a non-blocking exception. This does not mean no transfer occurred and neither local internal-network E2E nor the audit supports a whole-workflow no-egress claim. |
-| Remediation/review | BR/OC frontmatter and bundle/index/log validation are complete. The temporary internal Podman network was removed and its cleanup verified. Independent review and the final critic gate are complete; the critic approved delivery with caveats, including unknown local layer retention/bytes. The user accepts the confirmed historical GHCR transfer as a non-blocking exception, not as evidence of no transfer or whole-workflow no-egress. |
+| Remediation/review | BR/OC frontmatter and bundle/index/log validation are complete. The temporary internal Podman network was removed and its cleanup verified. Final critic: **APPROVED** for the combined multi-skill/readability follow-up, with caveats: the two earlier GHCR pull attempts transferred nine blobs plus config and manifest; local retention and transfer volume remain unknown; the user's acceptance makes this a non-blocking exception only. No whole-workflow no-egress claim is supported, and live-provider behavior remains untested. The separate `commit-multiskill-followup` task remains pending. |
 
 ## Plain-language task map
 
@@ -53,7 +55,7 @@ This status snapshot reconciles the plan with evidence available on 2026-10-16; 
 - Task 1.1 informs specification; it does not decide compatibility/report scope for the user.
 - Tasks 2.1/2.2 can parallelize only after a stable shared result contract and disjoint write surfaces; Task 3.1 integrates after both.
 - Skill ablation retains baseline/candidate comparison meaning, not merely ordinary pass/fail.
-- The current Loom Plan's `independent-review` and `final-critic` tasks are separate gates; documentation reconciliation belongs to `docs-repair`. This local plan's original numeric labels are not live Loom task identities.
+- The current Loom Plan's `independent-review` and `final-critic` tasks are separate gates. The closed `docs-repair` task owns only its historical changes; the combined follow-up documentation belongs to `multiskill-user-docs`. This local plan's original numeric labels are not live Loom task identities.
 
 ### Whole plan in one sentence
 
@@ -191,7 +193,7 @@ Acceptance criteria:
 ### Phase 3: Integrate and prove
 
 #### Task 3.1: Prove assembled paths [L] → owner: integrator (runner/product acceptance)
-Target/change surface: Public built-in eval paths, verified run records, renderers, ARS and evidence. Documentation reconciliation is the separate `docs-repair` task in the current Loom Plan.
+Target/change surface: Public built-in eval paths, verified run records, renderers, ARS and evidence. This was the base E2E scope; the current combined-skill documentation task is `multiskill-user-docs` in Loom Plan rev13.
 Type: Testing
 Nature: Enhancement
 Applicable skill: product-acceptance
@@ -218,7 +220,7 @@ Type: Testing
 Nature: Maintenance
 Applicable skill: product-acceptance, design-validation
 Implements: [ARD-001](../architecture/eval-format-ownership/design/ard-001-runner-owned-input-and-output-contracts.md)
-Depends on: `assembled-e2e`, `design-check`, `renderer-heading-fix`, `egress-history-audit`, `docs-repair`, `html-browser-check`, and `cleanup-network` in the current Loom Plan.
+Depends on: Base review dependencies are recorded in Loom Plan rev13. The combined-skill review additionally depends on `multiskill-user-docs`, `multiskill-e2e`, and `multiskill-design-validation` through `readable-report-review`.
 Acceptance criteria:
 - [ ] Independently trace each BR/OC and ARD invariant to implementation/evidence, probing semantic loss, output drift, false success, v1 regressions and image-boundary violations.
 - [ ] Review every output path for conformance and accessibility; unit tests are not accepted as E2E proof.
@@ -238,7 +240,7 @@ Acceptance criteria:
 
 ## Dependency and ownership graph
 
-The table and detailed legacy task text below retain some of the original local plan's numbering. For live scheduling, use the current Loom Plan revision 5 and its task IDs stated above; documentation repair, browser inspection, and network cleanup are separate remediation tasks, not part of assembled E2E proof.
+The table and detailed legacy task text below retain some of the original local plan's numbering. For live scheduling, use Loom Plan revision 13 and its stable task IDs; this local plan is historical context, not a live schedule. Documentation work for the combined-skill follow-up is `multiskill-user-docs`; the pending follow-up commit is `commit-multiskill-followup`.
 
 ```text
 1.1 inventory [researcher] -> 1.2 specification [architect/design-spec owner]
@@ -257,17 +259,17 @@ The table and detailed legacy task text below retain some of the original local 
 | 2.2 | Output coder | Spec, result contract, verifier | Dispatch/renderers/tests | 1.2; 2.1 for public wiring |
 | 3.1 | Integrator | Implementation, spec/evidence | Assembled E2E evidence | 2.1, 2.2 |
 | 3.2 | Designer | Generated Markdown/HTML, ARS-001 | Human-view validation report | 3.1 |
-| `independent-review` | Reviewer | Diff, docs and evidence | Independent review findings | E2E, design check, renderer fix, egress audit, docs repair, browser check, network cleanup |
+| Historical `independent-review` | Reviewer | Diff, docs and evidence | Base independent review findings | Base E2E, design check, renderer fix, egress audit, docs repair, browser check, network cleanup; current combined-follow-up dependencies are in Loom Plan rev13 |
 | `final-critic` | Critic | Final diff, requirements/ARD/spec, E2E evidence, review dispositions | Final gate findings only | `independent-review` plus prerequisite: all blocking findings resolved or explicitly accepted |
-| `docs-repair` | Documentation owner | Implementation, docs, ARD/spec | Reconciled plan and required metadata | Remediation; independent review depends on it |
+| Historical `docs-repair` | Documentation owner | Implementation, docs, ARD/spec | Base reconciled plan and required metadata | Historical base remediation; follow-up documentation is `multiskill-user-docs` |
 
-No shared mutable test state is specified in inspected sources [unverified]. Disclose shared artifact dirs, provider accounts, ports or generated surfaces before parallelizing. Tasks 2.1/2.2 overlap only with stable interfaces and disjoint writes; otherwise serialize CLI/schema integration. Live task identities and dependencies are those in Loom Plan revision 5.
+No shared mutable test state is specified in inspected sources [unverified]. Disclose shared artifact dirs, provider accounts, ports or generated surfaces before parallelizing. Tasks 2.1/2.2 overlap only with stable interfaces and disjoint writes; otherwise serialize CLI/schema integration. Live task identities and dependencies are those in Loom Plan revision 13.
 
 ## Execution waves
 
-1. The current rev6 graph's `assembled-e2e` has provider-free same-run evidence for both families; `renderer-heading-fix` and static `design-check` are reported complete.
-2. Remediation checks are complete: BR/OC frontmatter validation passed; offline browser inspection passed with minor horizontal overflow in skill stdout (content remains and is not clipped); and the temporary internal Podman network was removed. `egress-history-audit` established that two earlier GHCR attempts transferred nine blobs plus config and manifest. Whether transferred layers remain in local cache/storage and the amount of data transferred are unknown. The user explicitly accepts this confirmed historical egress as a non-blocking exception.
-3. `independent-review` and its findings disposition are complete; the final critic approved delivery with caveats, including unknown local layer retention/bytes. The critic had identified the historical GHCR transfer as a shipping blocker pending user decision; the user has now accepted that confirmed historical egress as a non-blocking exception.
+1. Loom Plan rev13's base `assembled-e2e` has provider-free same-run evidence for both families; `renderer-heading-fix` and `design-check` are reported complete. The combined-skill follow-up is separately evidenced in the status table above.
+2. Base remediation checks are complete: BR/OC frontmatter validation passed, and the temporary internal Podman network was removed. The combined HTML overflow found by an earlier browser review was fixed and rechecked at 1440/390/320px as recorded above. `egress-history-audit` established that two earlier GHCR attempts transferred nine blobs plus config and manifest. Whether transferred layers remain in local cache/storage and the amount of data transferred are unknown. The user explicitly accepts this confirmed historical egress as a non-blocking exception.
+3. Independent review and final critic are complete; the final critic approved the combined follow-up with caveats, including unknown local layer retention/bytes. The user accepts the confirmed historical GHCR transfer as a non-blocking exception.
 4. The accepted historical transfer is not a shipping blocker. No whole-workflow no-egress claim is supported.
 
 ## Open questions
@@ -286,7 +288,7 @@ Specialist-owned source-feature boundaries, fields, semantic mapping, interface 
 2. **Obligations:** BRs/OCs, semantics, accessibility, JSON integrity and invocation boundary all have owners, satisfiers, proof and disposition; compatibility/report are explicitly user-owned.
 3. **Decisions:** Only user compatibility/migration/report matters remain; specialist details assigned to Task 1.2 with escalation for material scope changes.
 4. **Foundations:** Inventory → spec → implementation → composition proof → independent review/findings disposition → final critic gate.
-5. **Graph:** The current rev6 task identities and dependencies are authoritative; this legacy local task list is not a count or schedule for that graph.
+5. **Graph:** Loom Plan rev13 task identities and dependencies are authoritative; this legacy local task list is not a count or schedule for that graph.
 6. **Mechanisms:** Adapters, verified record, selectable renderers, accessibility, one-call image boundary trace to BR/OC and ARD-001.
 7. **Repo claims:** Current implementation/evidence claims remain limited to inspected files and recorded artifacts; external consumers remain unknown unless separately evidenced.
 8. **Session fit:** Inventory, specification, family integration, output integration, composition/docs and review are bounded natural scopes; implementation splits at semantic seam, not by file.

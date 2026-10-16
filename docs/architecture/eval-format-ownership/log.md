@@ -7,6 +7,22 @@ tags: [architecture, evaluation, log]
 
 ## 2026-10-16
 
+- **Update**: [ARS-001 — Runner evaluation input, result, and output contract](/specifications/ars-001-runner-eval-contract.md) — Bound each v2 case to its exact source-input occurrence, not a unique skill-name lookup; defined injective comma-safe combined case IDs and selectors while preserving readable source fields and one-input selector compatibility.
+
+- **Update**: [ARD-001 — Runner-owned input and output contracts](/design/ard-001-runner-owned-input-and-output-contracts.md) — Added exact per-input provenance and collision-free composite-identity constraints and verification for delimiter-containing valid input strings.
+
+- **Update**: [Architecture index](/index.md) — Annotated the specification's occurrence attribution and injective selector guarantees.
+
+- **Update**: [ARS-001 — Runner evaluation input, result, and output contract](/specifications/ars-001-runner-eval-contract.md) — Resolved combined top-level-array identity with one explicit ordinally paired `--skill` binding per `--input`; retained raw-array acceptance without filesystem inference, required wrapper/binding agreement, and removed the dependent user question.
+
+- **Update**: [ARD-001 — Runner-owned input and output contracts](/design/ard-001-runner-owned-input-and-output-contracts.md) — Selected explicit per-input CLI identity binding as the minimum-sufficient realization for combined raw arrays; no directory discovery or user-owned behavior decision remains.
+
+- **Update**: [ARS-001 — Runner evaluation input, result, and output contract](/specifications/ars-001-runner-eval-contract.md) — Specified repeated explicit skill inputs, common workspace resolution, complete submitted-child validation, composite duplicate rejection, selection/iteration ordering, per-input provenance, v2 combined output and grouped complete Markdown/HTML presentation; preserved single-input v1 and `--profile`.
+
+- **Update**: [ARD-001 — Runner-owned input and output contracts](/design/ard-001-runner-owned-input-and-output-contracts.md) — Reconciled multi-skill inputs and readable reports with accepted BR-005/OC-001/OC-002/QS-001; selected explicit paths, one workspace, preflight identity invariants and versioned projection without discovery or cross-skill aggregation.
+
+- **Update**: [Architecture index](/index.md) — Linked the combined-skill requirement and governing input/output contracts.
+
 - **Update**: [ARS-001 — Runner evaluation input, result, and output contract](/specifications/ars-001-runner-eval-contract.md) — Replaced the unsupported machine-specific image pin with a required caller-selected immutable local identity, local-only version/adapter compatibility verification, exact identity preservation across target/judge phases, and OCI pull-never; preserved profile-mode image behavior.
 
 - **Update**: [ARD-001 — Runner-owned input and output contracts](/design/ard-001-runner-owned-input-and-output-contracts.md) — Aligned built-in image guarantees and verification evidence with caller-selected immutable local identity and compatibility metadata, with no fallback/pull and unchanged profile-mode behavior.

@@ -23,8 +23,9 @@ from runner.eval_artifacts import (
 )
 from runner.eval_cli import EVAL_EXIT_ERROR, EVAL_EXIT_PASS, EVAL_EXIT_VERDICT, run_eval
 from runner.eval_execute import RESULT_SCHEMA
+from runner.eval_input import combined_skill_case_id
 from runner.eval_plan import build_run_plan
-from runner.eval_types import NormalizedCase
+from runner.eval_types import ArtifactIdentity, NormalizedCase
 
 TEST_OPENCODE_IMAGE = "a" * 64
 
@@ -158,14 +159,14 @@ class BuiltinInvoker:
             evidence = (
                 self.skill_candidate_evidence
                 if candidate and self.skill_candidate_evidence is not None
-                else native_skill_evidence("helper", "skill-eval") if candidate and spec.transport == "opencode"
+                else native_skill_evidence(spec.skill or "helper", "skill-eval") if candidate and spec.transport == "opencode"
                 else empty_complete_evidence()
             )
             return 0, runner_result(
                 text="candidate response" if candidate else "baseline response",
                 evidence=evidence,
                 agent=spec.agent,
-                skills_loaded=["helper"] if candidate and spec.transport == "opencode" else [],
+                skills_loaded=[spec.skill or "helper"] if candidate and spec.transport == "opencode" else [],
             )
         return 0, runner_result(text="target response", evidence=self.runtime_evidence, agent=spec.agent)
 
@@ -635,6 +636,197 @@ def test_skill_eval_runs_four_phases_and_preserves_comparison_and_pair_integrity
         assert "evidence_id" in str(exc)
     else:
         raise AssertionError("family metadata tampering must invalidate the pair integrity ID")
+
+
+def test_combined_skill_run_preserves_source_occurrence_in_v2_and_rejects_duplicates(tmp_path, monkeypatch):
+    root = tmp_path / "project"
+    for skill in ("helper", "second"):
+        (root / "skills" / skill).mkdir(parents=True)
+        (root / "skills" / skill / "SKILL.md").write_text("Method", encoding="utf-8")
+    first, second = tmp_path / "first.json", tmp_path / "second.json"
+    first.write_text(json.dumps({"skill": "helper", "cases": [{"id": "one", "prompt": "Do", "expectations": ["useful"]}]}))
+    second.write_text(json.dumps({"skill_name": "second", "evals": [{"id": "two", "prompt": "Do", "expectations": ["useful"]}]}))
+    monkeypatch.chdir(root)
+    artifact_dir = tmp_path / "combined"
+    grades = [grade(["useful"], [], met=value) for value in (False, True) * 4]
+    invoker = BuiltinInvoker(skill_grades=grades)
+    args = parser().parse_args([
+        "eval", "--input", str(first), "--skill", "helper", "--input", str(second), "--skill", "second",
+        "--family", "skill", "--target-model", "provider/model", "--all", "--iterations", "2",
+        "--artifact-dir", str(artifact_dir),
+    ])
+
+    code, stdout, stderr = run_command(args, invoker)
+
+    assert code == EVAL_EXIT_PASS, stderr
+    output = json.loads(stdout)
+    assert output["schema"] == "opencode-eval-runner/eval-output/v2"
+    assert [entry["source_path"] for entry in output["run"]["input"]["inputs"]] == [str(first), str(second)]
+    assert [(case["identity"]["skill"], case["source_input"], case["iteration"]) for case in output["cases"]] == [
+        ("helper", 1, 1), ("helper", 1, 2), ("second", 2, 1), ("second", 2, 2),
+    ]
+    assert len(invoker.specs) == 16
+    manifest = json.loads((artifact_dir / "run.json").read_text())
+    store = RunArtifactStore(artifact_dir, manifest["run_id"])
+    pair = store.read_paired_job_artifact(ArtifactIdentity(manifest["run_id"], output["cases"][0]["id"], 1))
+    metadata = pair["project_metadata"]["runner_eval"]
+    assert metadata["schema"] == "opencode-eval-runner/eval-family-result/v2"
+    assert metadata["source_input"] == 1
+    assert metadata["source_path"] == str(first)
+    assert metadata["source_sha256"] == __import__("hashlib").sha256(first.read_bytes()).hexdigest()
+
+    duplicate = tmp_path / "duplicate.json"
+    duplicate.write_text(first.read_text())
+    bad = parser().parse_args([
+        "eval", "--input", str(first), "--skill", "helper", "--input", str(duplicate), "--skill", "helper",
+        "--family", "skill", "--target-model", "provider/model", "--cases", combined_skill_case_id("helper", "one"),
+    ])
+    before = len(invoker.specs)
+    bad_code, bad_stdout, bad_stderr = run_command(bad, invoker)
+    assert bad_code == EVAL_EXIT_ERROR
+    assert bad_stdout == ""
+    assert "duplicate composite" in bad_stderr
+    assert len(invoker.specs) == before
+
+
+def test_combined_markdown_and_html_render_five_iterations_under_repeated_skill_inputs(
+    tmp_path, monkeypatch
+):
+    root = tmp_path / "project"
+    (root / "skills" / "helper").mkdir(parents=True)
+    (root / "skills" / "helper" / "SKILL.md").write_text("Method", encoding="utf-8")
+    first, second = tmp_path / "first.json", tmp_path / "second.json"
+    first.write_text(
+        json.dumps(
+            {
+                "skill": "helper",
+                "cases": [{"id": "one-" + "x" * 40, "name": "<first case>", "prompt": "<one>", "expectations": ["useful"]}],
+            }
+        )
+    )
+    second.write_text(
+        json.dumps(
+            {
+                "skill_name": "helper",
+                "evals": [{"id": "two", "name": "<second case>", "prompt": "<two>", "expectations": ["useful"]}],
+            }
+        )
+    )
+    monkeypatch.chdir(root)
+    artifact_dir = tmp_path / "combined-five"
+    invoker = BuiltinInvoker(
+        skill_grades=[grade(["useful"], [], met=True) for _ in range(40)]
+    )
+    execute = parser().parse_args(
+        [
+            "eval",
+            "--input",
+            str(first),
+            "--skill",
+            "helper",
+            "--input",
+            str(second),
+            "--skill",
+            "helper",
+            "--family",
+            "skill",
+            "--target-model",
+            "provider/model",
+            "--all",
+            "--iterations",
+            "5",
+            "--artifact-dir",
+            str(artifact_dir),
+        ]
+    )
+
+    code, _, stderr = run_command(execute, invoker)
+
+    assert code == EVAL_EXIT_PASS, stderr
+    canonical_path = tmp_path / "combined.json"
+    canonical_args = parser().parse_args(
+        [
+            "eval",
+            "--render-run",
+            str(artifact_dir),
+            "--format",
+            "json",
+            "--output",
+            str(canonical_path),
+        ]
+    )
+    assert run_command(canonical_args, invoker)[0] == EVAL_EXIT_PASS
+    canonical = json.loads(canonical_path.read_text(encoding="utf-8"))
+    assert canonical["schema"] == "opencode-eval-runner/eval-output/v2"
+    assert len(canonical["cases"]) == 10
+    assert len(canonical["cases"][0]["id"]) > 60
+    assert {
+        (case["identity"]["skill"], case["source_input"]) for case in canonical["cases"]
+    } == {("helper", 1), ("helper", 2)}
+    yaml_path = tmp_path / "combined.yaml"
+    yaml_args = parser().parse_args(
+        [
+            "eval",
+            "--render-run",
+            str(artifact_dir),
+            "--format",
+            "yaml",
+            "--output",
+            str(yaml_path),
+        ]
+    )
+    assert run_command(yaml_args, invoker)[0] == EVAL_EXIT_PASS
+    import yaml
+
+    assert yaml.safe_load(yaml_path.read_text(encoding="utf-8")) == canonical
+
+    for output_format in ("markdown", "html"):
+        destination = tmp_path / f"combined.{output_format}"
+        render = parser().parse_args(
+            [
+                "eval",
+                "--render-run",
+                str(artifact_dir),
+                "--format",
+                output_format,
+                "--output",
+                str(destination),
+            ]
+        )
+        assert run_command(render, invoker)[0] == EVAL_EXIT_PASS
+        text = destination.read_text(encoding="utf-8")
+        assert text.count("Iteration 1 — pass") == 4
+        assert text.count("Iteration 2 — pass") == 4
+        assert text.count("Iteration 3 — pass") == 4
+        assert text.count("Iteration 4 — pass") == 4
+        assert text.count("Iteration 5 — pass") == 4
+        assert "baseline_score" in text and "candidate_score" in text and "Captured answers and evidence" in text
+        assert "source_id" in text
+        assert "one-" + "x" * 40 in text
+        assert "two" in text
+        assert "<one>" not in text and "&lt;one&gt;" in text if output_format == "html" else "<one>" in text
+        if output_format == "html":
+            assert text.count("<h3 id=\"skill-") == 1
+            assert text.count("<h4 id=\"case-") == 2
+            assert text.count("<h5 id=\"case-") == 10
+            assert "&lt;first case&gt;" in text and "&lt;second case&gt;" in text
+            assert f'<a href="#case-{canonical["cases"][0]["id"]}">Case helper: &lt;first case&gt;</a>' in text
+            assert "Case helper: &lt;first case&gt;" in text
+            assert "Case helper: &lt;second case&gt;" in text
+            assert "overflow-wrap:anywhere" in text
+            assert "word-break:break-word" in text
+            assert "dd{margin-inline-start:0}" in text
+            assert "ul,ol{padding-inline-start:0;list-style-position:inside}" in text
+            assert "<dl>" in text and "<dt>" in text and "<dd>" in text
+            assert "<dt>observations</dt><dd><ul>" in text
+            assert "<dt>tool</dt>" in text and "native-1" in text and "skill body" in text
+            assert "Raw captured stdout/stderr" in text
+        else:
+            assert text.count("### Skill helper") == 1
+            assert text.count("#### Case ") == 2
+            assert text.count("##### Iteration ") == 10
+            assert "Raw captured stdout/stderr" in text
+        assert "skill summary" not in text.lower()
 
 
 def test_skill_pair_non_evidence_side_preserves_both_outcomes_without_scores(tmp_path, monkeypatch):

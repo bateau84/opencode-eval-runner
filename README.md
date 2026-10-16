@@ -1,11 +1,11 @@
 # opencode-eval-runner
 
-Reusable OCI execution boundary for isolated OpenCode or GitHub Copilot CLI invocations, plus generic eval orchestration over project-supplied profiles.
+Reusable OCI execution boundary for isolated OpenCode or GitHub Copilot CLI invocations, plus evaluation orchestration over project-supplied profiles or explicit runner-owned input families.
 
-The runner intentionally does **not** own an eval corpus, grading semantics, or agent policy. Those stay in the project being evaluated. This repository owns two boundaries:
+The runner does **not** own a project eval corpus or agent policy. In `--profile` mode, the project profile also owns grading semantics; built-in modes implement only the accepted agent/runtime and skill-family semantics. This repository owns two boundaries:
 
 - <code>invoke</code>: exactly one fresh isolated model invocation;
-- <code>eval</code>: generic selection, iterations, concurrency, attempts, evidence readiness, target/judge orchestration, classification, artifacts, summaries, and exit status over a project-supplied <code>EvalProfile</code>.
+- <code>eval</code>: generic selection, iterations, concurrency, attempts, evidence readiness, target/judge orchestration, classification, artifacts, summaries, and exit status over either a project-supplied <code>EvalProfile</code> or the built-in agent/runtime and skill input families.
 
 Each actual model invocation still gets a fresh container, fresh HOME/XDG/OpenCode state, explicit provider configuration/authentication, and a read-only workspace by default.
 
@@ -18,7 +18,7 @@ opencode-eval-runner eval ...
 
 <code>invoke</code> remains the one-invocation primitive and has no hidden retry loop.
 
-<code>eval</code> loads an initialized external profile through <code>--profile module:attribute</code>. The profile owns cases, fixtures, prompts, evidence requirements, deterministic checks, judge construction/parsing, semantic meaning, and project metadata. The runner supplies generic orchestration without adding a universal assertion DSL.
+<code>eval</code> preserves the external <code>--profile module:attribute</code> mode and adds built-in modes for explicit agent/runtime or skill-case inputs. Profile mode leaves case and grading semantics with the profile. Built-in mode uses the runner's accepted family contracts; its live target and judge invocations are OpenCode-only. Combined skill runs accept repeated explicit input/skill bindings; they do not scan directories. See the **[Public eval CLI and profile reference](docs/eval-usage.md)** for input selection, output formats, compatibility, and execution safeguards.
 
 Supported usage modes include:
 
@@ -27,6 +27,7 @@ Supported usage modes include:
 | Local OpenCode invocation | <code>opencode-eval-runner invoke --transport opencode ...</code> |
 | Local Copilot invocation | <code>opencode-eval-runner invoke --transport github-copilot-cli ...</code> |
 | Local generic eval | <code>opencode-eval-runner eval --profile module:attribute ...</code> |
+| Local built-in eval | <code>opencode-eval-runner eval --input cases.json --family agent-runtime</code> or explicit skill-family inputs |
 | GitHub Action direct invocation | Action inputs with <code>model</code> set |
 | GitHub Action generic/project eval | Action <code>command</code> mode |
 | GitHub Action setup only | Leave <code>model</code> and <code>command</code> empty, then call the CLI later |
@@ -103,6 +104,20 @@ This transport reuses the trust-boundary pattern already proven in `nrkno/mats-o
 ## Local usage
 
 For the generic eval interface, see [Public eval CLI and profile reference](docs/eval-usage.md). For one-invocation options and defaults, see [Invocation usage and interface reference](docs/invocation-usage.md).
+
+Built-in skill evals can combine explicitly named input files. Each `--input` is paired by position with one `--skill`; there is no directory scan or input discovery. For example, from the evaluated project root:
+
+```bash
+export OPENCODE_EVAL_RUNNER_OPENCODE_IMAGE='<compatible-full-local-image-id-or-digest-qualified-image>'
+
+opencode-eval-runner eval \
+  --input skills/python-testing/evals/evals.json --skill python-testing \
+  --input skills/python-error-handling/evals/evals.json --skill python-error-handling \
+  --family skill --all --iterations 5 \
+  --target-model '<provider/model>' --format markdown
+```
+
+Built-in execution requires a compatible immutable image already available locally; the runner never pulls it. This example selects every submitted case and runs five iterations per case, separately grouped and compared within each skill. Markdown and HTML show the run → skill → case → iteration hierarchy; JSON and YAML retain their result semantics. See the eval reference for input binding, format selection, and rendering a saved run.
 
 Build the transport you need:
 

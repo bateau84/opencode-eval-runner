@@ -1,6 +1,7 @@
 """Strict host-side readers for the built-in evaluation input contracts."""
 from __future__ import annotations
 
+import base64
 import hashlib
 import json
 import math
@@ -28,6 +29,16 @@ class InputCase:
     display_name: str | None = None
     negative_expectations: tuple[str, ...] = ()
     trap: str | None = None
+    source_input: int = 1
+
+
+@dataclass(frozen=True)
+class InputSource:
+    source_path: Path
+    submitted_path: str
+    sha256: str
+    skill: str
+    contract: str = "skill-cases/v1"
 
 
 @dataclass(frozen=True)
@@ -40,6 +51,7 @@ class EvaluationInput:
     suite_default: bool | None
     skill: str | None
     cases: tuple[InputCase, ...]
+    inputs: tuple[InputSource, ...] = ()
 
 
 def _pairs(items: list[tuple[str, Any]]) -> dict[str, Any]:
@@ -353,6 +365,70 @@ def _skill_input(raw: Any, supplied_skill: str | None) -> tuple[str, tuple[Input
                                 authored_id=authored_id, display_name=display_name,
                                 negative_expectations=negative, trap=trap))
     return skill, tuple(result)
+
+
+def _uleb128(value: int) -> bytes:
+    encoded = bytearray()
+    while value >= 0x80:
+        encoded.append((value & 0x7F) | 0x80)
+        value >>= 7
+    encoded.append(value)
+    return bytes(encoded)
+
+
+def combined_skill_case_id(skill: str, source_id: str | int) -> str:
+    """Encode a skill/source-ID pair injectively, without selector delimiters."""
+    parts = []
+    for value in (skill, str(source_id)):
+        raw = value.encode("utf-16-be", errors="surrogatepass")
+        parts.extend((_uleb128(len(raw) // 2), raw))
+    return "sk1_" + base64.urlsafe_b64encode(b"".join(parts)).decode("ascii").rstrip("=")
+
+
+def load_evaluation_inputs(
+    paths: list[str | Path] | tuple[str | Path, ...],
+    *,
+    family: Family,
+    skills: list[str] | tuple[str, ...] | None = None,
+) -> EvaluationInput:
+    """Validate an ordered explicit input set; combined mode is skill-only."""
+    if family != "skill":
+        if len(paths) != 1:
+            raise InputContractError("multiple inputs are supported only for --family skill")
+        if skills:
+            raise InputContractError("--skill is only valid with --family skill")
+        return load_evaluation_input(paths[0], family=family)
+    if not paths:
+        raise InputContractError("at least one --input is required")
+    bindings = tuple(skills or ())
+    if len(paths) > 1 and len(bindings) != len(paths):
+        raise InputContractError("combined skill inputs require exactly one --skill binding per --input")
+    if len(paths) == 1 and len(bindings) > 1:
+        raise InputContractError("one skill input accepts at most one --skill binding")
+
+    sources: list[InputSource] = []
+    cases: list[InputCase] = []
+    seen: set[tuple[str, str]] = set()
+    for ordinal, path in enumerate(paths, 1):
+        bound_skill = bindings[ordinal - 1] if bindings else None
+        source = load_evaluation_input(path, family="skill", skill=bound_skill)
+        assert source.skill is not None
+        sources.append(InputSource(source.source_path, str(path), source.sha256, source.skill))
+        for case in source.cases:
+            identity = (source.skill, str(case.source_id))
+            if identity in seen:
+                raise InputContractError(f"duplicate composite skill case identity: {identity!r}")
+            seen.add(identity)
+            case_id = case.case_id if len(paths) == 1 else combined_skill_case_id(source.skill, case.source_id if case.source_id is not None else "")
+            cases.append(InputCase(
+                case_id=case_id, source_index=case.source_index, authored=case.authored,
+                skill=case.skill, source_id=case.source_id, authored_id=case.authored_id,
+                display_name=case.display_name, negative_expectations=case.negative_expectations,
+                trap=case.trap, source_input=ordinal,
+            ))
+    first = sources[0]
+    return EvaluationInput("skill", "skill-cases/v1", first.sha256 if len(sources) == 1 else "",
+                           first.source_path, None, None, first.skill, tuple(cases), tuple(sources))
 
 
 def load_evaluation_input(path: str | Path, *, family: Family, skill: str | None = None) -> EvaluationInput:

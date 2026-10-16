@@ -2,7 +2,11 @@ import json
 
 import pytest
 
-from runner.eval_input import InputContractError, load_evaluation_input
+from runner.eval_input import (
+    InputContractError,
+    load_evaluation_input,
+    load_evaluation_inputs,
+)
 
 
 def test_loads_agent_suite_and_preserves_source_identity(tmp_path):
@@ -149,3 +153,44 @@ def test_rejects_tool_result_assertion_without_a_result_test(tmp_path):
 
     with pytest.raises(InputContractError, match="result test"):
         load_evaluation_input(source, family="agent-runtime")
+
+
+def test_combined_skill_inputs_bind_each_occurrence_and_encode_composite_ids(tmp_path):
+    first = tmp_path / "first.json"
+    second = tmp_path / "second.json"
+    first.write_text(json.dumps({"skill": "same", "cases": [{"id": "a,b", "prompt": "do", "expectations": ["yes"]}]}))
+    second.write_text(json.dumps({"skill_name": "same", "evals": [{"id": "c", "prompt": "do", "expectations": ["yes"]}]}))
+
+    result = load_evaluation_inputs([first, second], family="skill", skills=["same", "same"])
+
+    assert [case.source_input for case in result.cases] == [1, 2]
+    assert [case.case_id for case in result.cases] == [
+        "sk1_BABzAGEAbQBlAwBhACwAYg", "sk1_BABzAGEAbQBlAQBj"
+    ]
+    assert [item.source_path for item in result.inputs] == [first, second]
+    assert result.inputs[0].sha256 != result.inputs[1].sha256
+
+
+def test_combined_skill_inputs_reject_duplicate_pairs_and_binding_mismatch(tmp_path):
+    first = tmp_path / "first.json"
+    second = tmp_path / "second.json"
+    payload = {"skill": "same", "cases": [{"id": "duplicate", "prompt": "do", "expectations": ["yes"]}]}
+    first.write_text(json.dumps(payload))
+    second.write_text(json.dumps(payload))
+
+    with pytest.raises(InputContractError, match="duplicate composite"):
+        load_evaluation_inputs([first, second], family="skill", skills=["same", "same"])
+    with pytest.raises(InputContractError, match="does not match"):
+        load_evaluation_inputs([first, second], family="skill", skills=["same", "other"])
+
+
+def test_combined_raw_arrays_use_each_explicit_binding(tmp_path):
+    first, second = tmp_path / "first.json", tmp_path / "second.json"
+    case = {"id": "same", "prompt": "do", "expectations": ["yes"]}
+    first.write_text(json.dumps([case]))
+    second.write_text(json.dumps([case]))
+
+    result = load_evaluation_inputs([first, second], family="skill", skills=["alpha", "beta"])
+
+    assert [(case.skill, case.source_input) for case in result.cases] == [("alpha", 1), ("beta", 2)]
+    assert result.cases[0].case_id != result.cases[1].case_id

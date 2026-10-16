@@ -103,11 +103,16 @@ def normalized_cases(source: EvaluationInput, *, lane: str | None = None) -> tup
             "source_index": case.source_index,
         }
         if source.family == "skill":
+            source_ref = source.inputs[case.source_input - 1] if source.inputs else None
             metadata.update({
                 "source_id": case.source_id,
                 "authored_id": case.authored_id,
                 "display_name": case.display_name,
                 "skill": case.skill,
+                "source_input": case.source_input,
+                "source_path": source_ref.submitted_path if source_ref else str(source.source_path),
+                "source_sha256": source_ref.sha256 if source_ref else source.sha256,
+                "input_count": len(source.inputs) or 1,
             })
         else:
             metadata.update({"suite_name": source.suite_name, "suite_default": source.suite_default})
@@ -863,14 +868,21 @@ class SkillAblationAdapter:
             )
             side_artifact["project_metadata"] = metadata
             artifact["sides"][name] = attach_artifact_evidence_id(side_artifact)
+        combined = job.case.metadata.get("input_count") > 1
+        family_result = self._skill_family_result(job, paired, artifact, store)
+        runner_eval = {
+            "schema": "opencode-eval-runner/eval-family-result/v2" if combined else "opencode-eval-runner/eval-family-result/v1",
+            "family": "skill", "contract": "skill-cases/v1", "case_id": job.case.id,
+            "family_result": family_result,
+        }
+        if combined:
+            runner_eval.update({
+                "source_input": job.case.metadata["source_input"],
+                "source_path": job.case.metadata["source_path"],
+                "source_sha256": job.case.metadata["source_sha256"],
+            })
         artifact["project_metadata"] = {
-            "runner_eval": {
-                "schema": "opencode-eval-runner/eval-family-result/v1",
-                "family": "skill",
-                "contract": "skill-cases/v1",
-                "case_id": job.case.id,
-                "family_result": self._skill_family_result(job, paired, artifact, store),
-            }
+            "runner_eval": runner_eval,
         }
         from runner.eval_artifacts import attach_paired_artifact_evidence_id
         return attach_paired_artifact_evidence_id(artifact)
@@ -941,6 +953,9 @@ class SkillAblationAdapter:
                 "authored_id": data["_skill_authored_id"],
                 "source_index": data["_skill_source_index"],
                 "display_name": data["_skill_display_name"],
+                **({"source_input": case.metadata["source_input"], "source_path": case.metadata["source_path"],
+                    "source_sha256": case.metadata["source_sha256"]}
+                   if case.metadata.get("input_count") > 1 else {}),
             },
             "prompt": data["prompt"],
             "fixture_files": data.get("fixture_files", []),
