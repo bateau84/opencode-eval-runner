@@ -217,11 +217,14 @@ Implements: [BR-004](../requirements/eval-format-ownership/br-004-present-readab
 Depends on: 2.2.
 Acceptance criteria:
 
-- [ ] Markdown and HTML lead with readable run outcome and then attribute skill → case → iteration; each applicable iteration includes status and its own baseline/candidate comparison, attempts, checks and evidence summary.
-- [ ] Human readers do not need to decode a raw field/value tree to identify outcomes; full captured answers/evidence and their redaction/truncation meaning remain in the same report.
-- [ ] Candidate absolute classification remains distinct from comparison decision and skill-value label; no per-skill or cross-skill aggregates are added.
-- [ ] Existing output escaping, semantic order, non-color status and keyboard-operable native interactions remain conformant to the approved baseline.
+- [x] Markdown and HTML lead with readable run outcome and then attribute skill → case → iteration; each applicable iteration includes status and its own baseline/candidate comparison, attempts, checks and evidence summary.
+- [x] Human readers do not need to decode a raw field/value tree to identify outcomes; full captured answers/evidence and their redaction/truncation meaning remain in the same report.
+- [x] Candidate absolute classification remains distinct from comparison decision and skill-value label; no per-skill or cross-skill aggregates are added.
+- [x] Existing output escaping, semantic order, non-color status and keyboard-operable native interactions remain conformant to the approved baseline.
 - [ ] Renderer tests use verified-shaped source results and assert narrative facts as well as representation parity; final browser/design proof remains Task 3.2.
+
+
+Implementation evidence: renderer changes in `runner/eval_output.py`; focused CLI renderer suite `python -m pytest tests/test_eval_builtin_cli.py -q` passed (19 tests). This proves local renderer behavior only. Full five-iteration fixtures use repeated occurrences of one skill, not distinct skills; raw capture/family facts are retained in fenced JSON or escaped HTML trees. Markdown literal input labels are HTML-entity escaped. Browser/host rendering, reflow, keyboard, and actual multi-skill OCI proof remain unverified and are owned by Tasks 3.2/3.3.
 
 ### Phase 3: Reconcile documentation and prove assembled product
 

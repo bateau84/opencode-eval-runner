@@ -336,11 +336,11 @@ def test_render_run_projects_one_verified_result_without_invocation(tmp_path, mo
         elif format == "markdown":
             assert "## Run " in rendered and "### Case decision" in rendered
             assert '"pass"' in rendered and "semantic_judge" in rendered
+            assert "Assertions:" in rendered and "Evidence readiness:" in rendered
         else:
             assert "<main>" in rendered and "<h1>" in rendered
             assert "<section><h2>Run " in rendered and "<section><h3>Case decision" in rendered
-            assert rendered.index("<section><h2>Run ") < rendered.index("<section><h3>Case decision") < rendered.index("</section>")
-            assert "<dt>classification</dt>" in rendered
+            assert "Assertions:" in rendered and "Evidence readiness:" in rendered
             assert "Choose &lt;safely&gt;" in rendered
         assert len(invoker.specs) == invocations
         assert (artifact_dir / "run.json").read_bytes() == manifest_before
@@ -667,7 +667,8 @@ def test_skill_eval_runs_four_phases_and_preserves_comparison_and_pair_integrity
             result = result["cases"][0]
             assert result["family_result"]["case_identity"]["source_id"] == "smoke"
         elif output_format == "markdown":
-            assert "### Case skill:helper:smoke" in text
+            assert "### Case smoke" in text and "Canonical case ID: skill:helper:smoke" in text
+            assert "Baseline:" in text and "percentage points" in text
             assert "baseline-target" in text and "candidate-target" in text and "delta_pp" in text
         else:
             assert "<main>" in text and "<h3>Case skill:helper:smoke" in text

@@ -1090,15 +1090,78 @@ def _skill_iteration_summary(case: dict[str, Any]) -> tuple[str, str]:
     candidate = ablation["candidate"]["classification"]
     comparison_status = comparison["status"]
     decision = comparison.get("decision")
+    data = (decision or {}).get("data", {})
+    baseline_score = data.get("baseline_score")
+    candidate_score = data.get("candidate_score")
+    delta = data.get("delta_pp", comparison.get("delta_pp", comparison.get("delta")))
     comparison_classification = (
         decision["classification"] if decision else comparison_status
     )
     outcome = (
-        f"Candidate: {candidate}; baseline: {baseline}; "
-        f"comparison: {comparison_classification} ({comparison_status})."
+        f"Baseline: {baseline} ({_percent(baseline_score)}); "
+        f"candidate: {candidate} ({_percent(candidate_score)}). "
+        f"Candidate absolute pass: {'yes' if candidate == 'pass' else 'no' if candidate == 'fail' else 'unavailable'}. "
+        f"Comparison: {comparison_classification} ({comparison_status}); "
+        f"delta: {_percentage_points(delta)}; "
+        f"skill value: {data.get('skill_value', 'unavailable')}. "
+        f"Trap change: {_trap_change(case)}"
     )
     detail = _pretty(comparison)
     return outcome, detail
+
+
+def _percent(value: Any) -> str:
+    return f"{value:.2f}%" if type(value) in (int, float) else "unavailable"
+
+
+def _percentage_points(value: Any) -> str:
+    return f"{value:+.2f} percentage points" if type(value) in (int, float) else "unavailable"
+
+
+def _trap_change(case: dict[str, Any]) -> str:
+    family = case["family_result"]
+    trap = family["trap"]
+    if not trap["declared"]:
+        return "no trap declared; not applicable"
+    baseline = family["ablation"]["baseline"]["skill_outcome"]["trap"]["observed"]
+    candidate = family["ablation"]["candidate"]["skill_outcome"]["trap"]["observed"]
+    if baseline is None or candidate is None:
+        return "unavailable"
+    if baseline and not candidate:
+        return "fixed"
+    if candidate and not baseline:
+        return "regressed"
+    return "observed on both sides" if candidate else "not observed on either side"
+
+
+def _agent_narrative(case: dict[str, Any]) -> list[str]:
+    family = case["family_result"]
+    lines = [f"Execution: {family['case']['execution']}; classification: {case['classification']}."]
+    assertions = family["assertions"]
+    lines.append("Assertions: " + ("; ".join(f"{a['kind']} — {a['status']}: {a['reason'] or a['authored']}" for a in assertions) if assertions else "none authored/applicable."))
+    judge = family["semantic_judge"]
+    lines.append("Semantic judge: " + (f"{'PASS' if judge['passed'] else 'FAIL'} — {judge['summary']}" if judge else "not run/unavailable."))
+    lines.extend(_attempt_narrative(case["attempts"], case["checks"], case["evidence"]))
+    return lines
+
+
+def _attempt_narrative(groups: list[dict[str, Any]], checks: list[dict[str, Any]], evidence: dict[str, Any]) -> list[str]:
+    lines = []
+    for group in groups:
+        attempts = group["attempts"]
+        lines.append(f"{group['phase']}: " + ("; ".join(f"attempt {a['number']} result {a['result'] if a['result'] is not None else 'unavailable'}; retry {a['retry_decision']}" for a in attempts) if attempts else "no attempts recorded."))
+    lines.append("Checks: " + ("; ".join(f"{check['name']} — {check['status']}{(': ' + check['reason']) if check['reason'] else ''}" for check in checks) if checks else "none recorded."))
+    lines.append(f"Evidence readiness: {evidence['status']}" + (f" — {', '.join(evidence['reasons'])}" if evidence["reasons"] else ""))
+    return lines
+
+
+def _literal_json(value: Any) -> str:
+    # Indented JSON in a fence preserves Markdown-significant captured text literally.
+    return "```json\n" + json.dumps(value, ensure_ascii=False, indent=2, allow_nan=False) + "\n```"
+
+
+def _md_literal(value: Any) -> str:
+    return html.escape(str(value), quote=False).replace("\n", " ")
 
 
 def _skill_case_label(case_id: str, iterations: list[dict[str, Any]]) -> str:
@@ -1128,14 +1191,14 @@ def _combined_markdown(model: dict[str, Any]) -> str:
     for skill_index, (skill, grouped_cases) in enumerate(
         _combined_skill_groups(model["cases"]), 1
     ):
-        sections.extend(("", f"### Skill {skill}"))
+        sections.extend(("", f"### Skill {_md_literal(skill)}"))
         for case_index, (case_id, iterations) in enumerate(grouped_cases, 1):
             sections.extend(
                 (
                     "",
-                    f"#### Case {_skill_case_label(case_id, iterations)}",
+                    f"#### Case {_md_literal(_skill_case_label(case_id, iterations))}",
                     "",
-                    f"Canonical case ID: `{case_id}`",
+                    f"Canonical case ID: {_md_literal(case_id)}",
                     "",
                     "**Iterations:**",
                 )
@@ -1146,6 +1209,16 @@ def _combined_markdown(model: dict[str, Any]) -> str:
                 )
             for case in iterations:
                 outcome, comparison = _skill_iteration_summary(case)
+                sides = case["family_result"]["ablation"]
+                side_lines = []
+                for side_name in ("baseline", "candidate"):
+                    side = sides[side_name]
+                    side_lines.append(f"**{side_name.title()} result:** {side['classification']}; evidence readiness {side['evidence']['status']}; checks " + ("; ".join(f"{c['name']} — {c['status']}" for c in side["checks"]) or "none recorded."))
+                    for item in side["skill_outcome"]["expectations"]:
+                        side_lines.append(f"- Expectation {'met' if item['met'] else 'not met'}: {_md_literal(item['text'])}" + (f" — {_md_literal(item['reason'])}" if item["reason"] else ""))
+                    for item in side["skill_outcome"]["negative_expectations"]:
+                        side_lines.append(f"- Negative expectation {'violated' if item['violated'] else 'not violated'}: {_md_literal(item['text'])}" + (f" — {_md_literal(item['reason'])}" if item["reason"] else ""))
+                side_lines.extend(_attempt_narrative(case["attempts"], case["checks"], case["evidence"]))
                 sections.extend(
                     (
                         "",
@@ -1153,13 +1226,15 @@ def _combined_markdown(model: dict[str, Any]) -> str:
                         "",
                         outcome,
                         "",
+                        *side_lines,
+                        "",
                         "**Per-iteration comparison:**",
                         comparison,
                         "",
                         "**Captured answers and evidence — supporting details:**",
                         "Full verified iteration record follows. Raw stdout/stderr fields remain raw process streams.",
                         "",
-                        _pretty(case),
+                        _literal_json(case),
                     )
                 )
     sections.extend(
@@ -1215,11 +1290,14 @@ def _combined_html(model: dict[str, Any]) -> str:
             skill_sections.append("</ul>")
             for case in iterations:
                 outcome, _comparison = _skill_iteration_summary(case)
+                ablation = case["family_result"]["ablation"]
+                side_summary = " ".join(f"{name.title()}: {ablation[name]['classification']}; readiness {ablation[name]['evidence']['status']}." for name in ("baseline", "candidate"))
+                attempts_summary = " ".join(_attempt_narrative(case["attempts"], case["checks"], case["evidence"]))
                 anchor = f"{case_anchor}-iteration-{case['iteration']}"
                 skill_sections.extend(
                     (
                         f'<section><h5 id="{anchor}">Iteration {case["iteration"]} — {html.escape(str(case["classification"]))}</h5>',
-                        f"<p>{html.escape(outcome)}</p><h6>Per-iteration comparison</h6>{_html_tree(case['family_result']['ablation']['comparison'])}",
+                        f"<p>{html.escape(outcome)}</p><p>{html.escape(side_summary + ' ' + attempts_summary)}</p><h6>Per-iteration comparison</h6>{_html_tree(case['family_result']['ablation']['comparison'])}",
                         f"<details><summary>Captured answers and evidence — iteration {case['iteration']}</summary>",
                         "<p>Full verified iteration record. Raw stdout/stderr fields are raw process streams, not answers or verdicts.</p>",
                         _html_tree(case),
@@ -1259,30 +1337,52 @@ def serialize_output(model: dict[str, Any], format: str) -> bytes:
                 "",
                 f"## Run {model['run']['id']}",
                 "",
-                _pretty(model["run"]),
+                f"- **Created:** {model['run']['created_at']}",
+                f"- **Family / mode:** {model['run']['input']['family']} / {model['run']['execution']['mode']}",
+                f"- **Status:** {model['run']['summary']['status']} — {model['run']['summary']['pass']} pass, {model['run']['summary']['fail']} fail, {model['run']['summary']['non_evidence']} non-evidence ({model['run']['summary']['total']} jobs)",
             ]
-            for case in model["cases"]:
-                sections.extend(
-                    (
-                        "",
-                        f"### Case {case['id']} — {case['family']} iteration {case['iteration']}",
-                        "",
-                        _pretty(case),
-                    )
-                )
+            cases = model["cases"]
+            groups: dict[str, list[dict[str, Any]]] = {}
+            for case in cases:
+                family = case["family_result"]
+                label = family.get("skill", "") if case["family"] == "skill" else (family["case"].get("skill") or "")
+                groups.setdefault(label or "Evaluation", []).append(case)
+            for skill, grouped in groups.items():
+                sections.extend(("", f"## {_md_literal(skill)}", ""))
+                for case in grouped:
+                    identity = case["family_result"].get("case_identity", {})
+                    display = identity.get("display_name") or identity.get("source_id") or case["id"]
+                    sections.extend((f"### Case {_md_literal(display)}", f"Canonical case ID: {_md_literal(case['id'])}", "", f"#### Iteration {case['iteration']} — {case['classification']}", ""))
+                    if case["family"] == "skill":
+                        outcome, _ = _skill_iteration_summary(case)
+                        sections.append(outcome)
+                        for side_name in ("baseline", "candidate"):
+                            side = case["family_result"]["ablation"][side_name]
+                            sections.extend(("", f"**{side_name.title()} checks/readiness:** {side['evidence']['status']}; " + ("; ".join(f"{check['name']} — {check['status']}" for check in side["checks"]) or "no checks recorded.")))
+                            for item in side["skill_outcome"]["expectations"]:
+                                sections.append(f"- Expectation {'met' if item['met'] else 'not met'}: {item['text']}" + (f" — {item['reason']}" if item["reason"] else ""))
+                            for item in side["skill_outcome"]["negative_expectations"]:
+                                sections.append(f"- Negative expectation {'violated' if item['violated'] else 'not violated'}: {item['text']}" + (f" — {item['reason']}" if item["reason"] else ""))
+                        sections.extend(_attempt_narrative(case["attempts"], case["checks"], case["evidence"]))
+                    else:
+                        sections.extend(_agent_narrative(case))
+                    sections.extend(("", "**Captured answers and evidence — supporting details:**", "", _literal_json(case)))
+            sections.extend(("", "## Run details", "", _literal_json(model["run"])))
             text = "\n".join(sections) + "\n"
     else:
         if model["schema"] == EVAL_OUTPUT_SCHEMA_V2:
             text = _combined_html(model)
         else:
-            sections = [
-                f"<section><h2>Run {html.escape(model['run']['id'])}</h2>{_html_tree(model['run'])}"
-            ]
+            run = model["run"]
+            summary = run["summary"]
+            sections = [f"<section><h2>Run {html.escape(run['id'])}</h2><p>Created: {html.escape(run['created_at'])}</p><p>Family / mode: {html.escape(run['input']['family'])} / {html.escape(run['execution']['mode'])}</p><p>Status: {html.escape(summary['status'])} — {summary['pass']} pass, {summary['fail']} fail, {summary['non_evidence']} non-evidence ({summary['total']} jobs)</p>"]
             for case in model["cases"]:
                 heading = f"Case {case['id']} — {case['family']} iteration {case['iteration']}"
-                sections.append(
-                    f"<section><h3>{html.escape(heading)}</h3>{_html_tree(case)}</section>"
-                )
+                identity = case["family_result"].get("case_identity", {})
+                label = identity.get("display_name") or identity.get("source_id") or case["id"]
+                narrative = "<p>" + html.escape("; ".join(_agent_narrative(case))) + "</p>" if case["family"] == "agent-runtime" else f"<p>{html.escape(_skill_iteration_summary(case)[0])}</p>"
+                details = _html_tree(case)
+                sections.append(f"<section><h3>{html.escape(heading)} — {html.escape(label)}</h3>{narrative}<details><summary>Captured answers and evidence — iteration {case['iteration']}</summary>{details}</details></section>")
             sections.append("</section>")
             text = '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Evaluation run</title></head><body><main><h1>Evaluation run</h1><p>Schema: {}</p>{}</main></body></html>\n'.format(
                 html.escape(model["schema"]), "".join(sections)
