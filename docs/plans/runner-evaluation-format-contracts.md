@@ -25,6 +25,8 @@ The target is both input families through the existing public `eval` interface; 
 
 **Read-only delivery observations (2026-10-29):** GitHub run `40935434652` completed successfully for current HEAD `23a8a4fedb79f7b0633af911a5b9006dde64b4bd`; test job `Python checks` visibly collected 46 pytest cases and completed `46 passed in 2.77s`, including `tests/test_eval_input.py`, `tests/test_eval_assertions.py`, and `tests/test_eval_builtin_cli.py`. This satisfies hosted execution evidence for Task 1.2. `gh pr view 89` reports base `main` (`1262ac8c2eebbd10af572e3e3560318f6113233b`), merge state `BLOCKED`, `mergeable: MERGEABLE`, no review decision/reviews/requests, and both check runs successful. Branch-protection API returned HTTP 404 “Branch not protected.” The precise reason for GitHub's `BLOCKED` state remains unavailable from these observations; do not infer a blocker or claim ready. Task 1.1/final readiness remains unresolved pending GitHub's authoritative reason.
 
+After the documentation-only evidence commit was pushed, `gh pr view 89` reported PR head `82fc536794ab284bce939822a86502854d65d5b6`, still `BLOCKED` and `MERGEABLE`, with no review decision and no checks yet listed for that new head. The successful hosted checks above are for parent source HEAD `23a8a4f`; they do not constitute checks on the pushed documentation commit. No merge was performed.
+
 ## Plain-language task map
 
 > Reader aid only. Task details, acceptance criteria, and dependencies govern if this ever differs.
