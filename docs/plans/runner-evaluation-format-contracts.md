@@ -13,6 +13,8 @@ The target is both input families through the existing public `eval` interface; 
 
 **Status basis:** branch `feat/evaluation-format-contracts`, HEAD `1b729fac44c98646718886224e0b50766383a71b`, base `1262ac8c2eebbd10af572e3e3560318f6113233b`, PR #89. These identifiers were supplied in the review handoff and confirmed from this checkout; the worktree was clean when inspected. The accepted plan's old delivery snapshot predates the current review and is superseded below. Historical green tests, review opinions, and prior `/tmp` artifacts are not proof that the current HEAD satisfies these tasks.
 
+**Execution update (2026-10-29):** Tasks 1.2 and 2.1 have implementation and local verification commits on this branch (`660da87`, `0e04355`). The existing unittest suite and the three targeted pytest modules pass locally. Task 1.2 remains open until a hosted GitHub run visibly records the pytest modules; `gh pr checks 89` reported no checks on the branch at this observation. Task 2.1's local evidence-readiness and judge-gate criteria are verified; real OCI composition remains Task 3.2.
+
 ## Plain-language task map
 
 > Reader aid only. Task details, acceptance criteria, and dependencies govern if this ever differs.
@@ -181,10 +183,10 @@ Applicable skill: software-engineering, python-how-to, python-testing, test-driv
 Implements: [ARS-001](../architecture/eval-format-ownership/specifications/ars-001-runner-eval-contract.md) §117 and [ARD-001](../architecture/eval-format-ownership/design/ard-001-runner-owned-input-and-output-contracts.md)
 Acceptance criteria:
 
-- [ ] Evidence readiness for scalar outcome and start-sequence assertions checks the fields those assertions require, not unrelated envelope fields.
-- [ ] A complete canonical nonempty runtime capture supporting the requested assertions is accepted and reaches the ARS-001-prescribed judge gate; required-but-missing evidence remains non-evidence.
-- [ ] Tests distinguish evidence readiness from assertion outcome and cover the relevant evidence boundary/field failure cases without replacing real E2E evidence.
-- [ ] Existing classification precedence and “judge skipped on non-pass deterministic checks” behavior remain contract-conforming.
+- [x] Evidence readiness for scalar outcome and start-sequence assertions checks the fields those assertions require, not unrelated envelope fields.
+- [x] A complete canonical nonempty runtime capture supporting the requested assertions is accepted and reaches the ARS-001-prescribed judge gate; required-but-missing evidence remains non-evidence.
+- [x] Tests distinguish evidence readiness from assertion outcome and cover the relevant evidence boundary/field failure cases without replacing real E2E evidence.
+- [x] Existing classification precedence and “judge skipped on non-pass deterministic checks” behavior remain contract-conforming.
 
 #### Task 2.2: Align result projection and trap semantics to the closed contract [M] → owner: runner output maintainer
 
