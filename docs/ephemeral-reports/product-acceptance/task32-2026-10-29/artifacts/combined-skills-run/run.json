@@ -1,0 +1,136 @@
+{
+  "schema": "opencode-eval-runner/eval-run/v1",
+  "run_id": "f47f708d31cf42b489900c870838ea43",
+  "created_at": "2026-10-29T19:13:17.262Z",
+  "selection": {
+    "profile": "builtin:skill:skill-cases/v1",
+    "all": false,
+    "selectors": [
+      "sk1_DgBwAHkAdABoAG8AbgAtAHQAZQBzAHQAaQBuAGcBADE",
+      "sk1_FQBwAHkAdABoAG8AbgAtAGUAcgByAG8AcgAtAGgAYQBuAGQAbABpAG4AZwEAMQ"
+    ],
+    "cases": [
+      "sk1_DgBwAHkAdABoAG8AbgAtAHQAZQBzAHQAaQBuAGcBADE",
+      "sk1_FQBwAHkAdABoAG8AbgAtAGUAcgByAG8AcgAtAGgAYQBuAGQAbABpAG4AZwEAMQ"
+    ]
+  },
+  "iterations": 5,
+  "concurrency": {
+    "standard": 0,
+    "runtime": 2
+  },
+  "jobs": [
+    {
+      "case": "sk1_DgBwAHkAdABoAG8AbgAtAHQAZQBzAHQAaQBuAGcBADE",
+      "iteration": 1,
+      "label": "sk1_DgBwAHkAdABoAG8AbgAtAHQAZQBzAHQAaQBuAGcBADE#1",
+      "lane": "runtime",
+      "artifact": "pairs/case-sk1_DgBwAHkAdABoAG8AbgAtAHQAZQBzAHQAaQBuAGcBADE/iteration-1.json",
+      "status": "pass"
+    },
+    {
+      "case": "sk1_DgBwAHkAdABoAG8AbgAtAHQAZQBzAHQAaQBuAGcBADE",
+      "iteration": 2,
+      "label": "sk1_DgBwAHkAdABoAG8AbgAtAHQAZQBzAHQAaQBuAGcBADE#2",
+      "lane": "runtime",
+      "artifact": "pairs/case-sk1_DgBwAHkAdABoAG8AbgAtAHQAZQBzAHQAaQBuAGcBADE/iteration-2.json",
+      "status": "pass"
+    },
+    {
+      "case": "sk1_DgBwAHkAdABoAG8AbgAtAHQAZQBzAHQAaQBuAGcBADE",
+      "iteration": 3,
+      "label": "sk1_DgBwAHkAdABoAG8AbgAtAHQAZQBzAHQAaQBuAGcBADE#3",
+      "lane": "runtime",
+      "artifact": "pairs/case-sk1_DgBwAHkAdABoAG8AbgAtAHQAZQBzAHQAaQBuAGcBADE/iteration-3.json",
+      "status": "pass"
+    },
+    {
+      "case": "sk1_DgBwAHkAdABoAG8AbgAtAHQAZQBzAHQAaQBuAGcBADE",
+      "iteration": 4,
+      "label": "sk1_DgBwAHkAdABoAG8AbgAtAHQAZQBzAHQAaQBuAGcBADE#4",
+      "lane": "runtime",
+      "artifact": "pairs/case-sk1_DgBwAHkAdABoAG8AbgAtAHQAZQBzAHQAaQBuAGcBADE/iteration-4.json",
+      "status": "pass"
+    },
+    {
+      "case": "sk1_DgBwAHkAdABoAG8AbgAtAHQAZQBzAHQAaQBuAGcBADE",
+      "iteration": 5,
+      "label": "sk1_DgBwAHkAdABoAG8AbgAtAHQAZQBzAHQAaQBuAGcBADE#5",
+      "lane": "runtime",
+      "artifact": "pairs/case-sk1_DgBwAHkAdABoAG8AbgAtAHQAZQBzAHQAaQBuAGcBADE/iteration-5.json",
+      "status": "pass"
+    },
+    {
+      "case": "sk1_FQBwAHkAdABoAG8AbgAtAGUAcgByAG8AcgAtAGgAYQBuAGQAbABpAG4AZwEAMQ",
+      "iteration": 1,
+      "label": "sk1_FQBwAHkAdABoAG8AbgAtAGUAcgByAG8AcgAtAGgAYQBuAGQAbABpAG4AZwEAMQ#1",
+      "lane": "runtime",
+      "artifact": "pairs/case-sk1_FQBwAHkAdABoAG8AbgAtAGUAcgByAG8AcgAtAGgAYQBuAGQAbABpAG4AZwEAMQ/iteration-1.json",
+      "status": "pass"
+    },
+    {
+      "case": "sk1_FQBwAHkAdABoAG8AbgAtAGUAcgByAG8AcgAtAGgAYQBuAGQAbABpAG4AZwEAMQ",
+      "iteration": 2,
+      "label": "sk1_FQBwAHkAdABoAG8AbgAtAGUAcgByAG8AcgAtAGgAYQBuAGQAbABpAG4AZwEAMQ#2",
+      "lane": "runtime",
+      "artifact": "pairs/case-sk1_FQBwAHkAdABoAG8AbgAtAGUAcgByAG8AcgAtAGgAYQBuAGQAbABpAG4AZwEAMQ/iteration-2.json",
+      "status": "pass"
+    },
+    {
+      "case": "sk1_FQBwAHkAdABoAG8AbgAtAGUAcgByAG8AcgAtAGgAYQBuAGQAbABpAG4AZwEAMQ",
+      "iteration": 3,
+      "label": "sk1_FQBwAHkAdABoAG8AbgAtAGUAcgByAG8AcgAtAGgAYQBuAGQAbABpAG4AZwEAMQ#3",
+      "lane": "runtime",
+      "artifact": "pairs/case-sk1_FQBwAHkAdABoAG8AbgAtAGUAcgByAG8AcgAtAGgAYQBuAGQAbABpAG4AZwEAMQ/iteration-3.json",
+      "status": "pass"
+    },
+    {
+      "case": "sk1_FQBwAHkAdABoAG8AbgAtAGUAcgByAG8AcgAtAGgAYQBuAGQAbABpAG4AZwEAMQ",
+      "iteration": 4,
+      "label": "sk1_FQBwAHkAdABoAG8AbgAtAGUAcgByAG8AcgAtAGgAYQBuAGQAbABpAG4AZwEAMQ#4",
+      "lane": "runtime",
+      "artifact": "pairs/case-sk1_FQBwAHkAdABoAG8AbgAtAGUAcgByAG8AcgAtAGgAYQBuAGQAbABpAG4AZwEAMQ/iteration-4.json",
+      "status": "pass"
+    },
+    {
+      "case": "sk1_FQBwAHkAdABoAG8AbgAtAGUAcgByAG8AcgAtAGgAYQBuAGQAbABpAG4AZwEAMQ",
+      "iteration": 5,
+      "label": "sk1_FQBwAHkAdABoAG8AbgAtAGUAcgByAG8AcgAtAGgAYQBuAGQAbABpAG4AZwEAMQ#5",
+      "lane": "runtime",
+      "artifact": "pairs/case-sk1_FQBwAHkAdABoAG8AbgAtAGUAcgByAG8AcgAtAGgAYQBuAGQAbABpAG4AZwEAMQ/iteration-5.json",
+      "status": "pass"
+    }
+  ],
+  "summary": {
+    "status": "pass",
+    "pass": 10,
+    "fail": 0,
+    "non-evidence": 0,
+    "errors": 0,
+    "not_run": 0,
+    "total": 10
+  },
+  "project_metadata": {
+    "runner_eval_input": {
+      "schema": "opencode-eval-runner/eval-input-set/v2",
+      "family": "skill",
+      "contract": "skill-cases/v1",
+      "inputs": [
+        {
+          "ordinal": 1,
+          "path": "skills/python-testing/evals/evals.json",
+          "skill": "python-testing",
+          "contract": "skill-cases/v1",
+          "sha256": "cce5b2be8186cf7aae33fdc88ee682339246b8d56e64b08caa7fa096c63d7f4b"
+        },
+        {
+          "ordinal": 2,
+          "path": "skills/python-error-handling/evals/evals.json",
+          "skill": "python-error-handling",
+          "contract": "skill-cases/v1",
+          "sha256": "e834048256f8c142f92930e320ff90e682f5d01b310edfdb13c61526e4cee61b"
+        }
+      ]
+    }
+  }
+}

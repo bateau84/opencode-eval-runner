@@ -1,0 +1,194 @@
+[
+     {
+          "Id": "0940e9ac543098bfa51dda81cce643ed3366df1ab8a4e90bf5fcd8601c2e5e39",
+          "Digest": "sha256:fe2f159234c9a2e1c4d13638c65fa6d17c59df72d40325fd85cfa6502e09d29d",
+          "RepoTags": [
+               "localhost/eval-contract-opencode:guarded"
+          ],
+          "RepoDigests": [
+               "localhost/eval-contract-opencode@sha256:fe2f159234c9a2e1c4d13638c65fa6d17c59df72d40325fd85cfa6502e09d29d"
+          ],
+          "Parent": "f8f3b337ea5d04e6a45771bf84c256be5dec6182e9bdf93cd4ef1140a7f14061",
+          "Comment": "debuerreotype 0.17",
+          "Created": "2026-10-16T07:01:44.040561125Z",
+          "Config": {
+               "User": "1000:1000",
+               "Env": [
+                    "PATH=/usr/local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+                    "LANG=C.UTF-8",
+                    "GPG_KEY=7169605F62C751356D054A26A821E680E5FA6305",
+                    "PYTHON_VERSION=3.12.14",
+                    "PYTHON_SHA256=5c8462af5790baf43a321a1559dbe0db06d1be4300fb85fb53c40060668e548a",
+                    "HOME=/tmp/runtime/home",
+                    "XDG_CONFIG_HOME=/tmp/runtime/config",
+                    "XDG_DATA_HOME=/tmp/runtime/data",
+                    "XDG_CACHE_HOME=/tmp/runtime/cache",
+                    "XDG_STATE_HOME=/tmp/runtime/state",
+                    "OPENCODE_DB=opencode.db",
+                    "OPENCODE_DISABLE_AUTOUPDATE=1"
+               ],
+               "Entrypoint": [
+                    "python3",
+                    "/opt/opencode-eval-runner/container/invoke.py"
+               ],
+               "WorkingDir": "/workspace",
+               "Labels": {
+                    "io.buildah.version": "1.43.2",
+                    "io.opencode-eval-runner.invoke-adapter": "opencode-eval-runner/opencode-invoke/v1",
+                    "org.opencontainers.image.version": "2.0.23"
+               }
+          },
+          "Version": "",
+          "Author": "",
+          "Architecture": "amd64",
+          "Os": "linux",
+          "Size": 439912179,
+          "VirtualSize": 439912179,
+          "GraphDriver": {
+               "Name": "overlay",
+               "Data": {
+                    "LowerDir": "/home/n23790/.local/share/containers/storage/overlay/9307c985c14cf00c88e65d3370ab665fbbf973610bf1e61f8553307f91378566/diff:/home/n23790/.local/share/containers/storage/overlay/1fa7fd86cf2fec44d8e41d5cfe12db4bc924ff6645f888dd6144d6c4d41347d2/diff:/home/n23790/.local/share/containers/storage/overlay/9d38c98d3084e7de8a56dc5dee668fd1ce8c4174187951920aa11c9a2f0f3235/diff:/home/n23790/.local/share/containers/storage/overlay/7d92f3159b432ae9aad6ffd212d85b2b9a3e1d3fa5aa64aebe2705ebdd3f263b/diff:/home/n23790/.local/share/containers/storage/overlay/23d4837c839f6235dd80941f22c16e394e7b4687ebdc31be579b8bf224681668/diff:/home/n23790/.local/share/containers/storage/overlay/973e7d280c818c4e45b6fa2ba55c6f1f9f67eca210b0ae4c30ad76c11aa3e5cb/diff:/home/n23790/.local/share/containers/storage/overlay/34467cc93912af891dfee8a3902adf9b4f355a9bca4eaa46f658d1181a21de0d/diff",
+                    "UpperDir": "/home/n23790/.local/share/containers/storage/overlay/335a1c0ba36b31201e02dda4d568dcd5351df35bd73611cf43846ba5abe01726/diff",
+                    "WorkDir": "/home/n23790/.local/share/containers/storage/overlay/335a1c0ba36b31201e02dda4d568dcd5351df35bd73611cf43846ba5abe01726/work"
+               }
+          },
+          "RootFS": {
+               "Type": "layers",
+               "Layers": [
+                    "sha256:34467cc93912af891dfee8a3902adf9b4f355a9bca4eaa46f658d1181a21de0d",
+                    "sha256:16df0073c13c96653ee2b601b16e514321513eb4af983de156c2d4e17df8a5d9",
+                    "sha256:9639007baab8a136bc468bd5d757fdf79cf5d77b6ff2a87889071252e334fab3",
+                    "sha256:abca6d63c9dbe51fa3bc42e75e0387da12803ef64430ad151814e468d5e1c203",
+                    "sha256:27a52ff5ba5085cd8c5798dd37e556c9457612b8e4eb3d31d0818023d6cdfd80",
+                    "sha256:36974375875a7b8b6111f482df9610aa5b561a736ed902a9ea9b628357a8bb85",
+                    "sha256:a1a17f004be7ddc0078a19a65bc65a994d2717bf41cca2c123967fa37ec804eb",
+                    "sha256:36068dc439de555a948641afefc4dd6161958cb48e96c30ae3f2de0af0ea1ddf"
+               ]
+          },
+          "Labels": {
+               "io.buildah.version": "1.43.2",
+               "io.opencode-eval-runner.invoke-adapter": "opencode-eval-runner/opencode-invoke/v1",
+               "org.opencontainers.image.version": "2.0.23"
+          },
+          "Annotations": {
+               "com.docker.official-images.bashbrew.arch": "amd64",
+               "org.opencontainers.image.base.digest": "sha256:1aaa65a85fda306ffb8b910824d4e93bdce61e212c7e87168123ea3073b41a1a",
+               "org.opencontainers.image.base.name": "docker.io/library/python@sha256:392307d22300de8b5986851a12d9176dfc0fc073e65bf6523ebd7dcbeb23564e",
+               "org.opencontainers.image.created": "2026-10-16T07:01:44.040561125Z",
+               "org.opencontainers.image.revision": "688a0b86bb44289df16a363e9f41d90514c1a5f9",
+               "org.opencontainers.image.source": "https://github.com/docker-library/python.git#688a0b86bb44289df16a363e9f41d90514c1a5f9:3.12/slim-bookworm",
+               "org.opencontainers.image.url": "https://hub.docker.com/_/python",
+               "org.opencontainers.image.version": "3.12.14-slim-bookworm"
+          },
+          "ManifestType": "application/vnd.oci.image.manifest.v1+json",
+          "User": "1000:1000",
+          "History": [
+               {
+                    "created": "2026-09-18T00:00:00Z",
+                    "created_by": "# debian.sh --arch 'amd64' out/ 'bookworm' '@1789689600'",
+                    "comment": "debuerreotype 0.17"
+               },
+               {
+                    "created": "2026-09-19T00:58:59.748969049Z",
+                    "created_by": "ENV PATH=/usr/local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+                    "comment": "buildkit.dockerfile.v0",
+                    "empty_layer": true
+               },
+               {
+                    "created": "2026-09-19T00:58:59.748969049Z",
+                    "created_by": "ENV LANG=C.UTF-8",
+                    "comment": "buildkit.dockerfile.v0",
+                    "empty_layer": true
+               },
+               {
+                    "created": "2026-09-19T00:58:59.748969049Z",
+                    "created_by": "RUN /bin/sh -c set -eux; \tapt-get update; \tapt-get install -y --no-install-recommends \t\tca-certificates \t\tnetbase \t\ttzdata \t; \trm -rf /var/lib/apt/lists/* # buildkit",
+                    "comment": "buildkit.dockerfile.v0"
+               },
+               {
+                    "created": "2026-09-19T00:58:59.748969049Z",
+                    "created_by": "ENV GPG_KEY=7169605F62C751356D054A26A821E680E5FA6305",
+                    "comment": "buildkit.dockerfile.v0",
+                    "empty_layer": true
+               },
+               {
+                    "created": "2026-09-19T00:58:59.748969049Z",
+                    "created_by": "ENV PYTHON_VERSION=3.12.14",
+                    "comment": "buildkit.dockerfile.v0",
+                    "empty_layer": true
+               },
+               {
+                    "created": "2026-09-19T00:58:59.748969049Z",
+                    "created_by": "ENV PYTHON_SHA256=5c8462af5790baf43a321a1559dbe0db06d1be4300fb85fb53c40060668e548a",
+                    "comment": "buildkit.dockerfile.v0",
+                    "empty_layer": true
+               },
+               {
+                    "created": "2026-09-19T01:08:17.689943577Z",
+                    "created_by": "RUN /bin/sh -c set -eux; \t\tsavedAptMark=\"$(apt-mark showmanual)\"; \tapt-get update; \tapt-get install -y --no-install-recommends \t\tdpkg-dev \t\tg++ \t\tgcc \t\tgnupg \t\tlibbluetooth-dev \t\tlibbz2-dev \t\tlibc6-dev \t\tlibdb-dev \t\tlibffi-dev \t\tlibgdbm-dev \t\tliblzma-dev \t\tlibncursesw5-dev \t\tlibreadline-dev \t\tlibsqlite3-dev \t\tlibssl-dev \t\tmake \t\ttk-dev \t\tuuid-dev \t\twget \t\txz-utils \t\tzlib1g-dev \t; \t\twget -O python.tar.xz \"https://www.python.org/ftp/python/${PYTHON_VERSION%%[a-z]*}/Python-$PYTHON_VERSION.tar.xz\"; \techo \"$PYTHON_SHA256 *python.tar.xz\" | sha256sum -c -; \twget -O python.tar.xz.asc \"https://www.python.org/ftp/python/${PYTHON_VERSION%%[a-z]*}/Python-$PYTHON_VERSION.tar.xz.asc\"; \tGNUPGHOME=\"$(mktemp -d)\"; export GNUPGHOME; \tgpg --batch --keyserver hkps://keys.openpgp.org --recv-keys \"$GPG_KEY\"; \tgpg --batch --verify python.tar.xz.asc python.tar.xz; \tgpgconf --kill all; \trm -rf \"$GNUPGHOME\" python.tar.xz.asc; \tmkdir -p /usr/src/python; \ttar --extract --directory /usr/src/python --strip-components=1 --file python.tar.xz; \trm python.tar.xz; \t\tcd /usr/src/python; \tgnuArch=\"$(dpkg-architecture --query DEB_BUILD_GNU_TYPE)\"; \t./configure \t\t--build=\"$gnuArch\" \t\t--enable-loadable-sqlite-extensions \t\t--enable-optimizations \t\t--enable-option-checking=fatal \t\t--enable-shared \t\t$(test \"${gnuArch%%-*}\" != 'riscv64' && echo '--with-lto') \t\t--with-ensurepip \t; \tnproc=\"$(nproc)\"; \tEXTRA_CFLAGS=\"$(dpkg-buildflags --get CFLAGS)\"; \tLDFLAGS=\"$(dpkg-buildflags --get LDFLAGS)\"; \tLDFLAGS=\"${LDFLAGS:-} -Wl,--strip-all\"; \tarch=\"$(dpkg --print-architecture)\"; arch=\"${arch##*-}\"; \tcase \"$arch\" in \t\tamd64|arm64) \t\t\tEXTRA_CFLAGS=\"${EXTRA_CFLAGS:-} -fno-omit-frame-pointer -mno-omit-leaf-frame-pointer\"; \t\t\t;; \t\ti386) \t\t\t;; \t\t*) \t\t\tEXTRA_CFLAGS=\"${EXTRA_CFLAGS:-} -fno-omit-frame-pointer\"; \t\t\t;; \tesac; \tmake -j \"$nproc\" \t\t\"EXTRA_CFLAGS=${EXTRA_CFLAGS:-}\" \t\t\"LDFLAGS=${LDFLAGS:-}\" \t; \trm python; \tmake -j \"$nproc\" \t\t\"EXTRA_CFLAGS=${EXTRA_CFLAGS:-}\" \t\t\"LDFLAGS=${LDFLAGS:-} -Wl,-rpath='\\$\\$ORIGIN/../lib'\" \t\tpython \t; \tmake install; \t\tcd /; \trm -rf /usr/src/python; \t\tfind /usr/local -depth \t\t\\( \t\t\t\\( -type d -a \\( -name test -o -name tests -o -name idle_test \\) \\) \t\t\t-o \\( -type f -a \\( -name '*.pyc' -o -name '*.pyo' -o -name 'libpython*.a' \\) \\) \t\t\\) -exec rm -rf '{}' + \t; \t\tldconfig; \t\tapt-mark auto '.*' > /dev/null; \tapt-mark manual $savedAptMark; \tfind /usr/local -type f -executable -not \\( -name '*tkinter*' \\) -exec ldd '{}' ';' \t\t| awk '/=>/ { so = $(NF-1); if (index(so, \"/usr/local/\") == 1) { next }; gsub(\"^/(usr/)?\", \"\", so); printf \"*%s\\n\", so }' \t\t| sort -u \t\t| xargs -rt dpkg-query --search \t\t| awk 'sub(\":$\", \"\", $1) { print $1 }' \t\t| sort -u \t\t| xargs -r apt-mark manual \t; \tapt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false; \trm -rf /var/lib/apt/lists/*; \t\texport PYTHONDONTWRITEBYTECODE=1; \tpython3 --version; \tpip3 --version # buildkit",
+                    "comment": "buildkit.dockerfile.v0"
+               },
+               {
+                    "created": "2026-09-19T01:08:17.794790714Z",
+                    "created_by": "RUN /bin/sh -c set -eux; \tfor src in idle3 pip3 pydoc3 python3 python3-config; do \t\tdst=\"$(echo \"$src\" | tr -d 3)\"; \t\t[ -s \"/usr/local/bin/$src\" ]; \t\t[ ! -e \"/usr/local/bin/$dst\" ]; \t\tln -svT \"$src\" \"/usr/local/bin/$dst\"; \tdone # buildkit",
+                    "comment": "buildkit.dockerfile.v0"
+               },
+               {
+                    "created": "2026-09-19T01:08:17.794790714Z",
+                    "created_by": "CMD [\"python3\"]",
+                    "comment": "buildkit.dockerfile.v0",
+                    "empty_layer": true
+               },
+               {
+                    "created": "2026-10-16T05:39:55.757459232Z",
+                    "created_by": "/bin/sh -c apt-get update     && apt-get install -y --no-install-recommends ca-certificates git     && rm -rf /var/lib/apt/lists/*     && groupadd --gid 1000 evalrunner     && useradd --uid 1000 --gid 1000 --no-create-home --home-dir /tmp/runtime/home --shell /usr/sbin/nologin evalrunner     && mkdir -p /seed /input /output /workspace",
+                    "comment": "FROM docker.io/library/python@sha256:392307d22300de8b5986851a12d9176dfc0fc073e65bf6523ebd7dcbeb23564e"
+               },
+               {
+                    "created": "2026-10-16T05:39:56.555438363Z",
+                    "created_by": "/bin/sh -c #(nop) ENV HOME=/tmp/runtime/home     XDG_CONFIG_HOME=/tmp/runtime/config     XDG_DATA_HOME=/tmp/runtime/data     XDG_CACHE_HOME=/tmp/runtime/cache     XDG_STATE_HOME=/tmp/runtime/state     OPENCODE_DB=opencode.db     OPENCODE_DISABLE_AUTOUPDATE=1",
+                    "empty_layer": true
+               },
+               {
+                    "created": "2026-10-16T05:39:56.757434528Z",
+                    "created_by": "/bin/sh -c #(nop) COPY dir:5befdc60a351c49ebcd534bb7fc7bf24c661d931e46d3def3d29e51905a4a7d3 in /opt/opencode-eval-runner/container      "
+               },
+               {
+                    "created": "2026-10-16T05:39:56.919429614Z",
+                    "created_by": "/bin/sh -c #(nop) WORKDIR /workspace",
+                    "empty_layer": true
+               },
+               {
+                    "created": "2026-10-16T05:39:57.005208313Z",
+                    "created_by": "/bin/sh -c #(nop) ENTRYPOINT [\"python3\", \"/opt/opencode-eval-runner/container/invoke.py\"]",
+                    "empty_layer": true
+               },
+               {
+                    "created": "2026-10-16T05:39:57.087787621Z",
+                    "created_by": "/bin/sh -c #(nop) USER 1000:1000",
+                    "empty_layer": true
+               },
+               {
+                    "created": "2026-10-16T07:01:41.603234201Z",
+                    "created_by": "/bin/sh -c #(nop) ARG OPENCODE_VERSION",
+                    "empty_layer": true
+               },
+               {
+                    "created": "2026-10-16T07:01:41.737290326Z",
+                    "created_by": "/bin/sh -c #(nop) LABEL org.opencontainers.image.version=\"${OPENCODE_VERSION}\"       io.opencode-eval-runner.invoke-adapter=\"opencode-eval-runner/opencode-invoke/v1\"",
+                    "empty_layer": true
+               },
+               {
+                    "created": "2026-10-16T07:01:42.714613879Z",
+                    "created_by": "/bin/sh -c #(nop) COPY file:60b64c70e868e5c81a3adfab010a3378c3f9c2463490092b1a35572cabc0ef8f in /usr/local/bin/opencode      "
+               },
+               {
+                    "created": "2026-10-16T07:01:44.07960796Z",
+                    "created_by": "|1 OPENCODE_VERSION=2.0.23 /bin/sh -c opencode --version"
+               }
+          ],
+          "NamesHistory": [
+               "localhost/eval-contract-opencode:guarded"
+          ]
+     }
+]

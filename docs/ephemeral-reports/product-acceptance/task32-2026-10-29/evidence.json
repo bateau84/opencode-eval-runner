@@ -1,0 +1,225 @@
+{
+  "assertions": [
+    "agent: persisted run completed and all 1 jobs passed",
+    "agent: separately requested JSON and YAML parse to identical values from verified run",
+    "skill: persisted run completed and all 10 jobs passed",
+    "skill: separately requested JSON and YAML parse to identical values from verified run",
+    "skill: two distinct skills each expose iterations 1\u20135 in the actual Markdown report",
+    "skill: each family renderer embeds the completed run ID",
+    "provider: requests were logged only for /v1/chat/completions and no request bodies/prompts are logged"
+  ],
+  "cleanup": {
+    "images_removed": false,
+    "network_removed": true,
+    "post_cleanup_inspection": "fixtures/network-after-cleanup.txt",
+    "preexisting_networks_modified": false,
+    "provider_container_removed": true
+  },
+  "commands": {
+    "agent": "eval --input agent-runtime-input.json --family agent-runtime --cases fixture-case --target-model fixture/mock --engine podman --network task32-recovery-1793300807 --timeout-seconds 90 --container-timeout 150",
+    "render": "eval --render-run <same completed run> --format <json|yaml|markdown|html> --output <distinct path>",
+    "skill": "eval --input skills/python-testing/evals/evals.json --skill python-testing --input skills/python-error-handling/evals/evals.json --skill python-error-handling --family skill --ablation --cases <canonical case 1 IDs> --iterations 5 --runtime-parallel 2 --target-model fixture/mock --engine podman --network task32-recovery-1793300807 --timeout-seconds 90 --container-timeout 150"
+  },
+  "database_seed": null,
+  "network_id": "8282fe66961e9a99eeae298dad5d3148156a85e68e25ee6602911ee07dea4882",
+  "network_internal": true,
+  "network_name": "task32-recovery-1793300807",
+  "opencode_image_id": "sha256:0940e9ac543098bfa51dda81cce643ed3366df1ab8a4e90bf5fcd8601c2e5e39",
+  "opencode_version": "2.0.23",
+  "provider_container_id": "eb2569ff6c5bf6ba7f3b5ff05dd69b30712018f573ad06eae1a238bc22078fb9",
+  "provider_image_id": "sha256:febd0be41adb897a0ab8f1f1c693d8912669ea60c4940e076e9946b60e210ef0",
+  "provider_request_capture": {
+    "all_paths": "/v1/chat/completions",
+    "logged_fields": [
+      "timestamp",
+      "path",
+      "model",
+      "tool names"
+    ],
+    "path": "fixtures/provider-requests.log",
+    "request_bodies_logged": false,
+    "request_count": 50,
+    "scope": "combined-skill run only, captured from its recorded start time"
+  },
+  "provider_requests_logged": 50,
+  "renderings": {
+    "agent": {
+      "html": {
+        "bytes": 37863,
+        "path": "renders/agent.html",
+        "sha256": "bb4010d837590d694c922dd03bb95544b63c511f786c2ca61270e863457953a7"
+      },
+      "json": {
+        "bytes": 23898,
+        "path": "renders/agent.json",
+        "sha256": "22dbcb20b25620d45cb0711b26b1c66b8e8b87b41b9f8323128a5b3821d25c08"
+      },
+      "markdown": {
+        "bytes": 30295,
+        "path": "renders/agent.markdown",
+        "sha256": "1ff3ffbb0d20f90eac5e99eb4ffadfbe0833441ad307b9544274b3025401e4a9"
+      },
+      "yaml": {
+        "bytes": 20238,
+        "path": "renders/agent.yaml",
+        "sha256": "221ab33c0639abf5d9cd2b7e70ef5dec8cc41e5cbd8bd561ba1f85143866972f"
+      }
+    },
+    "skill": {
+      "html": {
+        "bytes": 2333116,
+        "path": "renders/skill.html",
+        "sha256": "5312cc365facfde5f8c63b07a25fd1ebfb766873a9bd0ba4fcee5f3ee5cb1e88"
+      },
+      "json": {
+        "bytes": 1748044,
+        "path": "renders/skill.json",
+        "sha256": "f779900972eb0f098d15b6da2f54ccfdf41820312bd9e12dbac6b5c8dbb3627d"
+      },
+      "markdown": {
+        "bytes": 2126647,
+        "path": "renders/skill.markdown",
+        "sha256": "259641e6c2ad300c61f72964926b7b2caef944753782ad0db6793b02f755cfb1"
+      },
+      "yaml": {
+        "bytes": 1577822,
+        "path": "renders/skill.yaml",
+        "sha256": "b6a24ade4310baeb68aae318a306b40f2ff2ad334c9db8f0820ead4b03d5b66f"
+      }
+    }
+  },
+  "runs": {
+    "agent": {
+      "artifacts": [
+        {
+          "bytes": 46,
+          "path": "artifacts/agent-runtime-run/.eval-run-owner.json",
+          "sha256": "c6d978a6f36b0f61140386365b9cc089bf82698a2f010fb04f0b64cb5a9469ba"
+        },
+        {
+          "bytes": 17794,
+          "path": "artifacts/agent-runtime-run/jobs/case-fixture-case/iteration-1.json",
+          "sha256": "420cf81164b13478ef4322abe62e9e49c4f5e0e529ab3b42ee2fe51e361bf9af"
+        },
+        {
+          "bytes": 991,
+          "path": "artifacts/agent-runtime-run/run.json",
+          "sha256": "25506f486a55fdc22238d7a7bb5d359c3ed10e237bf16ec5c505c3a1f90d77db"
+        }
+      ],
+      "run_id": "eded2c961df84df3be3fdd9d1b33dedb",
+      "run_json": "artifacts/agent-runtime-run/run.json",
+      "run_json_sha256": "25506f486a55fdc22238d7a7bb5d359c3ed10e237bf16ec5c505c3a1f90d77db",
+      "status": "pass",
+      "summary": {
+        "errors": 0,
+        "fail": 0,
+        "non-evidence": 0,
+        "not_run": 0,
+        "pass": 1,
+        "status": "pass",
+        "total": 1
+      }
+    },
+    "skill": {
+      "artifacts": [
+        {
+          "bytes": 46,
+          "path": "artifacts/combined-skills-run/.eval-run-owner.json",
+          "sha256": "c9802d8814062987ac1eff8a7fea528b07e361bb1aedf6483074328d9de33d0d"
+        },
+        {
+          "bytes": 167184,
+          "path": "artifacts/combined-skills-run/pairs/case-sk1_DgBwAHkAdABoAG8AbgAtAHQAZQBzAHQAaQBuAGcBADE/iteration-1.json",
+          "sha256": "805ede7041835ed101ce92a83603a39fb9a720fda8a56250bf1d92c6adea3d5c"
+        },
+        {
+          "bytes": 167175,
+          "path": "artifacts/combined-skills-run/pairs/case-sk1_DgBwAHkAdABoAG8AbgAtAHQAZQBzAHQAaQBuAGcBADE/iteration-2.json",
+          "sha256": "7c86c798e92a99e231bfd99b1807d49b29ac11e077b5ef91012b09c3b4fac2aa"
+        },
+        {
+          "bytes": 167185,
+          "path": "artifacts/combined-skills-run/pairs/case-sk1_DgBwAHkAdABoAG8AbgAtAHQAZQBzAHQAaQBuAGcBADE/iteration-3.json",
+          "sha256": "3349fc4ab26e64c588f89e99b8a6b0eb085b8198797979b9e75bf189e44c7ddc"
+        },
+        {
+          "bytes": 167176,
+          "path": "artifacts/combined-skills-run/pairs/case-sk1_DgBwAHkAdABoAG8AbgAtAHQAZQBzAHQAaQBuAGcBADE/iteration-4.json",
+          "sha256": "a756659667dc47b7a623b18fc77f59f134d878d6578fb74261b78f940c408162"
+        },
+        {
+          "bytes": 167180,
+          "path": "artifacts/combined-skills-run/pairs/case-sk1_DgBwAHkAdABoAG8AbgAtAHQAZQBzAHQAaQBuAGcBADE/iteration-5.json",
+          "sha256": "e65d83e528e0f3b725d90ea4ffcec7567860ba1d580520510806df167c94cf30"
+        },
+        {
+          "bytes": 163957,
+          "path": "artifacts/combined-skills-run/pairs/case-sk1_FQBwAHkAdABoAG8AbgAtAGUAcgByAG8AcgAtAGgAYQBuAGQAbABpAG4AZwEAMQ/iteration-1.json",
+          "sha256": "98bde97ff027bbb562ca19ec1c7aaaf9fd593308ce4f6c1f0f5f87733057d4d7"
+        },
+        {
+          "bytes": 163963,
+          "path": "artifacts/combined-skills-run/pairs/case-sk1_FQBwAHkAdABoAG8AbgAtAGUAcgByAG8AcgAtAGgAYQBuAGQAbABpAG4AZwEAMQ/iteration-2.json",
+          "sha256": "8352c6e9c122db2a669b81b4a9d0423bf7b5f9f08422b6529c7f71d6e29f70cd"
+        },
+        {
+          "bytes": 163961,
+          "path": "artifacts/combined-skills-run/pairs/case-sk1_FQBwAHkAdABoAG8AbgAtAGUAcgByAG8AcgAtAGgAYQBuAGQAbABpAG4AZwEAMQ/iteration-3.json",
+          "sha256": "c8c404bf3f6215144c70db137cddca2c5c7bfac1c43e4c04763748f0ae5cc048"
+        },
+        {
+          "bytes": 163955,
+          "path": "artifacts/combined-skills-run/pairs/case-sk1_FQBwAHkAdABoAG8AbgAtAGUAcgByAG8AcgAtAGgAYQBuAGQAbABpAG4AZwEAMQ/iteration-4.json",
+          "sha256": "07ac6b1acc133a5392895c948580edcf8b11a68942edeb4b6e70788750066605"
+        },
+        {
+          "bytes": 163967,
+          "path": "artifacts/combined-skills-run/pairs/case-sk1_FQBwAHkAdABoAG8AbgAtAGUAcgByAG8AcgAtAGgAYQBuAGQAbABpAG4AZwEAMQ/iteration-5.json",
+          "sha256": "6bad4d5cfec59ea14399b855aac0bdd34b7dc4c4685f831e40f1d92f0c0ac6e7"
+        },
+        {
+          "bytes": 4956,
+          "path": "artifacts/combined-skills-run/run.json",
+          "sha256": "279d3be226765e19a486af8c3e26e22c26fa531208d95119c6fe7b6f071d3f5b"
+        }
+      ],
+      "run_id": "f47f708d31cf42b489900c870838ea43",
+      "run_json": "artifacts/combined-skills-run/run.json",
+      "run_json_sha256": "279d3be226765e19a486af8c3e26e22c26fa531208d95119c6fe7b6f071d3f5b",
+      "status": "pass",
+      "summary": {
+        "errors": 0,
+        "fail": 0,
+        "non-evidence": 0,
+        "not_run": 0,
+        "pass": 10,
+        "status": "pass",
+        "total": 10
+      }
+    }
+  },
+  "source_head": "636f637613a19120f8f533eff50127326bb95dff",
+  "source_inputs": {
+    "agent-runtime": {
+      "bytes": 476,
+      "sha256": "44474c7d95cfa3e186ebc0f82354f87eeb73f4020996a85290f6fd1ad0302ddc"
+    },
+    "python-error-handling": {
+      "bytes": 2696,
+      "sha256": "e834048256f8c142f92930e320ff90e682f5d01b310edfdb13c61526e4cee61b"
+    },
+    "python-error-handling-skill": {
+      "bytes": 7696,
+      "sha256": "86d041ab6b9a8cc17edd2e74768eaf35c96d704361b1a31e254f09389b1e293b"
+    },
+    "python-testing": {
+      "bytes": 2741,
+      "sha256": "cce5b2be8186cf7aae33fdc88ee682339246b8d56e64b08caa7fa096c63d7f4b"
+    },
+    "python-testing-skill": {
+      "bytes": 8286,
+      "sha256": "d8ed62c2905caa4d2e3b021f8069328ea4d1dab014131d5c26a15db471e8f469"
+    }
+  }
+}

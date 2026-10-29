@@ -1,0 +1,46 @@
+{
+  "schema": "opencode-eval-runner/eval-run/v1",
+  "run_id": "eded2c961df84df3be3fdd9d1b33dedb",
+  "created_at": "2026-10-29T19:10:40.350Z",
+  "selection": {
+    "profile": "builtin:agent-runtime:agent-runtime/v1",
+    "all": false,
+    "selectors": [
+      "fixture-case"
+    ],
+    "cases": [
+      "fixture-case"
+    ]
+  },
+  "iterations": 1,
+  "concurrency": {
+    "standard": 1,
+    "runtime": 0
+  },
+  "jobs": [
+    {
+      "case": "fixture-case",
+      "iteration": 1,
+      "label": "fixture-case",
+      "lane": "standard",
+      "artifact": "jobs/case-fixture-case/iteration-1.json",
+      "status": "pass"
+    }
+  ],
+  "summary": {
+    "status": "pass",
+    "pass": 1,
+    "fail": 0,
+    "non-evidence": 0,
+    "errors": 0,
+    "not_run": 0,
+    "total": 1
+  },
+  "project_metadata": {
+    "runner_eval_input": {
+      "family": "agent-runtime",
+      "contract": "agent-runtime/v1",
+      "sha256": "44474c7d95cfa3e186ebc0f82354f87eeb73f4020996a85290f6fd1ad0302ddc"
+    }
+  }
+}

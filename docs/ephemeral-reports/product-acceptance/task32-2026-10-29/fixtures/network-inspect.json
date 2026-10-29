@@ -1,0 +1,37 @@
+[
+     {
+          "name": "task32-recovery-1793300807",
+          "id": "8282fe66961e9a99eeae298dad5d3148156a85e68e25ee6602911ee07dea4882",
+          "driver": "bridge",
+          "network_interface": "podman1",
+          "created": "2026-10-29T20:06:47.09480203+01:00",
+          "subnets": [
+               {
+                    "subnet": "10.89.0.0/24",
+                    "gateway": "10.89.0.1"
+               }
+          ],
+          "ipv6_enabled": false,
+          "internal": true,
+          "dns_enabled": true,
+          "ipam_options": {
+               "driver": "host-local"
+          },
+          "containers": {
+               "eb2569ff6c5bf6ba7f3b5ff05dd69b30712018f573ad06eae1a238bc22078fb9": {
+                    "name": "task32-provider",
+                    "interfaces": {
+                         "eth0": {
+                              "subnets": [
+                                   {
+                                        "ipnet": "10.89.0.16/24",
+                                        "gateway": "10.89.0.1"
+                                   }
+                              ],
+                              "mac_address": "0e:95:8c:36:4f:95"
+                         }
+                    }
+               }
+          }
+     }
+]
