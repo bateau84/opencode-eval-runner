@@ -354,7 +354,7 @@
     "read"
   ],
   "renderer_refresh": {
-    "source_revision": "renderer correction working tree; see plan and implementation commit",
+    "source_revision": "bddccfa (fix(eval): correct readable report summaries)",
     "reason": "PR89 Task 3.3 F1-F4 renderer corrections",
     "run_artifact_unchanged": true,
     "evaluation_rerun": false,
