@@ -16,6 +16,12 @@ from container.evidence_safety import (
     _json_source_credentials,
 )
 from container.runtime_evidence import RuntimeEvidenceError, validate_runtime_evidence
+from runner.oci_image import (
+    ImageSelectionError,
+    local_engine_prefix_and_environment,
+    validate_immutable_image_identity,
+    verify_local_opencode_image,
+)
 
 DEFAULT_IMAGES = {
     "opencode": "ghcr.io/bateau84/opencode-eval-runner:opencode-edge",
@@ -241,18 +247,36 @@ def build_container_command(
         raise RunnerError("--skill is only supported by the opencode transport")
     if expected_plugin and args.transport != "opencode":
         raise RunnerError("--expected-plugin is only supported by the opencode transport")
+    require_local_opencode_image = getattr(args, "require_local_opencode_image", False)
+    if require_local_opencode_image:
+        if args.transport != "opencode":
+            raise RunnerError("built-in eval requires a compatible local OpenCode image")
+        image = host_env.get("OPENCODE_EVAL_RUNNER_OPENCODE_IMAGE")
+        try:
+            validate_immutable_image_identity(image)
+        except ImageSelectionError as exc:
+            raise RunnerError(str(exc)) from exc
+        if image != args.image:
+            raise RunnerError("built-in eval image selection changed after preflight")
     engine = resolve_engine(args.engine)
     transport_env = (
         "OPENCODE_EVAL_RUNNER_OPENCODE_IMAGE"
         if args.transport == "opencode"
         else "OPENCODE_EVAL_RUNNER_COPILOT_IMAGE"
     )
-    image = (
-        args.image
-        or host_env.get(transport_env)
-        or host_env.get("OPENCODE_EVAL_RUNNER_IMAGE")
-        or DEFAULT_IMAGES[args.transport]
-    )
+    if not require_local_opencode_image:
+        image = (
+            args.image
+            or host_env.get(transport_env)
+            or host_env.get("OPENCODE_EVAL_RUNNER_IMAGE")
+            or DEFAULT_IMAGES[args.transport]
+        )
+        engine_prefix = [engine]
+    else:
+        try:
+            engine_prefix, _ = verify_local_opencode_image(engine, image, host_env)
+        except ImageSelectionError as exc:
+            raise RunnerError(str(exc)) from exc
     workspace = Path(args.workspace).resolve()
     if not workspace.is_dir():
         raise RunnerError(f"workspace not found: {workspace}")
@@ -260,8 +284,7 @@ def build_container_command(
     result_host = Path(args.output).resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    command = [
-        engine,
+    command = engine_prefix + [
         "run",
         "--rm",
         "--read-only",
@@ -272,6 +295,8 @@ def build_container_command(
         "--security-opt",
         "no-new-privileges",
     ]
+    if require_local_opencode_image:
+        command += ["--pull=never"]
     network = getattr(args, "network", None)
     if network:
         command += ["--network", network]
@@ -392,9 +417,17 @@ def invoke(args: argparse.Namespace) -> int:
             host_env=host_env,
             database_seed=database_seed,
         )
+        command_environment = host_env
+        if getattr(args, "require_local_opencode_image", False):
+            try:
+                _, command_environment = local_engine_prefix_and_environment(
+                    command[0], host_env
+                )
+            except ImageSelectionError as exc:
+                raise RunnerError(str(exc)) from exc
         proc = subprocess.run(
             command,
-            env=host_env,
+            env=command_environment,
             text=True,
             capture_output=True,
             timeout=args.container_timeout,

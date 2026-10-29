@@ -1,0 +1,43 @@
+{
+  "skill_name": "python-testing",
+  "evals": [
+    {
+      "id": 1,
+      "name": "asyncmock-for-awaitable",
+      "prompt": "Write a pytest test for this function. `client.get_playlist` is an async method. The test should make it raise TimeoutError and assert that `sync_one` returns 'skipped'.\n\n```python\nasync def sync_one(client, pid):\n    try:\n        await client.get_playlist(pid)\n    except TimeoutError:\n        return 'skipped'\n    return 'ok'\n```",
+      "trap": "Patching `get_playlist` with a plain `Mock()` returns a non-awaitable value, so `await` fails with a TypeError unrelated to the test intent. Awaitables need AsyncMock (or an async function).",
+      "expectations": [
+        "Uses AsyncMock (or an async function), not a plain Mock, for the awaited method",
+        "The test function is async (relies on asyncio_mode/marker)",
+        "Configures the mock to raise TimeoutError (e.g. side_effect)",
+        "Asserts the return value equals 'skipped'",
+        "Does NOT use a synchronous Mock() for the awaited call"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "per-test-db-isolation",
+      "prompt": "Add a pytest fixture that provides a migrated Repository backed by SQLite, for a suite that runs in parallel with `pytest -n auto`. Tests must not interfere with one another.",
+      "trap": "A session- or module-scoped fixture sharing one DB file is the efficient-looking choice, but it leaks state between tests and throws 'database is locked' under parallel workers. Each test needs its own DB via tmp_path at function scope.",
+      "expectations": [
+        "Gives each test its own database via tmp_path (function scope)",
+        "Does NOT use a shared session/module-scoped mutable file DB",
+        "Runs migrations on the fresh DB inside the fixture",
+        "Uses yield for teardown (closes the connection)",
+        "Notes a shared file DB risks state leakage / 'database is locked' under parallel workers"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "parametrize-over-loop",
+      "prompt": "Write tests covering these matcher cases, each reported as an independent result: ('Song (Live)','Song')→True, ('Song','Other')→False, ('A','a')→True. The function under test is `is_match(a, b) -> bool`.",
+      "trap": "A single test looping over the cases stops at the first failure and reports only one case. parametrize runs and names each case independently.",
+      "expectations": [
+        "Uses @pytest.mark.parametrize rather than a loop over cases in one test",
+        "Each case runs as an independent parametrized invocation",
+        "Provides ids or otherwise identifies each case",
+        "Does NOT assert inside a for-loop over the cases"
+      ]
+    }
+  ]
+}

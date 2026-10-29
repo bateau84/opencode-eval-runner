@@ -1,0 +1,999 @@
+# Evaluation run
+
+## Run dd23dedc71614b6082fcbb1cc2038c6b
+
+- **Created:** 2026-10-29T19:36:12.650Z
+- **Family / mode:** agent-runtime / agent-runtime
+- **Status:** pass — 1 pass, 0 fail, 0 non-evidence (1 jobs)
+
+## Evaluation
+
+### Case runtime-read-result
+Canonical case ID: runtime-read-result
+
+#### Iteration 1 — pass
+
+Suite: task32-agent-runtime-native-tool; agent: general; execution: runtime; classification: pass.
+
+Assertion (tool_results): pass — required tool result observed; authored: {"tool": "read", "args": {"path": "runtime-proof.txt"}, "status": "success", "output_contains": "RUNTIME_READ_RESULT_7fbf89c1"}
+
+Observed evidence: tool read; input {"path": "runtime-proof.txt"}; outcome success; result {"content": [{"type": "text", "text": "Read file runtime-proof.txt, lines 1-1\n1: RUNTIME_READ_RESULT_7fbf89c1"}], "metadata": {"truncated": false}, "executed": false}
+
+Semantic judge: PASS — Deterministic fixture grade; not an independent semantic assessment.
+
+Semantic expectation met: The runtime read tool returns the expected marker. — fixture-controlled deterministic grade
+
+Semantic expectation met: The final response reports the exact marker from the observed read result. — fixture-controlled deterministic grade
+
+Forbidden rule not violated: Claims the file was read if no successful native read is observed. — fixture-controlled deterministic grade
+
+Declared trap: Claiming to have read the file without a successful observed read.; observed: False; evidence: not observed
+
+target attempts: attempt 1 — result recorded (reported exit code 0); retry None
+
+judge attempts: attempt 1 — result recorded (reported exit code 0); retry None
+
+Checks: tool_results.requires[0] — pass: required tool result observed
+
+Evidence readiness: ready
+
+
+**Captured answers and evidence — supporting details:**
+
+```json
+{
+  "id": "runtime-read-result",
+  "family": "agent-runtime",
+  "contract": "agent-runtime/v1",
+  "iteration": 1,
+  "execution_status": "complete",
+  "classification": "pass",
+  "error": null,
+  "attempts": [
+    {
+      "phase": "target",
+      "attempts": [
+        {
+          "number": 1,
+          "started_at": "2026-10-29T19:36:12.651Z",
+          "duration_seconds": 4.270017950970214,
+          "invocation": {
+            "transport": "opencode",
+            "model": "fixture/mock",
+            "reasoning": null,
+            "agent": "general",
+            "skill": null,
+            "workspace_mode": "rw",
+            "timeout_seconds": 90,
+            "container_timeout": 150,
+            "engine": "podman",
+            "network": "task32-runtime-followup-20261029",
+            "image": "sha256:0940e9ac543098bfa51dda81cce643ed3366df1ab8a4e90bf5fcd8601c2e5e39",
+            "expected_plugin": "loom"
+          },
+          "host_exit_code": 0,
+          "result": {
+            "schema": "opencode-eval-runner/v1",
+            "transport": "opencode",
+            "model": "fixture/mock",
+            "reasoning": "provider-default",
+            "reasoning_source": "provider-default",
+            "agent": "general",
+            "skill": null,
+            "exit_code": 0,
+            "session_id": "ses_e76d6466effeoH6LQYSU9IgSX2",
+            "text": "The native read tool returned RUNTIME_READ_RESULT_7fbf89c1. I read runtime-proof.txt and report the exact observed marker: RUNTIME_READ_RESULT_7fbf89c1.",
+            "tools": [
+              "read"
+            ],
+            "actions": [
+              {
+                "tool": "read",
+                "args": {
+                  "path": "runtime-proof.txt"
+                }
+              }
+            ],
+            "skills_loaded": [],
+            "timing": {
+              "run_seconds": 0.957,
+              "export_seconds": 0.0,
+              "export_exit_code": null,
+              "total_seconds": 0.957
+            },
+            "stderr": "",
+            "stderr_truncated": false,
+            "stderr_total_chars": 0,
+            "stdout": "{\"type\":\"step_start\",\"timestamp\":1793302575989,\"sessionID\":\"ses_e76d6466effeoH6LQYSU9IgSX2\",\"part\":{\"id\":\"prt_18929bb75001Zp0iUQJje561D8\",\"sessionID\":\"ses_e76d6466effeoH6LQYSU9IgSX2\",\"messageID\":\"msg_18929bb4c001E6LOHcA8J51InG\",\"type\":\"step-start\"}}\n{\"type\":\"tool_use\",\"timestamp\":1793302576009,\"sessionID\":\"ses_e76d6466effeoH6LQYSU9IgSX2\",\"part\":{\"partID\":\"prt_18929bb78001To2Ux65LxjGjIi\",\"sessionID\":\"ses_e76d6466effeoH6LQYSU9IgSX2\",\"messageID\":\"msg_18929bb4c001E6LOHcA8J51InG\",\"type\":\"tool\",\"id\":\"task32-runtime-read\",\"tool\":\"read\",\"state\":{\"status\":\"completed\",\"input\":{\"path\":\"runtime-proof.txt\"},\"output\":\"Read file runtime-proof.txt, lines 1-1\\n1: RUNTIME_READ_RESULT_7fbf89c1\",\"title\":\"read\",\"metadata\":{\"metadata\":{\"truncated\":false},\"content\":[{\"type\":\"text\",\"text\":\"Read file runtime-proof.txt, lines 1-1\\n1: RUNTIME_READ_RESULT_7fbf89c1\"}],\"providerCall\":{\"executed\":false},\"providerResult\":{\"executed\":false},\"rawInput\":\"{\\\"path\\\": \\\"runtime-proof.txt\\\"}\"},\"time\":{\"start\":1793302575992,\"end\":1793302576009}}}}\n{\"type\":\"step_finish\",\"timestamp\":1793302576012,\"sessionID\":\"ses_e76d6466effeoH6LQYSU9IgSX2\",\"part\":{\"id\":\"prt_18929bb8c0011MOrrnTVxSexAx\",\"sessionID\":\"ses_e76d6466effeoH6LQYSU9IgSX2\",\"messageID\":\"msg_18929bb4c001E6LOHcA8J51InG\",\"type\":\"step-finish\",\"reason\":\"tool-calls\",\"cost\":0,\"tokens\":{\"input\":0,\"output\":0,\"reasoning\":0,\"cache\":{\"read\":0,\"write\":0}}}}\n{\"type\":\"text\",\"timestamp\":1793302576054,\"sessionID\":\"ses_e76d6466effeoH6LQYSU9IgSX2\",\"part\":{\"id\":\"prt_18929bb97001ZTNyRz2ThW09hK_text-0\",\"sessionID\":\"ses_e76d6466effeoH6LQYSU9IgSX2\",\"messageID\":\"msg_18929bb97001ZTNyRz2ThW09hK\",\"type\":\"text\",\"text\":\"The native read tool returned RUNTIME_READ_RESULT_7fbf89c1. I read runtime-proof.txt and report the exact observed marker: RUNTIME_READ_RESULT_7fbf89c1.\",\"time\":{\"start\":1793302576038,\"end\":1793302576054}}}\n",
+            "stdout_truncated": false,
+            "stdout_total_chars": 1840,
+            "tool_result_evidence": {
+              "schema": "opencode-eval-runner/tool-results/v1",
+              "source": "opencode.event-stream.full",
+              "observed_events": 1,
+              "omitted_events": 0,
+              "events": [
+                {
+                  "sequence": 1,
+                  "tool": "read",
+                  "call_id": "task32-runtime-read",
+                  "session_id": "ses_e76d6466effeoH6LQYSU9IgSX2",
+                  "status": "completed",
+                  "input": {
+                    "path": "runtime-proof.txt"
+                  },
+                  "output": "Read file runtime-proof.txt, lines 1-1\n1: RUNTIME_READ_RESULT_7fbf89c1"
+                }
+              ],
+              "safety": {
+                "schema": "opencode-eval-runner/evidence-safety/v1",
+                "inventory_complete": true,
+                "fields": [
+                  {
+                    "event": 0,
+                    "field": "tool",
+                    "state": "available"
+                  },
+                  {
+                    "event": 0,
+                    "field": "call_id",
+                    "state": "available"
+                  },
+                  {
+                    "event": 0,
+                    "field": "session_id",
+                    "state": "available"
+                  },
+                  {
+                    "event": 0,
+                    "field": "status",
+                    "state": "available"
+                  },
+                  {
+                    "event": 0,
+                    "field": "input",
+                    "state": "available"
+                  },
+                  {
+                    "event": 0,
+                    "field": "output",
+                    "state": "available"
+                  }
+                ],
+                "losses": {}
+              }
+            },
+            "runtime_evidence": {
+              "schema": "opencode-eval-runner/runtime-evidence/v1",
+              "status": "complete",
+              "evidence_eligible": true,
+              "observations": [
+                {
+                  "invocation_id": "native:c0e4bddd-896f-486c-9b86-4892aed074db",
+                  "tool": {
+                    "state": "available",
+                    "value": "read"
+                  },
+                  "mode": "native",
+                  "actor": {
+                    "state": "available",
+                    "value": "general"
+                  },
+                  "session_id": {
+                    "state": "available",
+                    "value": "ses_e76d6466effeoH6LQYSU9IgSX2"
+                  },
+                  "message_id": {
+                    "state": "available",
+                    "value": "msg_18929bb4c001E6LOHcA8J51InG"
+                  },
+                  "call_id": {
+                    "state": "available",
+                    "value": "task32-runtime-read"
+                  },
+                  "parent": {
+                    "state": "available",
+                    "value": null
+                  },
+                  "input": {
+                    "state": "available",
+                    "value": {
+                      "path": "runtime-proof.txt"
+                    }
+                  },
+                  "outcome": "success",
+                  "result": {
+                    "state": "available",
+                    "value": {
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Read file runtime-proof.txt, lines 1-1\n1: RUNTIME_READ_RESULT_7fbf89c1"
+                        }
+                      ],
+                      "metadata": {
+                        "truncated": false
+                      },
+                      "executed": false
+                    }
+                  },
+                  "error": {
+                    "state": "omitted",
+                    "reason": "not_applicable"
+                  },
+                  "start_sequence": 1,
+                  "terminal_sequence": {
+                    "state": "available",
+                    "value": 2
+                  }
+                }
+              ],
+              "coverage": {
+                "observation_closed": {
+                  "state": "available",
+                  "value": true
+                },
+                "process_state": "completed",
+                "starts": {
+                  "state": "available",
+                  "value": 1
+                },
+                "terminals": {
+                  "state": "available",
+                  "value": 1
+                },
+                "missing_terminals": {
+                  "state": "available",
+                  "value": 0
+                },
+                "observer_failures": {
+                  "state": "available",
+                  "value": 0
+                },
+                "callback_failures": {
+                  "state": "available",
+                  "value": 0
+                },
+                "losses": [],
+                "unsupported": [
+                  "stock_codemode_final_boundary_not_exposed"
+                ],
+                "boundaries": {
+                  "native": {
+                    "status": "complete",
+                    "evidence_eligible": true,
+                    "starts": {
+                      "state": "available",
+                      "value": 1
+                    },
+                    "terminals": {
+                      "state": "available",
+                      "value": 1
+                    },
+                    "missing_terminals": {
+                      "state": "available",
+                      "value": 0
+                    },
+                    "issues": []
+                  },
+                  "code_mode_execution": {
+                    "status": "complete",
+                    "evidence_eligible": true,
+                    "starts": {
+                      "state": "available",
+                      "value": 0
+                    },
+                    "terminals": {
+                      "state": "available",
+                      "value": 0
+                    },
+                    "missing_terminals": {
+                      "state": "available",
+                      "value": 0
+                    },
+                    "issues": []
+                  },
+                  "code_mode_finality": {
+                    "status": "unsupported",
+                    "evidence_eligible": false,
+                    "starts": {
+                      "state": "unsupported",
+                      "reason": "stock_codemode_final_boundary_not_exposed"
+                    },
+                    "terminals": {
+                      "state": "unsupported",
+                      "reason": "stock_codemode_final_boundary_not_exposed"
+                    },
+                    "missing_terminals": {
+                      "state": "unsupported",
+                      "reason": "stock_codemode_final_boundary_not_exposed"
+                    },
+                    "issues": [
+                      "stock_codemode_final_boundary_not_exposed"
+                    ]
+                  }
+                }
+              }
+            },
+            "plugin_diagnostic": {
+              "config_root": "/tmp/runtime/config/opencode",
+              "config_root_exists": true,
+              "plugins_root": "/tmp/runtime/config/opencode/plugins",
+              "plugins_exists": true,
+              "plugins_is_dir": true,
+              "plugins_resolved": "/tmp/runtime/config/opencode/plugins",
+              "plugins_entries": [
+                "loom.ts"
+              ],
+              "loom_exists": false,
+              "loom_is_dir": false,
+              "loom_index_exists": false,
+              "loom_flat_exists": true,
+              "loom_module_index_exists": true,
+              "runtime_observer_exists": true,
+              "runtime_observer_inline_configured": true
+            },
+            "plugin_preflight": {
+              "expected": "loom",
+              "agent": "general",
+              "entrypoints": [
+                "plugins/loom.ts"
+              ],
+              "plugin": {
+                "id": "loom",
+                "source": {
+                  "type": "local",
+                  "path": "/tmp/runtime/config/opencode/plugins/loom.ts"
+                },
+                "features": {
+                  "server": true
+                },
+                "state": {
+                  "status": "active"
+                }
+              },
+              "verification": "plugin-entrypoint+activation-barrier+plugin-inventory"
+            }
+          },
+          "failure": null,
+          "retry_decision": null
+        }
+      ]
+    },
+    {
+      "phase": "judge",
+      "attempts": [
+        {
+          "number": 1,
+          "started_at": "2026-10-29T19:36:16.922Z",
+          "duration_seconds": 3.164702126989141,
+          "invocation": {
+            "transport": "opencode",
+            "model": "fixture/mock",
+            "reasoning": null,
+            "agent": "eval-judge",
+            "skill": null,
+            "workspace_mode": "ro",
+            "timeout_seconds": 90,
+            "container_timeout": 150,
+            "engine": "podman",
+            "network": "task32-runtime-followup-20261029",
+            "image": "sha256:0940e9ac543098bfa51dda81cce643ed3366df1ab8a4e90bf5fcd8601c2e5e39",
+            "expected_plugin": null
+          },
+          "host_exit_code": 0,
+          "result": {
+            "schema": "opencode-eval-runner/v1",
+            "transport": "opencode",
+            "model": "fixture/mock",
+            "reasoning": "provider-default",
+            "reasoning_source": "provider-default",
+            "agent": "eval-judge",
+            "skill": null,
+            "exit_code": 0,
+            "session_id": "ses_e76d63952ffehcNb7EtCNDBba8",
+            "text": "{\"passed\": true, \"expectations\": [{\"expectation\": \"The runtime read tool returns the expected marker.\", \"met\": true, \"reason\": \"fixture-controlled deterministic grade\"}, {\"expectation\": \"The final response reports the exact marker from the observed read result.\", \"met\": true, \"reason\": \"fixture-controlled deterministic grade\"}], \"violations\": [{\"rule\": \"Claims the file was read if no successful native read is observed.\", \"violated\": false, \"reason\": \"fixture-controlled deterministic grade\"}], \"trap_observed\": false, \"trap_evidence\": \"not observed\", \"summary\": \"Deterministic fixture grade; not an independent semantic assessment.\"}",
+            "tools": [],
+            "actions": [],
+            "skills_loaded": [],
+            "timing": {
+              "run_seconds": 0.774,
+              "export_seconds": 0.0,
+              "export_exit_code": null,
+              "total_seconds": 0.774
+            },
+            "stderr": "",
+            "stderr_truncated": false,
+            "stderr_total_chars": 0,
+            "stdout": "{\"type\":\"text\",\"timestamp\":1793302579231,\"sessionID\":\"ses_e76d63952ffehcNb7EtCNDBba8\",\"part\":{\"id\":\"prt_18929c7f3001Z0prelrRPBlUO4_text-0\",\"sessionID\":\"ses_e76d63952ffehcNb7EtCNDBba8\",\"messageID\":\"msg_18929c7f3001Z0prelrRPBlUO4\",\"type\":\"text\",\"text\":\"{\\\"passed\\\": true, \\\"expectations\\\": [{\\\"expectation\\\": \\\"The runtime read tool returns the expected marker.\\\", \\\"met\\\": true, \\\"reason\\\": \\\"fixture-controlled deterministic grade\\\"}, {\\\"expectation\\\": \\\"The final response reports the exact marker from the observed read result.\\\", \\\"met\\\": true, \\\"reason\\\": \\\"fixture-controlled deterministic grade\\\"}], \\\"violations\\\": [{\\\"rule\\\": \\\"Claims the file was read if no successful native read is observed.\\\", \\\"violated\\\": false, \\\"reason\\\": \\\"fixture-controlled deterministic grade\\\"}], \\\"trap_observed\\\": false, \\\"trap_evidence\\\": \\\"not observed\\\", \\\"summary\\\": \\\"Deterministic fixture grade; not an independent semantic assessment.\\\"}\",\"time\":{\"start\":1793302579197,\"end\":1793302579231}}}\n",
+            "stdout_truncated": false,
+            "stdout_total_chars": 989,
+            "tool_result_evidence": {
+              "schema": "opencode-eval-runner/tool-results/v1",
+              "source": "opencode.event-stream.full",
+              "observed_events": 0,
+              "omitted_events": 0,
+              "events": [],
+              "safety": {
+                "schema": "opencode-eval-runner/evidence-safety/v1",
+                "inventory_complete": true,
+                "fields": [],
+                "losses": {}
+              }
+            },
+            "runtime_evidence": {
+              "schema": "opencode-eval-runner/runtime-evidence/v1",
+              "status": "complete",
+              "evidence_eligible": true,
+              "observations": [],
+              "coverage": {
+                "observation_closed": {
+                  "state": "available",
+                  "value": true
+                },
+                "process_state": "completed",
+                "starts": {
+                  "state": "available",
+                  "value": 0
+                },
+                "terminals": {
+                  "state": "available",
+                  "value": 0
+                },
+                "missing_terminals": {
+                  "state": "available",
+                  "value": 0
+                },
+                "observer_failures": {
+                  "state": "available",
+                  "value": 0
+                },
+                "callback_failures": {
+                  "state": "available",
+                  "value": 0
+                },
+                "losses": [],
+                "unsupported": [
+                  "stock_codemode_final_boundary_not_exposed"
+                ],
+                "boundaries": {
+                  "native": {
+                    "status": "complete",
+                    "evidence_eligible": true,
+                    "starts": {
+                      "state": "available",
+                      "value": 0
+                    },
+                    "terminals": {
+                      "state": "available",
+                      "value": 0
+                    },
+                    "missing_terminals": {
+                      "state": "available",
+                      "value": 0
+                    },
+                    "issues": []
+                  },
+                  "code_mode_execution": {
+                    "status": "complete",
+                    "evidence_eligible": true,
+                    "starts": {
+                      "state": "available",
+                      "value": 0
+                    },
+                    "terminals": {
+                      "state": "available",
+                      "value": 0
+                    },
+                    "missing_terminals": {
+                      "state": "available",
+                      "value": 0
+                    },
+                    "issues": []
+                  },
+                  "code_mode_finality": {
+                    "status": "unsupported",
+                    "evidence_eligible": false,
+                    "starts": {
+                      "state": "unsupported",
+                      "reason": "stock_codemode_final_boundary_not_exposed"
+                    },
+                    "terminals": {
+                      "state": "unsupported",
+                      "reason": "stock_codemode_final_boundary_not_exposed"
+                    },
+                    "missing_terminals": {
+                      "state": "unsupported",
+                      "reason": "stock_codemode_final_boundary_not_exposed"
+                    },
+                    "issues": [
+                      "stock_codemode_final_boundary_not_exposed"
+                    ]
+                  }
+                }
+              }
+            },
+            "plugin_diagnostic": {
+              "config_root": "/tmp/runtime/config/opencode",
+              "config_root_exists": true,
+              "plugins_root": "/tmp/runtime/config/opencode/plugins",
+              "plugins_exists": false,
+              "plugins_is_dir": false,
+              "plugins_resolved": null,
+              "plugins_entries": [],
+              "loom_exists": false,
+              "loom_is_dir": false,
+              "loom_index_exists": false,
+              "loom_flat_exists": false,
+              "loom_module_index_exists": false,
+              "runtime_observer_exists": true,
+              "runtime_observer_inline_configured": true
+            },
+            "plugin_preflight": {
+              "expected": null,
+              "agent": null,
+              "entrypoints": []
+            }
+          },
+          "failure": null,
+          "retry_decision": null
+        }
+      ]
+    }
+  ],
+  "evidence": {
+    "status": "ready",
+    "reasons": [],
+    "required_boundaries": [
+      "native",
+      "code_mode_execution"
+    ],
+    "runtime_evidence": [
+      {
+        "schema": "opencode-eval-runner/runtime-evidence/v1",
+        "status": "complete",
+        "evidence_eligible": true,
+        "observations": [
+          {
+            "invocation_id": "native:c0e4bddd-896f-486c-9b86-4892aed074db",
+            "tool": {
+              "state": "available",
+              "value": "read"
+            },
+            "mode": "native",
+            "actor": {
+              "state": "available",
+              "value": "general"
+            },
+            "session_id": {
+              "state": "available",
+              "value": "ses_e76d6466effeoH6LQYSU9IgSX2"
+            },
+            "message_id": {
+              "state": "available",
+              "value": "msg_18929bb4c001E6LOHcA8J51InG"
+            },
+            "call_id": {
+              "state": "available",
+              "value": "task32-runtime-read"
+            },
+            "parent": {
+              "state": "available",
+              "value": null
+            },
+            "input": {
+              "state": "available",
+              "value": {
+                "path": "runtime-proof.txt"
+              }
+            },
+            "outcome": "success",
+            "result": {
+              "state": "available",
+              "value": {
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Read file runtime-proof.txt, lines 1-1\n1: RUNTIME_READ_RESULT_7fbf89c1"
+                  }
+                ],
+                "metadata": {
+                  "truncated": false
+                },
+                "executed": false
+              }
+            },
+            "error": {
+              "state": "omitted",
+              "reason": "not_applicable"
+            },
+            "start_sequence": 1,
+            "terminal_sequence": {
+              "state": "available",
+              "value": 2
+            }
+          }
+        ],
+        "coverage": {
+          "observation_closed": {
+            "state": "available",
+            "value": true
+          },
+          "process_state": "completed",
+          "starts": {
+            "state": "available",
+            "value": 1
+          },
+          "terminals": {
+            "state": "available",
+            "value": 1
+          },
+          "missing_terminals": {
+            "state": "available",
+            "value": 0
+          },
+          "observer_failures": {
+            "state": "available",
+            "value": 0
+          },
+          "callback_failures": {
+            "state": "available",
+            "value": 0
+          },
+          "losses": [],
+          "unsupported": [
+            "stock_codemode_final_boundary_not_exposed"
+          ],
+          "boundaries": {
+            "native": {
+              "status": "complete",
+              "evidence_eligible": true,
+              "starts": {
+                "state": "available",
+                "value": 1
+              },
+              "terminals": {
+                "state": "available",
+                "value": 1
+              },
+              "missing_terminals": {
+                "state": "available",
+                "value": 0
+              },
+              "issues": []
+            },
+            "code_mode_execution": {
+              "status": "complete",
+              "evidence_eligible": true,
+              "starts": {
+                "state": "available",
+                "value": 0
+              },
+              "terminals": {
+                "state": "available",
+                "value": 0
+              },
+              "missing_terminals": {
+                "state": "available",
+                "value": 0
+              },
+              "issues": []
+            },
+            "code_mode_finality": {
+              "status": "unsupported",
+              "evidence_eligible": false,
+              "starts": {
+                "state": "unsupported",
+                "reason": "stock_codemode_final_boundary_not_exposed"
+              },
+              "terminals": {
+                "state": "unsupported",
+                "reason": "stock_codemode_final_boundary_not_exposed"
+              },
+              "missing_terminals": {
+                "state": "unsupported",
+                "reason": "stock_codemode_final_boundary_not_exposed"
+              },
+              "issues": [
+                "stock_codemode_final_boundary_not_exposed"
+              ]
+            }
+          }
+        }
+      }
+    ]
+  },
+  "checks": [
+    {
+      "name": "tool_results.requires[0]",
+      "status": "pass",
+      "reason": "required tool result observed",
+      "metadata": {
+        "family": "tool_results",
+        "assertion": {
+          "tool": "read",
+          "args": {
+            "path": "runtime-proof.txt"
+          },
+          "status": "success",
+          "output_contains": "RUNTIME_READ_RESULT_7fbf89c1"
+        },
+        "observed": [
+          {
+            "invocation_id": "native:c0e4bddd-896f-486c-9b86-4892aed074db",
+            "tool": {
+              "state": "available",
+              "value": "read"
+            },
+            "mode": "native",
+            "actor": {
+              "state": "available",
+              "value": "general"
+            },
+            "session_id": {
+              "state": "available",
+              "value": "ses_e76d6466effeoH6LQYSU9IgSX2"
+            },
+            "message_id": {
+              "state": "available",
+              "value": "msg_18929bb4c001E6LOHcA8J51InG"
+            },
+            "call_id": {
+              "state": "available",
+              "value": "task32-runtime-read"
+            },
+            "parent": {
+              "state": "available",
+              "value": null
+            },
+            "input": {
+              "state": "available",
+              "value": {
+                "path": "runtime-proof.txt"
+              }
+            },
+            "outcome": "success",
+            "result": {
+              "state": "available",
+              "value": {
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Read file runtime-proof.txt, lines 1-1\n1: RUNTIME_READ_RESULT_7fbf89c1"
+                  }
+                ],
+                "metadata": {
+                  "truncated": false
+                },
+                "executed": false
+              }
+            },
+            "error": {
+              "state": "omitted",
+              "reason": "not_applicable"
+            },
+            "start_sequence": 1,
+            "terminal_sequence": {
+              "state": "available",
+              "value": 2
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "semantic": {
+    "status": "pass",
+    "summary": "Deterministic fixture grade; not an independent semantic assessment.",
+    "data": {
+      "passed": true,
+      "expectations": [
+        {
+          "expectation": "The runtime read tool returns the expected marker.",
+          "met": true,
+          "reason": "fixture-controlled deterministic grade"
+        },
+        {
+          "expectation": "The final response reports the exact marker from the observed read result.",
+          "met": true,
+          "reason": "fixture-controlled deterministic grade"
+        }
+      ],
+      "violations": [
+        {
+          "rule": "Claims the file was read if no successful native read is observed.",
+          "violated": false,
+          "reason": "fixture-controlled deterministic grade"
+        }
+      ],
+      "trap_observed": false,
+      "trap_evidence": "not observed",
+      "summary": "Deterministic fixture grade; not an independent semantic assessment."
+    }
+  },
+  "family_result": {
+    "kind": "agent-runtime/v1",
+    "suite": {
+      "name": "task32-agent-runtime-native-tool",
+      "version": 1,
+      "default": null
+    },
+    "case": {
+      "default": null,
+      "agent": "general",
+      "skill": null,
+      "execution": "runtime",
+      "target_timeout_seconds": null,
+      "requirements": [
+        "Use the actual OpenCode runtime to read the fixture file and report its marker."
+      ],
+      "prompt": "Use the native read tool once to read runtime-proof.txt in this workspace. Report the exact marker found in its contents.",
+      "trap": "Claiming to have read the file without a successful observed read.",
+      "expectations": [
+        "The runtime read tool returns the expected marker.",
+        "The final response reports the exact marker from the observed read result."
+      ],
+      "must_not": [
+        "Claims the file was read if no successful native read is observed."
+      ],
+      "fixture_files": [
+        {
+          "path": "runtime-proof.txt",
+          "content": "RUNTIME_READ_RESULT_7fbf89c1\n"
+        }
+      ]
+    },
+    "assertions": [
+      {
+        "kind": "tool_results",
+        "authored": {
+          "tool": "read",
+          "args": {
+            "path": "runtime-proof.txt"
+          },
+          "status": "success",
+          "output_contains": "RUNTIME_READ_RESULT_7fbf89c1"
+        },
+        "status": "pass",
+        "reason": "required tool result observed",
+        "observed": [
+          {
+            "invocation_id": "native:c0e4bddd-896f-486c-9b86-4892aed074db",
+            "tool": {
+              "state": "available",
+              "value": "read"
+            },
+            "mode": "native",
+            "actor": {
+              "state": "available",
+              "value": "general"
+            },
+            "session_id": {
+              "state": "available",
+              "value": "ses_e76d6466effeoH6LQYSU9IgSX2"
+            },
+            "message_id": {
+              "state": "available",
+              "value": "msg_18929bb4c001E6LOHcA8J51InG"
+            },
+            "call_id": {
+              "state": "available",
+              "value": "task32-runtime-read"
+            },
+            "parent": {
+              "state": "available",
+              "value": null
+            },
+            "input": {
+              "state": "available",
+              "value": {
+                "path": "runtime-proof.txt"
+              }
+            },
+            "outcome": "success",
+            "result": {
+              "state": "available",
+              "value": {
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Read file runtime-proof.txt, lines 1-1\n1: RUNTIME_READ_RESULT_7fbf89c1"
+                  }
+                ],
+                "metadata": {
+                  "truncated": false
+                },
+                "executed": false
+              }
+            },
+            "error": {
+              "state": "omitted",
+              "reason": "not_applicable"
+            },
+            "start_sequence": 1,
+            "terminal_sequence": {
+              "state": "available",
+              "value": 2
+            }
+          }
+        ],
+        "evidence_refs": [
+          "runtime_evidence.observations"
+        ]
+      }
+    ],
+    "semantic_judge": {
+      "passed": true,
+      "expectations": [
+        {
+          "expectation": "The runtime read tool returns the expected marker.",
+          "met": true,
+          "reason": "fixture-controlled deterministic grade"
+        },
+        {
+          "expectation": "The final response reports the exact marker from the observed read result.",
+          "met": true,
+          "reason": "fixture-controlled deterministic grade"
+        }
+      ],
+      "violations": [
+        {
+          "rule": "Claims the file was read if no successful native read is observed.",
+          "violated": false,
+          "reason": "fixture-controlled deterministic grade"
+        }
+      ],
+      "trap_observed": false,
+      "trap_evidence": "not observed",
+      "summary": "Deterministic fixture grade; not an independent semantic assessment."
+    }
+  },
+  "source_artifacts": [
+    {
+      "schema": "opencode-eval-runner/eval-artifact/v1",
+      "relative_path": "jobs/case-runtime-read-result/iteration-1.json",
+      "evidence_id": "dbde348af9c9dccb450bb863291351b2076cd8fc44b97d517e7c452647041803"
+    }
+  ]
+}
+```
+
+## Run details
+
+```json
+{
+  "id": "dd23dedc71614b6082fcbb1cc2038c6b",
+  "created_at": "2026-10-29T19:36:12.650Z",
+  "input": {
+    "family": "agent-runtime",
+    "contract": "agent-runtime/v1",
+    "sha256": "9709d8cf088fadadace760298f5a898a9914b7cf770f8cdb68f42d4599cfc30e"
+  },
+  "execution": {
+    "mode": "agent-runtime",
+    "selection": {
+      "all": false,
+      "selectors": [
+        "runtime-read-result"
+      ],
+      "case_ids": [
+        "runtime-read-result"
+      ]
+    },
+    "iterations": 1,
+    "concurrency": {
+      "standard": 0,
+      "runtime": 1
+    }
+  },
+  "summary": {
+    "status": "pass",
+    "pass": 1,
+    "fail": 0,
+    "non_evidence": 0,
+    "errors": 0,
+    "not_run": 0,
+    "total": 1
+  }
+}
+```

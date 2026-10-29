@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "name": "task32-agent-runtime-native-tool",
+  "cases": [
+    {
+      "id": "runtime-read-result",
+      "agent": "general",
+      "execution": "runtime",
+      "requirements": [
+        "Use the actual OpenCode runtime to read the fixture file and report its marker."
+      ],
+      "prompt": "Use the native read tool once to read runtime-proof.txt in this workspace. Report the exact marker found in its contents.",
+      "trap": "Claiming to have read the file without a successful observed read.",
+      "expectations": [
+        "The runtime read tool returns the expected marker.",
+        "The final response reports the exact marker from the observed read result."
+      ],
+      "must_not": [
+        "Claims the file was read if no successful native read is observed."
+      ],
+      "tool_results": {
+        "requires": [
+          {
+            "tool": "read",
+            "args": {
+              "path": "runtime-proof.txt"
+            },
+            "status": "success",
+            "output_contains": "RUNTIME_READ_RESULT_7fbf89c1"
+          }
+        ]
+      },
+      "fixture_files": [
+        {
+          "path": "runtime-proof.txt",
+          "content": "RUNTIME_READ_RESULT_7fbf89c1\n"
+        }
+      ]
+    }
+  ]
+}

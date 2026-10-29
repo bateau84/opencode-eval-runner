@@ -1,0 +1,46 @@
+{
+  "schema": "opencode-eval-runner/eval-run/v1",
+  "run_id": "dd23dedc71614b6082fcbb1cc2038c6b",
+  "created_at": "2026-10-29T19:36:12.650Z",
+  "selection": {
+    "profile": "builtin:agent-runtime:agent-runtime/v1",
+    "all": false,
+    "selectors": [
+      "runtime-read-result"
+    ],
+    "cases": [
+      "runtime-read-result"
+    ]
+  },
+  "iterations": 1,
+  "concurrency": {
+    "standard": 0,
+    "runtime": 1
+  },
+  "jobs": [
+    {
+      "case": "runtime-read-result",
+      "iteration": 1,
+      "label": "runtime-read-result",
+      "lane": "runtime",
+      "artifact": "jobs/case-runtime-read-result/iteration-1.json",
+      "status": "pass"
+    }
+  ],
+  "summary": {
+    "status": "pass",
+    "pass": 1,
+    "fail": 0,
+    "non-evidence": 0,
+    "errors": 0,
+    "not_run": 0,
+    "total": 1
+  },
+  "project_metadata": {
+    "runner_eval_input": {
+      "family": "agent-runtime",
+      "contract": "agent-runtime/v1",
+      "sha256": "9709d8cf088fadadace760298f5a898a9914b7cf770f8cdb68f42d4599cfc30e"
+    }
+  }
+}

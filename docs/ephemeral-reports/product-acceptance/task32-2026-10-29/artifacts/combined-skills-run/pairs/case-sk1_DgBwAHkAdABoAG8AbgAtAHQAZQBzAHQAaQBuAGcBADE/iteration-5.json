@@ -1,0 +1,2333 @@
+{
+  "schema": "opencode-eval-runner/eval-paired-artifact/v1",
+  "run_id": "f47f708d31cf42b489900c870838ea43",
+  "case": "sk1_DgBwAHkAdABoAG8AbgAtAHQAZQBzAHQAaQBuAGcBADE",
+  "iteration": 5,
+  "pair_id": "e6988f81175ed7856ecdcd91e829334021faaeaa7031c090cc1dc75f6f641c8b",
+  "execution_policy": {
+    "mode": "sequential",
+    "order": [
+      "baseline",
+      "candidate"
+    ]
+  },
+  "sides": {
+    "baseline": {
+      "schema": "opencode-eval-runner/eval-artifact/v1",
+      "run_id": "f47f708d31cf42b489900c870838ea43",
+      "case": "sk1_DgBwAHkAdABoAG8AbgAtAHQAZQBzAHQAaQBuAGcBADE",
+      "iteration": 5,
+      "lane": "runtime",
+      "classification": "pass",
+      "timing": {
+        "started_at": "2026-10-29T19:13:45.625Z",
+        "duration_seconds": 6.71925599995302,
+        "target_seconds": 3.363410178979393,
+        "judge_seconds": 3.3558458209736273
+      },
+      "target": {
+        "attempts": [
+          {
+            "attempt": 1,
+            "started_at": "2026-10-29T19:13:45.625Z",
+            "duration_seconds": 3.363410178979393,
+            "host_exit_code": 0,
+            "result": {
+              "schema": "opencode-eval-runner/v1",
+              "transport": "opencode",
+              "model": "fixture/mock",
+              "reasoning": "provider-default",
+              "reasoning_source": "provider-default",
+              "agent": "skill-baseline",
+              "skill": null,
+              "exit_code": 0,
+              "session_id": "ses_e76ead778ffevOdy8O0UoSbNek",
+              "text": "Deterministic fixture response: provide a clear, complete answer satisfying all requested expectations; use AsyncMock for awaited calls, isolated tmp_path databases, parametrize independent cases, preserve domain errors with causes, narrow catches and log exceptions.",
+              "tools": [],
+              "actions": [],
+              "skills_loaded": [],
+              "timing": {
+                "run_seconds": 0.85,
+                "export_seconds": 0.0,
+                "export_exit_code": null,
+                "total_seconds": 0.85
+              },
+              "stderr": "",
+              "stderr_truncated": false,
+              "stderr_total_chars": 0,
+              "stdout": "{\"type\":\"text\",\"timestamp\":1793301228052,\"sessionID\":\"ses_e76ead778ffevOdy8O0UoSbNek\",\"part\":{\"id\":\"prt_1891529dc0019EwAE5TVtxjq1N_text-0\",\"sessionID\":\"ses_e76ead778ffevOdy8O0UoSbNek\",\"messageID\":\"msg_1891529dc0019EwAE5TVtxjq1N\",\"type\":\"text\",\"text\":\"Deterministic fixture response: provide a clear, complete answer satisfying all requested expectations; use AsyncMock for awaited calls, isolated tmp_path databases, parametrize independent cases, preserve domain errors with causes, narrow catches and log exceptions.\",\"time\":{\"start\":1793301228011,\"end\":1793301228052}}}\n",
+              "stdout_truncated": false,
+              "stdout_total_chars": 573,
+              "tool_result_evidence": {
+                "schema": "opencode-eval-runner/tool-results/v1",
+                "source": "opencode.event-stream.full",
+                "observed_events": 0,
+                "omitted_events": 0,
+                "events": [],
+                "safety": {
+                  "schema": "opencode-eval-runner/evidence-safety/v1",
+                  "inventory_complete": true,
+                  "fields": [],
+                  "losses": {}
+                }
+              },
+              "runtime_evidence": {
+                "schema": "opencode-eval-runner/runtime-evidence/v1",
+                "status": "complete",
+                "evidence_eligible": true,
+                "observations": [],
+                "coverage": {
+                  "observation_closed": {
+                    "state": "available",
+                    "value": true
+                  },
+                  "process_state": "completed",
+                  "starts": {
+                    "state": "available",
+                    "value": 0
+                  },
+                  "terminals": {
+                    "state": "available",
+                    "value": 0
+                  },
+                  "missing_terminals": {
+                    "state": "available",
+                    "value": 0
+                  },
+                  "observer_failures": {
+                    "state": "available",
+                    "value": 0
+                  },
+                  "callback_failures": {
+                    "state": "available",
+                    "value": 0
+                  },
+                  "losses": [],
+                  "unsupported": [
+                    "stock_codemode_final_boundary_not_exposed"
+                  ],
+                  "boundaries": {
+                    "native": {
+                      "status": "complete",
+                      "evidence_eligible": true,
+                      "starts": {
+                        "state": "available",
+                        "value": 0
+                      },
+                      "terminals": {
+                        "state": "available",
+                        "value": 0
+                      },
+                      "missing_terminals": {
+                        "state": "available",
+                        "value": 0
+                      },
+                      "issues": []
+                    },
+                    "code_mode_execution": {
+                      "status": "complete",
+                      "evidence_eligible": true,
+                      "starts": {
+                        "state": "available",
+                        "value": 0
+                      },
+                      "terminals": {
+                        "state": "available",
+                        "value": 0
+                      },
+                      "missing_terminals": {
+                        "state": "available",
+                        "value": 0
+                      },
+                      "issues": []
+                    },
+                    "code_mode_finality": {
+                      "status": "unsupported",
+                      "evidence_eligible": false,
+                      "starts": {
+                        "state": "unsupported",
+                        "reason": "stock_codemode_final_boundary_not_exposed"
+                      },
+                      "terminals": {
+                        "state": "unsupported",
+                        "reason": "stock_codemode_final_boundary_not_exposed"
+                      },
+                      "missing_terminals": {
+                        "state": "unsupported",
+                        "reason": "stock_codemode_final_boundary_not_exposed"
+                      },
+                      "issues": [
+                        "stock_codemode_final_boundary_not_exposed"
+                      ]
+                    }
+                  }
+                }
+              },
+              "plugin_diagnostic": {
+                "config_root": "/tmp/runtime/config/opencode",
+                "config_root_exists": true,
+                "plugins_root": "/tmp/runtime/config/opencode/plugins",
+                "plugins_exists": false,
+                "plugins_is_dir": false,
+                "plugins_resolved": null,
+                "plugins_entries": [],
+                "loom_exists": false,
+                "loom_is_dir": false,
+                "loom_index_exists": false,
+                "loom_flat_exists": false,
+                "loom_module_index_exists": false,
+                "runtime_observer_exists": true,
+                "runtime_observer_inline_configured": true
+              },
+              "plugin_preflight": {
+                "expected": null,
+                "agent": null,
+                "entrypoints": []
+              }
+            },
+            "failure": null
+          }
+        ],
+        "evidence_readiness": {
+          "status": "ready",
+          "reasons": [],
+          "required_boundaries": [
+            "native"
+          ]
+        }
+      },
+      "deterministic_checks": [
+        {
+          "name": "skill.native-load",
+          "status": "pass",
+          "reason": "native skill evidence evaluated",
+          "metadata": {
+            "family": "skill"
+          }
+        }
+      ],
+      "judge": {
+        "attempts": [
+          {
+            "attempt": 1,
+            "started_at": "2026-10-29T19:13:48.988Z",
+            "duration_seconds": 3.3558458209736273,
+            "host_exit_code": 0,
+            "result": {
+              "schema": "opencode-eval-runner/v1",
+              "transport": "opencode",
+              "model": "fixture/mock",
+              "reasoning": "provider-default",
+              "reasoning_source": "provider-default",
+              "agent": "eval-judge",
+              "skill": null,
+              "exit_code": 0,
+              "session_id": "ses_e76eaca54ffeLrrgZhHH9BPz0n",
+              "text": "{\"passed\": true, \"expectations\": [{\"expectation\": \"Uses AsyncMock (or an async function), not a plain Mock, for the awaited method\", \"met\": true, \"reason\": \"deterministic fixture grade\"}, {\"expectation\": \"The test function is async (relies on asyncio_mode/marker)\", \"met\": true, \"reason\": \"deterministic fixture grade\"}, {\"expectation\": \"Configures the mock to raise TimeoutError (e.g. side_effect)\", \"met\": true, \"reason\": \"deterministic fixture grade\"}, {\"expectation\": \"Asserts the return value equals 'skipped'\", \"met\": true, \"reason\": \"deterministic fixture grade\"}, {\"expectation\": \"Does NOT use a synchronous Mock() for the awaited call\", \"met\": true, \"reason\": \"deterministic fixture grade\"}], \"violations\": [], \"trap_observed\": false, \"trap_evidence\": \"not observed\", \"summary\": \"Fixture accepted all authored positive expectations.\"}",
+              "tools": [],
+              "actions": [],
+              "skills_loaded": [],
+              "timing": {
+                "run_seconds": 0.829,
+                "export_seconds": 0.0,
+                "export_exit_code": null,
+                "total_seconds": 0.829
+              },
+              "stderr": "",
+              "stderr_truncated": false,
+              "stderr_total_chars": 0,
+              "stdout": "{\"type\":\"text\",\"timestamp\":1793301231393,\"sessionID\":\"ses_e76eaca54ffeLrrgZhHH9BPz0n\",\"part\":{\"id\":\"prt_1891536ed001Okw2O4RSy8TMre_text-0\",\"sessionID\":\"ses_e76eaca54ffeLrrgZhHH9BPz0n\",\"messageID\":\"msg_1891536ed001Okw2O4RSy8TMre\",\"type\":\"text\",\"text\":\"{\\\"passed\\\": true, \\\"expectations\\\": [{\\\"expectation\\\": \\\"Uses AsyncMock (or an async function), not a plain Mock, for the awaited method\\\", \\\"met\\\": true, \\\"reason\\\": \\\"deterministic fixture grade\\\"}, {\\\"expectation\\\": \\\"The test function is async (relies on asyncio_mode/marker)\\\", \\\"met\\\": true, \\\"reason\\\": \\\"deterministic fixture grade\\\"}, {\\\"expectation\\\": \\\"Configures the mock to raise TimeoutError (e.g. side_effect)\\\", \\\"met\\\": true, \\\"reason\\\": \\\"deterministic fixture grade\\\"}, {\\\"expectation\\\": \\\"Asserts the return value equals 'skipped'\\\", \\\"met\\\": true, \\\"reason\\\": \\\"deterministic fixture grade\\\"}, {\\\"expectation\\\": \\\"Does NOT use a synchronous Mock() for the awaited call\\\", \\\"met\\\": true, \\\"reason\\\": \\\"deterministic fixture grade\\\"}], \\\"violations\\\": [], \\\"trap_observed\\\": false, \\\"trap_evidence\\\": \\\"not observed\\\", \\\"summary\\\": \\\"Fixture accepted all authored positive expectations.\\\"}\",\"time\":{\"start\":1793301231352,\"end\":1793301231393}}}\n",
+              "stdout_truncated": false,
+              "stdout_total_chars": 1215,
+              "tool_result_evidence": {
+                "schema": "opencode-eval-runner/tool-results/v1",
+                "source": "opencode.event-stream.full",
+                "observed_events": 0,
+                "omitted_events": 0,
+                "events": [],
+                "safety": {
+                  "schema": "opencode-eval-runner/evidence-safety/v1",
+                  "inventory_complete": true,
+                  "fields": [],
+                  "losses": {}
+                }
+              },
+              "runtime_evidence": {
+                "schema": "opencode-eval-runner/runtime-evidence/v1",
+                "status": "complete",
+                "evidence_eligible": true,
+                "observations": [],
+                "coverage": {
+                  "observation_closed": {
+                    "state": "available",
+                    "value": true
+                  },
+                  "process_state": "completed",
+                  "starts": {
+                    "state": "available",
+                    "value": 0
+                  },
+                  "terminals": {
+                    "state": "available",
+                    "value": 0
+                  },
+                  "missing_terminals": {
+                    "state": "available",
+                    "value": 0
+                  },
+                  "observer_failures": {
+                    "state": "available",
+                    "value": 0
+                  },
+                  "callback_failures": {
+                    "state": "available",
+                    "value": 0
+                  },
+                  "losses": [],
+                  "unsupported": [
+                    "stock_codemode_final_boundary_not_exposed"
+                  ],
+                  "boundaries": {
+                    "native": {
+                      "status": "complete",
+                      "evidence_eligible": true,
+                      "starts": {
+                        "state": "available",
+                        "value": 0
+                      },
+                      "terminals": {
+                        "state": "available",
+                        "value": 0
+                      },
+                      "missing_terminals": {
+                        "state": "available",
+                        "value": 0
+                      },
+                      "issues": []
+                    },
+                    "code_mode_execution": {
+                      "status": "complete",
+                      "evidence_eligible": true,
+                      "starts": {
+                        "state": "available",
+                        "value": 0
+                      },
+                      "terminals": {
+                        "state": "available",
+                        "value": 0
+                      },
+                      "missing_terminals": {
+                        "state": "available",
+                        "value": 0
+                      },
+                      "issues": []
+                    },
+                    "code_mode_finality": {
+                      "status": "unsupported",
+                      "evidence_eligible": false,
+                      "starts": {
+                        "state": "unsupported",
+                        "reason": "stock_codemode_final_boundary_not_exposed"
+                      },
+                      "terminals": {
+                        "state": "unsupported",
+                        "reason": "stock_codemode_final_boundary_not_exposed"
+                      },
+                      "missing_terminals": {
+                        "state": "unsupported",
+                        "reason": "stock_codemode_final_boundary_not_exposed"
+                      },
+                      "issues": [
+                        "stock_codemode_final_boundary_not_exposed"
+                      ]
+                    }
+                  }
+                }
+              },
+              "plugin_diagnostic": {
+                "config_root": "/tmp/runtime/config/opencode",
+                "config_root_exists": true,
+                "plugins_root": "/tmp/runtime/config/opencode/plugins",
+                "plugins_exists": false,
+                "plugins_is_dir": false,
+                "plugins_resolved": null,
+                "plugins_entries": [],
+                "loom_exists": false,
+                "loom_is_dir": false,
+                "loom_index_exists": false,
+                "loom_flat_exists": false,
+                "loom_module_index_exists": false,
+                "runtime_observer_exists": true,
+                "runtime_observer_inline_configured": true
+              },
+              "plugin_preflight": {
+                "expected": null,
+                "agent": null,
+                "entrypoints": []
+              }
+            },
+            "failure": null
+          }
+        ],
+        "semantic": {
+          "status": "pass",
+          "summary": "Fixture accepted all authored positive expectations.",
+          "data": {
+            "passed": true,
+            "expectations": [
+              {
+                "expectation": "Uses AsyncMock (or an async function), not a plain Mock, for the awaited method",
+                "met": true,
+                "reason": "deterministic fixture grade"
+              },
+              {
+                "expectation": "The test function is async (relies on asyncio_mode/marker)",
+                "met": true,
+                "reason": "deterministic fixture grade"
+              },
+              {
+                "expectation": "Configures the mock to raise TimeoutError (e.g. side_effect)",
+                "met": true,
+                "reason": "deterministic fixture grade"
+              },
+              {
+                "expectation": "Asserts the return value equals 'skipped'",
+                "met": true,
+                "reason": "deterministic fixture grade"
+              },
+              {
+                "expectation": "Does NOT use a synchronous Mock() for the awaited call",
+                "met": true,
+                "reason": "deterministic fixture grade"
+              }
+            ],
+            "violations": [],
+            "trap_observed": false,
+            "trap_evidence": "not observed",
+            "summary": "Fixture accepted all authored positive expectations.",
+            "behavior_score": 1.0
+          }
+        }
+      },
+      "project_metadata": {
+        "family": "skill",
+        "contract": "skill-cases/v1",
+        "input_sha256": "",
+        "source_index": 1,
+        "source_id": 1,
+        "authored_id": 1,
+        "display_name": "asyncmock-for-awaitable",
+        "skill": "python-testing",
+        "source_input": 1,
+        "source_path": "skills/python-testing/evals/evals.json",
+        "source_sha256": "cce5b2be8186cf7aae33fdc88ee682339246b8d56e64b08caa7fa096c63d7f4b",
+        "input_count": 2,
+        "side": "baseline",
+        "runner_eval_invocations": [
+          {
+            "transport": "opencode",
+            "model": "fixture/mock",
+            "reasoning": null,
+            "agent": "skill-baseline",
+            "skill": null,
+            "workspace_mode": "ro",
+            "timeout_seconds": 90,
+            "container_timeout": 150,
+            "engine": "podman",
+            "network": "task32-recovery-1793300807",
+            "image": "sha256:0940e9ac543098bfa51dda81cce643ed3366df1ab8a4e90bf5fcd8601c2e5e39",
+            "expected_plugin": null
+          },
+          {
+            "transport": "opencode",
+            "model": "fixture/mock",
+            "reasoning": null,
+            "agent": "eval-judge",
+            "skill": null,
+            "workspace_mode": "ro",
+            "timeout_seconds": 90,
+            "container_timeout": 150,
+            "engine": "podman",
+            "network": "task32-recovery-1793300807",
+            "image": "sha256:0940e9ac543098bfa51dda81cce643ed3366df1ab8a4e90bf5fcd8601c2e5e39",
+            "expected_plugin": null
+          }
+        ]
+      },
+      "artifact_evidence_id": "3fa9dcca412a74ac7fa0609f9cb76994c0463bd4b0f54c42893969aa238e457a"
+    },
+    "candidate": {
+      "schema": "opencode-eval-runner/eval-artifact/v1",
+      "run_id": "f47f708d31cf42b489900c870838ea43",
+      "case": "sk1_DgBwAHkAdABoAG8AbgAtAHQAZQBzAHQAaQBuAGcBADE",
+      "iteration": 5,
+      "lane": "runtime",
+      "classification": "pass",
+      "timing": {
+        "started_at": "2026-10-29T19:13:52.344Z",
+        "duration_seconds": 6.95306934096152,
+        "target_seconds": 3.573507932946086,
+        "judge_seconds": 3.3795614080154337
+      },
+      "target": {
+        "attempts": [
+          {
+            "attempt": 1,
+            "started_at": "2026-10-29T19:13:52.344Z",
+            "duration_seconds": 3.573507932946086,
+            "host_exit_code": 0,
+            "result": {
+              "schema": "opencode-eval-runner/v1",
+              "transport": "opencode",
+              "model": "fixture/mock",
+              "reasoning": "provider-default",
+              "reasoning_source": "provider-default",
+              "agent": "skill-eval",
+              "skill": "python-testing",
+              "exit_code": 0,
+              "session_id": "ses_e76eabcc9ffeoa5IK0JPqR2117",
+              "text": "Deterministic fixture response: provide a clear, complete answer satisfying all requested expectations; use AsyncMock for awaited calls, isolated tmp_path databases, parametrize independent cases, preserve domain errors with causes, narrow catches and log exceptions.",
+              "tools": [
+                "skill"
+              ],
+              "actions": [
+                {
+                  "tool": "skill",
+                  "args": {
+                    "id": "python-testing"
+                  }
+                }
+              ],
+              "skills_loaded": [
+                "python-testing"
+              ],
+              "timing": {
+                "run_seconds": 0.891,
+                "export_seconds": 0.0,
+                "export_exit_code": null,
+                "total_seconds": 0.891
+              },
+              "stderr": "",
+              "stderr_truncated": false,
+              "stderr_total_chars": 0,
+              "stdout": "{\"type\":\"step_start\",\"timestamp\":1793301234862,\"sessionID\":\"ses_e76eabcc9ffeoa5IK0JPqR2117\",\"part\":{\"id\":\"prt_1891544ae001IDWDlvXO9d8fBh\",\"sessionID\":\"ses_e76eabcc9ffeoa5IK0JPqR2117\",\"messageID\":\"msg_1891544880011NjIpdmNK6n3rM\",\"type\":\"step-start\"}}\n{\"type\":\"tool_use\",\"timestamp\":1793301234881,\"sessionID\":\"ses_e76eabcc9ffeoa5IK0JPqR2117\",\"part\":{\"partID\":\"prt_1891544b1001MuQRbQOZWf2o98\",\"sessionID\":\"ses_e76eabcc9ffeoa5IK0JPqR2117\",\"messageID\":\"msg_1891544880011NjIpdmNK6n3rM\",\"type\":\"tool\",\"id\":\"fixture-skill-call\",\"tool\":\"skill\",\"state\":{\"status\":\"completed\",\"input\":{\"id\":\"python-testing\"},\"output\":\"<skill_content name=\\\"python-testing\\\">\\n# Skill: python-testing\\n\\n> Pair with `python-common-practice` for shared verification guidance.\\n\\n**Persona:** You are a Python engineer who treats tests as executable specifications. You write tests to constrain behavior, not to chase a coverage number.\\n\\n# Python Testing with pytest\\n\\nTests pin behavior. A good test fails for exactly one reason and names that reason. Prefer plain `assert` (pytest rewrites it for rich diffs) over `unittest`'s `assertEqual` zoo.\\n\\n## Structure and naming\\n\\n- Files `test_*.py`, functions `test_*`, one behavior per test. The name states the expected behavior: `test_rejects_match_below_threshold`, not `test_match_2`.\\n- **Arrange / Act / Assert** with blank lines between phases. If a test needs comments to explain phases, it is doing too much.\\n- Put shared fixtures in `conftest.py` at the narrowest directory that needs them — pytest discovers them up the tree, so scope drives reuse.\\n\\n## Fixtures over setUp\\n\\nFixtures are dependency injection for tests: request what you need, get teardown for free via `yield`.\\n\\n```python\\nimport pytest\\n\\n@pytest.fixture\\ndef settings(tmp_path):\\n    # tmp_path is a per-test directory — no manual cleanup, no shared state\\n    return Settings(database_file=str(tmp_path / \\\"test.db\\\"))\\n\\n@pytest.fixture\\ndef repo(settings):\\n    conn = open_connection(settings.database_file)\\n    run_migrations(conn)\\n    yield Repository(conn)   # everything after yield is teardown\\n    conn.close()\\n```\\n\\nScope deliberately: default `function` (fresh per test, safest). Use `module`/`session` only for expensive, read-only setup — shared mutable fixtures leak state and create order-dependent flakiness.\\n\\n## Parametrize instead of loops\\n\\nA loop inside one test stops at the first failure and reports one case. `parametrize` runs each case independently and names it.\\n\\n```python\\n@pytest.mark.parametrize(\\n    (\\\"title_a\\\", \\\"title_b\\\", \\\"expected\\\"),\\n    [\\n        (\\\"Song (Live)\\\", \\\"Song\\\", True),\\n        (\\\"Song\\\", \\\"Totally Other\\\", False),\\n    ],\\n    ids=[\\\"live-suffix-matches\\\", \\\"different-titles-reject\\\"],\\n)\\ndef test_fuzzy_match(title_a, title_b, expected):\\n    assert is_match(title_a, title_b) is expected\\n```\\n\\n## Async tests (pytest-asyncio)\\n\\nWhen `pyproject.toml` sets `asyncio_mode = \\\"auto\\\"`, every `async def test_*` runs on the event loop with no decorator. Without it, mark each one `@pytest.mark.asyncio`. Know which mode the repo uses before adding tests.\\n\\n```toml\\n[tool.pytest.ini_options]\\nasyncio_mode = \\\"auto\\\"\\n```\\n\\n```python\\nasync def test_fetches_playlist(httpx_mock):\\n    httpx_mock.add_response(json={\\\"items\\\": []})\\n    result = await client.get_playlist(\\\"abc\\\")\\n    assert result == []\\n```\\n\\nAsync fixtures use the same `async def` + `yield` shape. Do not call `asyncio.run()` inside a test — you are already on the loop; nesting raises `RuntimeError`.\\n\\n## Mocking — at the boundary, not the internals\\n\\nMock I/O and external services (YouTube/Spotify APIs, the network), not your own pure functions. Prefer real objects (the `tmp_path` SQLite DB) over mocks when they are cheap — sortarr's web tests run against a real in-process SQLite DB for exactly this reason.\\n\\n```python\\ndef test_skips_on_api_error(monkeypatch):\\n    def boom(*_): raise TimeoutError\\n    monkeypatch.setattr(client, \\\"get_playlist\\\", boom)\\n    # monkeypatch auto-reverts after the test — no manual cleanup\\n```\\n\\n- `monkeypatch` for attributes/env/dicts (auto-reverted).\\n- `unittest.mock.AsyncMock` for awaitables; a plain `Mock` returns a coroutine-less value and the `await` fails.\\n- For httpx, prefer `pytest-httpx`'s `httpx_mock` or `respx` over patching internals — patch the transport, not the call site.\\n\\n## Coverage and CI\\n\\n```bash\\npytest                       # all tests\\npytest -k \\\"match and not slow\\\"   # filter by name expression\\npytest -x --ff               # stop at first failure, failed-first ordering\\npytest -q tests/test_match.py::test_fuzzy_match   # one test\\npytest --cov=src --cov-report=term-missing        # coverage with missing lines\\n```\\n\\nCoverage is a floor, not a goal: 100% coverage with no assertions tests nothing. Chase uncovered *branches* that carry risk, not the percentage.\\n\\n## Targeted mutation testing\\n\\nAfter the relevant suite is green, consider a few mutations for changed or high-risk comparisons, guards, exception paths, and state updates. Mutation testing changes production code to challenge the tests; coverage only shows execution. Neither a whole-repository run nor a fixed mutation score is required.\\n\\n**Manual fallback:** preserve current edits and use an isolated test copy containing the candidate. Run the selected pytest cases and confirm they actually collected and passed rather than only skipping/xfailing. Change one production behavior with tests fixed, rerun, and inspect the failing assertion. Verify imports resolve to the mutated source, not another installed package or a monkeypatched replacement. An import/setup/type-check failure or unexplained timeout is not an assertion-based kill. For a real survivor, add a contract-derived test and prove it rejects the mutant. Restore only the probe change, inspect the diff, and rerun the relevant suite without discarding unrelated work.\\n\\n**Automation:** [mutmut](https://mutmut.readthedocs.io/en/latest/) is an option for a compatible pytest project. Prefer the repository's pinned environment. Check the installed version's help and documentation before choosing source paths, test selection, timeout/concurrency settings, or configuration keys; these can differ between versions. Bound the scope before using `mutmut run`, then inspect outcomes with `mutmut browse`. Verify copied fixtures/configuration and imported source. Do not treat cached/incremental results as a fresh run when dependencies, configuration, fixtures, or the candidate changed without the tool accounting for them.\\n\\n`mutmut apply` writes a mutant into source. Use it only in an isolated, recoverable copy and verify restoration even after interruption. Do not install tools or publish reports merely because the command appears here; a safe manual sample or a stated limitation is preferable to unsupported setup.\\n\\nRecord candidate, tool/Python versions, source/test scope, budget, baseline, actual outcomes, and final restoration in existing verification notes. Triage survivors into real gaps, missing execution, justified equivalence/out-of-scope behavior, or unresolved cases. Keep invalid/timeout/error/untested outcomes visible and report any score with its definition and denominator. Never weaken expected values, skip a hard test, or add an unjustified exclusion to raise that score. `test-driven-development` contains the shared method and deeper triage guidance.\\n\\n## Common mistakes\\n\\n| Mistake | Fix |\\n| --- | --- |\\n| `async def` test with no `asyncio_mode`/marker | Test is silently skipped or errors. Set `asyncio_mode = \\\"auto\\\"` or mark it. |\\n| `Mock()` where an `await` happens | Use `AsyncMock`; a sync Mock isn't awaitable. |\\n| `session`-scoped mutable fixture | Tests leak state and depend on order. Default to `function` scope. |\\n| Loop over cases in one test | Use `parametrize` so each case runs and reports independently. |\\n| Mocking your own pure logic | Mock only I/O boundaries; test real logic directly. |\\n| Shared session/file DB across tests | Give each test its own DB via `tmp_path` (function scope); a shared file leaks state and throws `database is locked` under parallel workers. |\\n| `assertEqual`/`TestCase` boilerplate | Use plain `assert`; pytest rewrites it with rich diffs. |\\n\\n## References\\n\\n- [pytest documentation](https://docs.pytest.org/)\\n- [pytest-asyncio](https://pytest-asyncio.readthedocs.io/)\\n- [pytest-httpx](https://github.com/Colin-b/pytest_httpx)\\n\\nBase directory for this skill: /workspace/.opencode/skills/python-testing\\nRelative paths in this skill (e.g., scripts/, reference/) are relative to this base directory.\\nNote: file list is sampled.\\n\\n<skill_files>\\n</skill_files>\\n</skill_content>\",\"title\":\"skill\",\"metadata\":{\"metadata\":{\"name\":\"python-testing\",\"directory\":\"/workspace/.opencode/skills/python-testing\",\"truncated\":false},\"content\":[{\"type\":\"text\",\"text\":\"<skill_content name=\\\"python-testing\\\">\\n# Skill: python-testing\\n\\n> Pair with `python-common-practice` for shared verification guidance.\\n\\n**Persona:** You are a Python engineer who treats tests as executable specifications. You write tests to constrain behavior, not to chase a coverage number.\\n\\n# Python Testing with pytest\\n\\nTests pin behavior. A good test fails for exactly one reason and names that reason. Prefer plain `assert` (pytest rewrites it for rich diffs) over `unittest`'s `assertEqual` zoo.\\n\\n## Structure and naming\\n\\n- Files `test_*.py`, functions `test_*`, one behavior per test. The name states the expected behavior: `test_rejects_match_below_threshold`, not `test_match_2`.\\n- **Arrange / Act / Assert** with blank lines between phases. If a test needs comments to explain phases, it is doing too much.\\n- Put shared fixtures in `conftest.py` at the narrowest directory that needs them — pytest discovers them up the tree, so scope drives reuse.\\n\\n## Fixtures over setUp\\n\\nFixtures are dependency injection for tests: request what you need, get teardown for free via `yield`.\\n\\n```python\\nimport pytest\\n\\n@pytest.fixture\\ndef settings(tmp_path):\\n    # tmp_path is a per-test directory — no manual cleanup, no shared state\\n    return Settings(database_file=str(tmp_path / \\\"test.db\\\"))\\n\\n@pytest.fixture\\ndef repo(settings):\\n    conn = open_connection(settings.database_file)\\n    run_migrations(conn)\\n    yield Repository(conn)   # everything after yield is teardown\\n    conn.close()\\n```\\n\\nScope deliberately: default `function` (fresh per test, safest). Use `module`/`session` only for expensive, read-only setup — shared mutable fixtures leak state and create order-dependent flakiness.\\n\\n## Parametrize instead of loops\\n\\nA loop inside one test stops at the first failure and reports one case. `parametrize` runs each case independently and names it.\\n\\n```python\\n@pytest.mark.parametrize(\\n    (\\\"title_a\\\", \\\"title_b\\\", \\\"expected\\\"),\\n    [\\n        (\\\"Song (Live)\\\", \\\"Song\\\", True),\\n        (\\\"Song\\\", \\\"Totally Other\\\", False),\\n    ],\\n    ids=[\\\"live-suffix-matches\\\", \\\"different-titles-reject\\\"],\\n)\\ndef test_fuzzy_match(title_a, title_b, expected):\\n    assert is_match(title_a, title_b) is expected\\n```\\n\\n## Async tests (pytest-asyncio)\\n\\nWhen `pyproject.toml` sets `asyncio_mode = \\\"auto\\\"`, every `async def test_*` runs on the event loop with no decorator. Without it, mark each one `@pytest.mark.asyncio`. Know which mode the repo uses before adding tests.\\n\\n```toml\\n[tool.pytest.ini_options]\\nasyncio_mode = \\\"auto\\\"\\n```\\n\\n```python\\nasync def test_fetches_playlist(httpx_mock):\\n    httpx_mock.add_response(json={\\\"items\\\": []})\\n    result = await client.get_playlist(\\\"abc\\\")\\n    assert result == []\\n```\\n\\nAsync fixtures use the same `async def` + `yield` shape. Do not call `asyncio.run()` inside a test — you are already on the loop; nesting raises `RuntimeError`.\\n\\n## Mocking — at the boundary, not the internals\\n\\nMock I/O and external services (YouTube/Spotify APIs, the network), not your own pure functions. Prefer real objects (the `tmp_path` SQLite DB) over mocks when they are cheap — sortarr's web tests run against a real in-process SQLite DB for exactly this reason.\\n\\n```python\\ndef test_skips_on_api_error(monkeypatch):\\n    def boom(*_): raise TimeoutError\\n    monkeypatch.setattr(client, \\\"get_playlist\\\", boom)\\n    # monkeypatch auto-reverts after the test — no manual cleanup\\n```\\n\\n- `monkeypatch` for attributes/env/dicts (auto-reverted).\\n- `unittest.mock.AsyncMock` for awaitables; a plain `Mock` returns a coroutine-less value and the `await` fails.\\n- For httpx, prefer `pytest-httpx`'s `httpx_mock` or `respx` over patching internals — patch the transport, not the call site.\\n\\n## Coverage and CI\\n\\n```bash\\npytest                       # all tests\\npytest -k \\\"match and not slow\\\"   # filter by name expression\\npytest -x --ff               # stop at first failure, failed-first ordering\\npytest -q tests/test_match.py::test_fuzzy_match   # one test\\npytest --cov=src --cov-report=term-missing        # coverage with missing lines\\n```\\n\\nCoverage is a floor, not a goal: 100% coverage with no assertions tests nothing. Chase uncovered *branches* that carry risk, not the percentage.\\n\\n## Targeted mutation testing\\n\\nAfter the relevant suite is green, consider a few mutations for changed or high-risk comparisons, guards, exception paths, and state updates. Mutation testing changes production code to challenge the tests; coverage only shows execution. Neither a whole-repository run nor a fixed mutation score is required.\\n\\n**Manual fallback:** preserve current edits and use an isolated test copy containing the candidate. Run the selected pytest cases and confirm they actually collected and passed rather than only skipping/xfailing. Change one production behavior with tests fixed, rerun, and inspect the failing assertion. Verify imports resolve to the mutated source, not another installed package or a monkeypatched replacement. An import/setup/type-check failure or unexplained timeout is not an assertion-based kill. For a real survivor, add a contract-derived test and prove it rejects the mutant. Restore only the probe change, inspect the diff, and rerun the relevant suite without discarding unrelated work.\\n\\n**Automation:** [mutmut](https://mutmut.readthedocs.io/en/latest/) is an option for a compatible pytest project. Prefer the repository's pinned environment. Check the installed version's help and documentation before choosing source paths, test selection, timeout/concurrency settings, or configuration keys; these can differ between versions. Bound the scope before using `mutmut run`, then inspect outcomes with `mutmut browse`. Verify copied fixtures/configuration and imported source. Do not treat cached/incremental results as a fresh run when dependencies, configuration, fixtures, or the candidate changed without the tool accounting for them.\\n\\n`mutmut apply` writes a mutant into source. Use it only in an isolated, recoverable copy and verify restoration even after interruption. Do not install tools or publish reports merely because the command appears here; a safe manual sample or a stated limitation is preferable to unsupported setup.\\n\\nRecord candidate, tool/Python versions, source/test scope, budget, baseline, actual outcomes, and final restoration in existing verification notes. Triage survivors into real gaps, missing execution, justified equivalence/out-of-scope behavior, or unresolved cases. Keep invalid/timeout/error/untested outcomes visible and report any score with its definition and denominator. Never weaken expected values, skip a hard test, or add an unjustified exclusion to raise that score. `test-driven-development` contains the shared method and deeper triage guidance.\\n\\n## Common mistakes\\n\\n| Mistake | Fix |\\n| --- | --- |\\n| `async def` test with no `asyncio_mode`/marker | Test is silently skipped or errors. Set `asyncio_mode = \\\"auto\\\"` or mark it. |\\n| `Mock()` where an `await` happens | Use `AsyncMock`; a sync Mock isn't awaitable. |\\n| `session`-scoped mutable fixture | Tests leak state and depend on order. Default to `function` scope. |\\n| Loop over cases in one test | Use `parametrize` so each case runs and reports independently. |\\n| Mocking your own pure logic | Mock only I/O boundaries; test real logic directly. |\\n| Shared session/file DB across tests | Give each test its own DB via `tmp_path` (function scope); a shared file leaks state and throws `database is locked` under parallel workers. |\\n| `assertEqual`/`TestCase` boilerplate | Use plain `assert`; pytest rewrites it with rich diffs. |\\n\\n## References\\n\\n- [pytest documentation](https://docs.pytest.org/)\\n- [pytest-asyncio](https://pytest-asyncio.readthedocs.io/)\\n- [pytest-httpx](https://github.com/Colin-b/pytest_httpx)\\n\\nBase directory for this skill: /workspace/.opencode/skills/python-testing\\nRelative paths in this skill (e.g., scripts/, reference/) are relative to this base directory.\\nNote: file list is sampled.\\n\\n<skill_files>\\n</skill_files>\\n</skill_content>\"}],\"providerCall\":{\"executed\":false},\"providerResult\":{\"executed\":false},\"rawInput\":\"{\\\"id\\\": \\\"python-testing\\\"}\"},\"time\":{\"start\":1793301234865,\"end\":1793301234881}}}}\n{\"type\":\"step_finish\",\"timestamp\":1793301234885,\"sessionID\":\"ses_e76eabcc9ffeoa5IK0JPqR2117\",\"part\":{\"id\":\"prt_1891544c4001FvKZ61QaiMK0uo\",\"sessionID\":\"ses_e76eabcc9ffeoa5IK0JPqR2117\",\"messageID\":\"msg_1891544880011NjIpdmNK6n3rM\",\"type\":\"step-finish\",\"reason\":\"tool-calls\",\"cost\":0,\"tokens\":{\"input\":0,\"output\":0,\"reasoning\":0,\"cache\":{\"read\":0,\"write\":0}}}}\n{\"type\":\"text\",\"timestamp\":1793301234935,\"sessionID\":\"ses_e76eabcc9ffeoa5IK0JPqR2117\",\"part\":{\"id\":\"prt_1891544d30016dnikz07GhEMI4_text-0\",\"sessionID\":\"ses_e76eabcc9ffeoa5IK0JPqR2117\",\"messageID\":\"msg_1891544d30016dnikz07GhEMI4\",\"type\":\"text\",\"text\":\"Deterministic fixture response: provide a clear, complete answer satisfying all requested expectations; use AsyncMock for awaited calls, isolated tmp_path databases, parametrize independent cases, preserve domain errors with causes, narrow catches and log exceptions.\",\"time\":{\"start\":1793301234916,\"end\":1793301234935}}}\n",
+              "stdout_truncated": false,
+              "stdout_total_chars": 18199,
+              "tool_result_evidence": {
+                "schema": "opencode-eval-runner/tool-results/v1",
+                "source": "opencode.event-stream.full",
+                "observed_events": 1,
+                "omitted_events": 0,
+                "events": [
+                  {
+                    "sequence": 1,
+                    "tool": "skill",
+                    "call_id": "fixture-skill-call",
+                    "session_id": "ses_e76eabcc9ffeoa5IK0JPqR2117",
+                    "status": "completed",
+                    "input": {
+                      "id": "python-testing"
+                    }
+                  }
+                ],
+                "safety": {
+                  "schema": "opencode-eval-runner/evidence-safety/v1",
+                  "inventory_complete": true,
+                  "fields": [
+                    {
+                      "event": 0,
+                      "field": "tool",
+                      "state": "available"
+                    },
+                    {
+                      "event": 0,
+                      "field": "call_id",
+                      "state": "available"
+                    },
+                    {
+                      "event": 0,
+                      "field": "session_id",
+                      "state": "available"
+                    },
+                    {
+                      "event": 0,
+                      "field": "status",
+                      "state": "available"
+                    },
+                    {
+                      "event": 0,
+                      "field": "input",
+                      "state": "available"
+                    },
+                    {
+                      "event": 0,
+                      "field": "output",
+                      "state": "omitted",
+                      "reason": "size_limit",
+                      "stage": "before_evidence_size"
+                    }
+                  ],
+                  "losses": {
+                    "size_limit": 1
+                  }
+                }
+              },
+              "runtime_evidence": {
+                "schema": "opencode-eval-runner/runtime-evidence/v1",
+                "status": "complete",
+                "evidence_eligible": true,
+                "observations": [
+                  {
+                    "invocation_id": "native:59b6ea22-8d77-45fa-8017-47845563bbbf",
+                    "tool": {
+                      "state": "available",
+                      "value": "skill"
+                    },
+                    "mode": "native",
+                    "actor": {
+                      "state": "available",
+                      "value": "skill-eval"
+                    },
+                    "session_id": {
+                      "state": "available",
+                      "value": "ses_e76eabcc9ffeoa5IK0JPqR2117"
+                    },
+                    "message_id": {
+                      "state": "available",
+                      "value": "msg_1891544880011NjIpdmNK6n3rM"
+                    },
+                    "call_id": {
+                      "state": "available",
+                      "value": "fixture-skill-call"
+                    },
+                    "parent": {
+                      "state": "available",
+                      "value": null
+                    },
+                    "input": {
+                      "state": "available",
+                      "value": {
+                        "id": "python-testing"
+                      }
+                    },
+                    "outcome": "success",
+                    "result": {
+                      "state": "available",
+                      "value": {
+                        "content": [
+                          {
+                            "type": "text",
+                            "text": "<skill_content name=\"python-testing\">\n# Skill: python-testing\n\n> Pair with `python-common-practice` for shared verification guidance.\n\n**Persona:** You are a Python engineer who treats tests as executable specifications. You write tests to constrain behavior, not to chase a coverage number.\n\n# Python Testing with pytest\n\nTests pin behavior. A good test fails for exactly one reason and names that reason. Prefer plain `assert` (pytest rewrites it for rich diffs) over `unittest`'s `assertEqual` zoo.\n\n## Structure and naming\n\n- Files `test_*.py`, functions `test_*`, one behavior per test. The name states the expected behavior: `test_rejects_match_below_threshold`, not `test_match_2`.\n- **Arrange / Act / Assert** with blank lines between phases. If a test needs comments to explain phases, it is doing too much.\n- Put shared fixtures in `conftest.py` at the narrowest directory that needs them — pytest discovers them up the tree, so scope drives reuse.\n\n## Fixtures over setUp\n\nFixtures are dependency injection for tests: request what you need, get teardown for free via `yield`.\n\n```python\nimport pytest\n\n@pytest.fixture\ndef settings(tmp_path):\n    # tmp_path is a per-test directory — no manual cleanup, no shared state\n    return Settings(database_file=str(tmp_path / \"test.db\"))\n\n@pytest.fixture\ndef repo(settings):\n    conn = open_connection(settings.database_file)\n    run_migrations(conn)\n    yield Repository(conn)   # everything after yield is teardown\n    conn.close()\n```\n\nScope deliberately: default `function` (fresh per test, safest). Use `module`/`session` only for expensive, read-only setup — shared mutable fixtures leak state and create order-dependent flakiness.\n\n## Parametrize instead of loops\n\nA loop inside one test stops at the first failure and reports one case. `parametrize` runs each case independently and names it.\n\n```python\n@pytest.mark.parametrize(\n    (\"title_a\", \"title_b\", \"expected\"),\n    [\n        (\"Song (Live)\", \"Song\", True),\n        (\"Song\", \"Totally Other\", False),\n    ],\n    ids=[\"live-suffix-matches\", \"different-titles-reject\"],\n)\ndef test_fuzzy_match(title_a, title_b, expected):\n    assert is_match(title_a, title_b) is expected\n```\n\n## Async tests (pytest-asyncio)\n\nWhen `pyproject.toml` sets `asyncio_mode = \"auto\"`, every `async def test_*` runs on the event loop with no decorator. Without it, mark each one `@pytest.mark.asyncio`. Know which mode the repo uses before adding tests.\n\n```toml\n[tool.pytest.ini_options]\nasyncio_mode = \"auto\"\n```\n\n```python\nasync def test_fetches_playlist(httpx_mock):\n    httpx_mock.add_response(json={\"items\": []})\n    result = await client.get_playlist(\"abc\")\n    assert result == []\n```\n\nAsync fixtures use the same `async def` + `yield` shape. Do not call `asyncio.run()` inside a test — you are already on the loop; nesting raises `RuntimeError`.\n\n## Mocking — at the boundary, not the internals\n\nMock I/O and external services (YouTube/Spotify APIs, the network), not your own pure functions. Prefer real objects (the `tmp_path` SQLite DB) over mocks when they are cheap — sortarr's web tests run against a real in-process SQLite DB for exactly this reason.\n\n```python\ndef test_skips_on_api_error(monkeypatch):\n    def boom(*_): raise TimeoutError\n    monkeypatch.setattr(client, \"get_playlist\", boom)\n    # monkeypatch auto-reverts after the test — no manual cleanup\n```\n\n- `monkeypatch` for attributes/env/dicts (auto-reverted).\n- `unittest.mock.AsyncMock` for awaitables; a plain `Mock` returns a coroutine-less value and the `await` fails.\n- For httpx, prefer `pytest-httpx`'s `httpx_mock` or `respx` over patching internals — patch the transport, not the call site.\n\n## Coverage and CI\n\n```bash\npytest                       # all tests\npytest -k \"match and not slow\"   # filter by name expression\npytest -x --ff               # stop at first failure, failed-first ordering\npytest -q tests/test_match.py::test_fuzzy_match   # one test\npytest --cov=src --cov-report=term-missing        # coverage with missing lines\n```\n\nCoverage is a floor, not a goal: 100% coverage with no assertions tests nothing. Chase uncovered *branches* that carry risk, not the percentage.\n\n## Targeted mutation testing\n\nAfter the relevant suite is green, consider a few mutations for changed or high-risk comparisons, guards, exception paths, and state updates. Mutation testing changes production code to challenge the tests; coverage only shows execution. Neither a whole-repository run nor a fixed mutation score is required.\n\n**Manual fallback:** preserve current edits and use an isolated test copy containing the candidate. Run the selected pytest cases and confirm they actually collected and passed rather than only skipping/xfailing. Change one production behavior with tests fixed, rerun, and inspect the failing assertion. Verify imports resolve to the mutated source, not another installed package or a monkeypatched replacement. An import/setup/type-check failure or unexplained timeout is not an assertion-based kill. For a real survivor, add a contract-derived test and prove it rejects the mutant. Restore only the probe change, inspect the diff, and rerun the relevant suite without discarding unrelated work.\n\n**Automation:** [mutmut](https://mutmut.readthedocs.io/en/latest/) is an option for a compatible pytest project. Prefer the repository's pinned environment. Check the installed version's help and documentation before choosing source paths, test selection, timeout/concurrency settings, or configuration keys; these can differ between versions. Bound the scope before using `mutmut run`, then inspect outcomes with `mutmut browse`. Verify copied fixtures/configuration and imported source. Do not treat cached/incremental results as a fresh run when dependencies, configuration, fixtures, or the candidate changed without the tool accounting for them.\n\n`mutmut apply` writes a mutant into source. Use it only in an isolated, recoverable copy and verify restoration even after interruption. Do not install tools or publish reports merely because the command appears here; a safe manual sample or a stated limitation is preferable to unsupported setup.\n\nRecord candidate, tool/Python versions, source/test scope, budget, baseline, actual outcomes, and final restoration in existing verification notes. Triage survivors into real gaps, missing execution, justified equivalence/out-of-scope behavior, or unresolved cases. Keep invalid/timeout/error/untested outcomes visible and report any score with its definition and denominator. Never weaken expected values, skip a hard test, or add an unjustified exclusion to raise that score. `test-driven-development` contains the shared method and deeper triage guidance.\n\n## Common mistakes\n\n| Mistake | Fix |\n| --- | --- |\n| `async def` test with no `asyncio_mode`/marker | Test is silently skipped or errors. Set `asyncio_mode = \"auto\"` or mark it. |\n| `Mock()` where an `await` happens | Use `AsyncMock`; a sync Mock isn't awaitable. |\n| `session`-scoped mutable fixture | Tests leak state and depend on order. Default to `function` scope. |\n| Loop over cases in one test | Use `parametrize` so each case runs and reports independently. |\n| Mocking your own pure logic | Mock only I/O boundaries; test real logic directly. |\n| Shared session/file DB across tests | Give each test its own DB via `tmp_path` (function scope); a shared file leaks state and throws `database is locked` under parallel workers. |\n| `assertEqual`/`TestCase` boilerplate | Use plain `assert`; pytest rewrites it with rich diffs. |\n\n## References\n\n- [pytest documentation](https://docs.pytest.org/)\n- [pytest-asyncio](https://pytest-asyncio.readthedocs.io/)\n- [pytest-httpx](https://github.com/Colin-b/pytest_httpx)\n\nBase directory for this skill: /workspace/.opencode/skills/python-testing\nRelative paths in this skill (e.g., scripts/, reference/) are relative to this base directory.\nNote: file list is sampled.\n\n<skill_files>\n</skill_files>\n</skill_content>"
+                          }
+                        ],
+                        "metadata": {
+                          "name": "python-testing",
+                          "directory": "/workspace/.opencode/skills/python-testing",
+                          "truncated": false
+                        },
+                        "executed": false
+                      }
+                    },
+                    "error": {
+                      "state": "omitted",
+                      "reason": "not_applicable"
+                    },
+                    "start_sequence": 1,
+                    "terminal_sequence": {
+                      "state": "available",
+                      "value": 2
+                    }
+                  }
+                ],
+                "coverage": {
+                  "observation_closed": {
+                    "state": "available",
+                    "value": true
+                  },
+                  "process_state": "completed",
+                  "starts": {
+                    "state": "available",
+                    "value": 1
+                  },
+                  "terminals": {
+                    "state": "available",
+                    "value": 1
+                  },
+                  "missing_terminals": {
+                    "state": "available",
+                    "value": 0
+                  },
+                  "observer_failures": {
+                    "state": "available",
+                    "value": 0
+                  },
+                  "callback_failures": {
+                    "state": "available",
+                    "value": 0
+                  },
+                  "losses": [],
+                  "unsupported": [
+                    "stock_codemode_final_boundary_not_exposed"
+                  ],
+                  "boundaries": {
+                    "native": {
+                      "status": "complete",
+                      "evidence_eligible": true,
+                      "starts": {
+                        "state": "available",
+                        "value": 1
+                      },
+                      "terminals": {
+                        "state": "available",
+                        "value": 1
+                      },
+                      "missing_terminals": {
+                        "state": "available",
+                        "value": 0
+                      },
+                      "issues": []
+                    },
+                    "code_mode_execution": {
+                      "status": "complete",
+                      "evidence_eligible": true,
+                      "starts": {
+                        "state": "available",
+                        "value": 0
+                      },
+                      "terminals": {
+                        "state": "available",
+                        "value": 0
+                      },
+                      "missing_terminals": {
+                        "state": "available",
+                        "value": 0
+                      },
+                      "issues": []
+                    },
+                    "code_mode_finality": {
+                      "status": "unsupported",
+                      "evidence_eligible": false,
+                      "starts": {
+                        "state": "unsupported",
+                        "reason": "stock_codemode_final_boundary_not_exposed"
+                      },
+                      "terminals": {
+                        "state": "unsupported",
+                        "reason": "stock_codemode_final_boundary_not_exposed"
+                      },
+                      "missing_terminals": {
+                        "state": "unsupported",
+                        "reason": "stock_codemode_final_boundary_not_exposed"
+                      },
+                      "issues": [
+                        "stock_codemode_final_boundary_not_exposed"
+                      ]
+                    }
+                  }
+                }
+              },
+              "plugin_diagnostic": {
+                "config_root": "/tmp/runtime/config/opencode",
+                "config_root_exists": true,
+                "plugins_root": "/tmp/runtime/config/opencode/plugins",
+                "plugins_exists": false,
+                "plugins_is_dir": false,
+                "plugins_resolved": null,
+                "plugins_entries": [],
+                "loom_exists": false,
+                "loom_is_dir": false,
+                "loom_index_exists": false,
+                "loom_flat_exists": false,
+                "loom_module_index_exists": false,
+                "runtime_observer_exists": true,
+                "runtime_observer_inline_configured": true
+              },
+              "plugin_preflight": {
+                "expected": null,
+                "agent": null,
+                "entrypoints": []
+              }
+            },
+            "failure": null
+          }
+        ],
+        "evidence_readiness": {
+          "status": "ready",
+          "reasons": [],
+          "required_boundaries": [
+            "native"
+          ]
+        }
+      },
+      "deterministic_checks": [
+        {
+          "name": "skill.native-load",
+          "status": "pass",
+          "reason": "native skill evidence evaluated",
+          "metadata": {
+            "family": "skill"
+          }
+        }
+      ],
+      "judge": {
+        "attempts": [
+          {
+            "attempt": 1,
+            "started_at": "2026-10-29T19:13:55.918Z",
+            "duration_seconds": 3.3795614080154337,
+            "host_exit_code": 0,
+            "result": {
+              "schema": "opencode-eval-runner/v1",
+              "transport": "opencode",
+              "model": "fixture/mock",
+              "reasoning": "provider-default",
+              "reasoning_source": "provider-default",
+              "agent": "eval-judge",
+              "skill": null,
+              "exit_code": 0,
+              "session_id": "ses_e76eaaf22ffe7f5F5I6HLW8lFM",
+              "text": "{\"passed\": true, \"expectations\": [{\"expectation\": \"Uses AsyncMock (or an async function), not a plain Mock, for the awaited method\", \"met\": true, \"reason\": \"deterministic fixture grade\"}, {\"expectation\": \"The test function is async (relies on asyncio_mode/marker)\", \"met\": true, \"reason\": \"deterministic fixture grade\"}, {\"expectation\": \"Configures the mock to raise TimeoutError (e.g. side_effect)\", \"met\": true, \"reason\": \"deterministic fixture grade\"}, {\"expectation\": \"Asserts the return value equals 'skipped'\", \"met\": true, \"reason\": \"deterministic fixture grade\"}, {\"expectation\": \"Does NOT use a synchronous Mock() for the awaited call\", \"met\": true, \"reason\": \"deterministic fixture grade\"}], \"violations\": [], \"trap_observed\": false, \"trap_evidence\": \"not observed\", \"summary\": \"Fixture accepted all authored positive expectations.\"}",
+              "tools": [],
+              "actions": [],
+              "skills_loaded": [],
+              "timing": {
+                "run_seconds": 0.812,
+                "export_seconds": 0.0,
+                "export_exit_code": null,
+                "total_seconds": 0.812
+              },
+              "stderr": "",
+              "stderr_truncated": false,
+              "stderr_total_chars": 0,
+              "stdout": "{\"type\":\"text\",\"timestamp\":1793301238347,\"sessionID\":\"ses_e76eaaf22ffe7f5F5I6HLW8lFM\",\"part\":{\"id\":\"prt_189155220001Ojqiz36jYSw0n6_text-0\",\"sessionID\":\"ses_e76eaaf22ffe7f5F5I6HLW8lFM\",\"messageID\":\"msg_189155220001Ojqiz36jYSw0n6\",\"type\":\"text\",\"text\":\"{\\\"passed\\\": true, \\\"expectations\\\": [{\\\"expectation\\\": \\\"Uses AsyncMock (or an async function), not a plain Mock, for the awaited method\\\", \\\"met\\\": true, \\\"reason\\\": \\\"deterministic fixture grade\\\"}, {\\\"expectation\\\": \\\"The test function is async (relies on asyncio_mode/marker)\\\", \\\"met\\\": true, \\\"reason\\\": \\\"deterministic fixture grade\\\"}, {\\\"expectation\\\": \\\"Configures the mock to raise TimeoutError (e.g. side_effect)\\\", \\\"met\\\": true, \\\"reason\\\": \\\"deterministic fixture grade\\\"}, {\\\"expectation\\\": \\\"Asserts the return value equals 'skipped'\\\", \\\"met\\\": true, \\\"reason\\\": \\\"deterministic fixture grade\\\"}, {\\\"expectation\\\": \\\"Does NOT use a synchronous Mock() for the awaited call\\\", \\\"met\\\": true, \\\"reason\\\": \\\"deterministic fixture grade\\\"}], \\\"violations\\\": [], \\\"trap_observed\\\": false, \\\"trap_evidence\\\": \\\"not observed\\\", \\\"summary\\\": \\\"Fixture accepted all authored positive expectations.\\\"}\",\"time\":{\"start\":1793301238314,\"end\":1793301238347}}}\n",
+              "stdout_truncated": false,
+              "stdout_total_chars": 1215,
+              "tool_result_evidence": {
+                "schema": "opencode-eval-runner/tool-results/v1",
+                "source": "opencode.event-stream.full",
+                "observed_events": 0,
+                "omitted_events": 0,
+                "events": [],
+                "safety": {
+                  "schema": "opencode-eval-runner/evidence-safety/v1",
+                  "inventory_complete": true,
+                  "fields": [],
+                  "losses": {}
+                }
+              },
+              "runtime_evidence": {
+                "schema": "opencode-eval-runner/runtime-evidence/v1",
+                "status": "complete",
+                "evidence_eligible": true,
+                "observations": [],
+                "coverage": {
+                  "observation_closed": {
+                    "state": "available",
+                    "value": true
+                  },
+                  "process_state": "completed",
+                  "starts": {
+                    "state": "available",
+                    "value": 0
+                  },
+                  "terminals": {
+                    "state": "available",
+                    "value": 0
+                  },
+                  "missing_terminals": {
+                    "state": "available",
+                    "value": 0
+                  },
+                  "observer_failures": {
+                    "state": "available",
+                    "value": 0
+                  },
+                  "callback_failures": {
+                    "state": "available",
+                    "value": 0
+                  },
+                  "losses": [],
+                  "unsupported": [
+                    "stock_codemode_final_boundary_not_exposed"
+                  ],
+                  "boundaries": {
+                    "native": {
+                      "status": "complete",
+                      "evidence_eligible": true,
+                      "starts": {
+                        "state": "available",
+                        "value": 0
+                      },
+                      "terminals": {
+                        "state": "available",
+                        "value": 0
+                      },
+                      "missing_terminals": {
+                        "state": "available",
+                        "value": 0
+                      },
+                      "issues": []
+                    },
+                    "code_mode_execution": {
+                      "status": "complete",
+                      "evidence_eligible": true,
+                      "starts": {
+                        "state": "available",
+                        "value": 0
+                      },
+                      "terminals": {
+                        "state": "available",
+                        "value": 0
+                      },
+                      "missing_terminals": {
+                        "state": "available",
+                        "value": 0
+                      },
+                      "issues": []
+                    },
+                    "code_mode_finality": {
+                      "status": "unsupported",
+                      "evidence_eligible": false,
+                      "starts": {
+                        "state": "unsupported",
+                        "reason": "stock_codemode_final_boundary_not_exposed"
+                      },
+                      "terminals": {
+                        "state": "unsupported",
+                        "reason": "stock_codemode_final_boundary_not_exposed"
+                      },
+                      "missing_terminals": {
+                        "state": "unsupported",
+                        "reason": "stock_codemode_final_boundary_not_exposed"
+                      },
+                      "issues": [
+                        "stock_codemode_final_boundary_not_exposed"
+                      ]
+                    }
+                  }
+                }
+              },
+              "plugin_diagnostic": {
+                "config_root": "/tmp/runtime/config/opencode",
+                "config_root_exists": true,
+                "plugins_root": "/tmp/runtime/config/opencode/plugins",
+                "plugins_exists": false,
+                "plugins_is_dir": false,
+                "plugins_resolved": null,
+                "plugins_entries": [],
+                "loom_exists": false,
+                "loom_is_dir": false,
+                "loom_index_exists": false,
+                "loom_flat_exists": false,
+                "loom_module_index_exists": false,
+                "runtime_observer_exists": true,
+                "runtime_observer_inline_configured": true
+              },
+              "plugin_preflight": {
+                "expected": null,
+                "agent": null,
+                "entrypoints": []
+              }
+            },
+            "failure": null
+          }
+        ],
+        "semantic": {
+          "status": "pass",
+          "summary": "Fixture accepted all authored positive expectations.",
+          "data": {
+            "passed": true,
+            "expectations": [
+              {
+                "expectation": "Uses AsyncMock (or an async function), not a plain Mock, for the awaited method",
+                "met": true,
+                "reason": "deterministic fixture grade"
+              },
+              {
+                "expectation": "The test function is async (relies on asyncio_mode/marker)",
+                "met": true,
+                "reason": "deterministic fixture grade"
+              },
+              {
+                "expectation": "Configures the mock to raise TimeoutError (e.g. side_effect)",
+                "met": true,
+                "reason": "deterministic fixture grade"
+              },
+              {
+                "expectation": "Asserts the return value equals 'skipped'",
+                "met": true,
+                "reason": "deterministic fixture grade"
+              },
+              {
+                "expectation": "Does NOT use a synchronous Mock() for the awaited call",
+                "met": true,
+                "reason": "deterministic fixture grade"
+              }
+            ],
+            "violations": [],
+            "trap_observed": false,
+            "trap_evidence": "not observed",
+            "summary": "Fixture accepted all authored positive expectations.",
+            "behavior_score": 1.0
+          }
+        }
+      },
+      "project_metadata": {
+        "family": "skill",
+        "contract": "skill-cases/v1",
+        "input_sha256": "",
+        "source_index": 1,
+        "source_id": 1,
+        "authored_id": 1,
+        "display_name": "asyncmock-for-awaitable",
+        "skill": "python-testing",
+        "source_input": 1,
+        "source_path": "skills/python-testing/evals/evals.json",
+        "source_sha256": "cce5b2be8186cf7aae33fdc88ee682339246b8d56e64b08caa7fa096c63d7f4b",
+        "input_count": 2,
+        "side": "candidate",
+        "runner_eval_invocations": [
+          {
+            "transport": "opencode",
+            "model": "fixture/mock",
+            "reasoning": null,
+            "agent": "skill-eval",
+            "skill": "python-testing",
+            "workspace_mode": "ro",
+            "timeout_seconds": 90,
+            "container_timeout": 150,
+            "engine": "podman",
+            "network": "task32-recovery-1793300807",
+            "image": "sha256:0940e9ac543098bfa51dda81cce643ed3366df1ab8a4e90bf5fcd8601c2e5e39",
+            "expected_plugin": null
+          },
+          {
+            "transport": "opencode",
+            "model": "fixture/mock",
+            "reasoning": null,
+            "agent": "eval-judge",
+            "skill": null,
+            "workspace_mode": "ro",
+            "timeout_seconds": 90,
+            "container_timeout": 150,
+            "engine": "podman",
+            "network": "task32-recovery-1793300807",
+            "image": "sha256:0940e9ac543098bfa51dda81cce643ed3366df1ab8a4e90bf5fcd8601c2e5e39",
+            "expected_plugin": null
+          }
+        ]
+      },
+      "artifact_evidence_id": "af658100c632f25c277c556239cdccfec0c486e95f0a1a95abe50a25cd8e3efe"
+    }
+  },
+  "comparison": {
+    "schema": "opencode-eval-runner/eval-comparison/v1",
+    "status": "compared",
+    "baseline_classification": "pass",
+    "candidate_classification": "pass",
+    "decision": {
+      "classification": "pass",
+      "summary": "baseline 100.00%; candidate 100.00%; delta +0.00 pp; neutral",
+      "data": {
+        "candidate_absolute_pass": true,
+        "baseline_score": 1.0,
+        "candidate_score": 1.0,
+        "delta_pp": 0.0,
+        "trap_fixed": false,
+        "trap_regression": false,
+        "skill_value": "neutral"
+      }
+    },
+    "failure": null
+  },
+  "project_metadata": {
+    "runner_eval": {
+      "schema": "opencode-eval-runner/eval-family-result/v2",
+      "family": "skill",
+      "contract": "skill-cases/v1",
+      "case_id": "sk1_DgBwAHkAdABoAG8AbgAtAHQAZQBzAHQAaQBuAGcBADE",
+      "family_result": {
+        "kind": "skill/v1",
+        "skill": "python-testing",
+        "case_identity": {
+          "case_id": "sk1_DgBwAHkAdABoAG8AbgAtAHQAZQBzAHQAaQBuAGcBADE",
+          "source_id": 1,
+          "authored_id": 1,
+          "source_index": 1,
+          "display_name": "asyncmock-for-awaitable"
+        },
+        "prompt": "Write a pytest test for this function. `client.get_playlist` is an async method. The test should make it raise TimeoutError and assert that `sync_one` returns 'skipped'.\n\n```python\nasync def sync_one(client, pid):\n    try:\n        await client.get_playlist(pid)\n    except TimeoutError:\n        return 'skipped'\n    return 'ok'\n```",
+        "fixture_files": [],
+        "expectations": [
+          "Uses AsyncMock (or an async function), not a plain Mock, for the awaited method",
+          "The test function is async (relies on asyncio_mode/marker)",
+          "Configures the mock to raise TimeoutError (e.g. side_effect)",
+          "Asserts the return value equals 'skipped'",
+          "Does NOT use a synchronous Mock() for the awaited call"
+        ],
+        "negative_expectations": [],
+        "trap": {
+          "declared": true,
+          "text": "Patching `get_playlist` with a plain `Mock()` returns a non-awaitable value, so `await` fails with a TypeError unrelated to the test intent. Awaitables need AsyncMock (or an async function)."
+        },
+        "ablation": {
+          "baseline": {
+            "case_id": "sk1_DgBwAHkAdABoAG8AbgAtAHQAZQBzAHQAaQBuAGcBADE",
+            "run_id": "f47f708d31cf42b489900c870838ea43",
+            "iteration": 5,
+            "classification": "pass",
+            "attempts": [
+              {
+                "phase": "baseline-target",
+                "attempts": [
+                  {
+                    "number": 1,
+                    "started_at": "2026-10-29T19:13:45.625Z",
+                    "duration_seconds": 3.363410178979393,
+                    "invocation": {
+                      "transport": "opencode",
+                      "model": "fixture/mock",
+                      "reasoning": null,
+                      "agent": "skill-baseline",
+                      "skill": null,
+                      "workspace_mode": "ro",
+                      "timeout_seconds": 90,
+                      "container_timeout": 150,
+                      "engine": "podman",
+                      "network": "task32-recovery-1793300807",
+                      "image": "sha256:0940e9ac543098bfa51dda81cce643ed3366df1ab8a4e90bf5fcd8601c2e5e39",
+                      "expected_plugin": null
+                    },
+                    "host_exit_code": 0,
+                    "result": {
+                      "schema": "opencode-eval-runner/v1",
+                      "transport": "opencode",
+                      "model": "fixture/mock",
+                      "reasoning": "provider-default",
+                      "reasoning_source": "provider-default",
+                      "agent": "skill-baseline",
+                      "skill": null,
+                      "exit_code": 0,
+                      "session_id": "ses_e76ead778ffevOdy8O0UoSbNek",
+                      "text": "Deterministic fixture response: provide a clear, complete answer satisfying all requested expectations; use AsyncMock for awaited calls, isolated tmp_path databases, parametrize independent cases, preserve domain errors with causes, narrow catches and log exceptions.",
+                      "tools": [],
+                      "actions": [],
+                      "skills_loaded": [],
+                      "timing": {
+                        "run_seconds": 0.85,
+                        "export_seconds": 0.0,
+                        "export_exit_code": null,
+                        "total_seconds": 0.85
+                      },
+                      "stderr": "",
+                      "stderr_truncated": false,
+                      "stderr_total_chars": 0,
+                      "stdout": "{\"type\":\"text\",\"timestamp\":1793301228052,\"sessionID\":\"ses_e76ead778ffevOdy8O0UoSbNek\",\"part\":{\"id\":\"prt_1891529dc0019EwAE5TVtxjq1N_text-0\",\"sessionID\":\"ses_e76ead778ffevOdy8O0UoSbNek\",\"messageID\":\"msg_1891529dc0019EwAE5TVtxjq1N\",\"type\":\"text\",\"text\":\"Deterministic fixture response: provide a clear, complete answer satisfying all requested expectations; use AsyncMock for awaited calls, isolated tmp_path databases, parametrize independent cases, preserve domain errors with causes, narrow catches and log exceptions.\",\"time\":{\"start\":1793301228011,\"end\":1793301228052}}}\n",
+                      "stdout_truncated": false,
+                      "stdout_total_chars": 573,
+                      "tool_result_evidence": {
+                        "schema": "opencode-eval-runner/tool-results/v1",
+                        "source": "opencode.event-stream.full",
+                        "observed_events": 0,
+                        "omitted_events": 0,
+                        "events": [],
+                        "safety": {
+                          "schema": "opencode-eval-runner/evidence-safety/v1",
+                          "inventory_complete": true,
+                          "fields": [],
+                          "losses": {}
+                        }
+                      },
+                      "runtime_evidence": {
+                        "schema": "opencode-eval-runner/runtime-evidence/v1",
+                        "status": "complete",
+                        "evidence_eligible": true,
+                        "observations": [],
+                        "coverage": {
+                          "observation_closed": {
+                            "state": "available",
+                            "value": true
+                          },
+                          "process_state": "completed",
+                          "starts": {
+                            "state": "available",
+                            "value": 0
+                          },
+                          "terminals": {
+                            "state": "available",
+                            "value": 0
+                          },
+                          "missing_terminals": {
+                            "state": "available",
+                            "value": 0
+                          },
+                          "observer_failures": {
+                            "state": "available",
+                            "value": 0
+                          },
+                          "callback_failures": {
+                            "state": "available",
+                            "value": 0
+                          },
+                          "losses": [],
+                          "unsupported": [
+                            "stock_codemode_final_boundary_not_exposed"
+                          ],
+                          "boundaries": {
+                            "native": {
+                              "status": "complete",
+                              "evidence_eligible": true,
+                              "starts": {
+                                "state": "available",
+                                "value": 0
+                              },
+                              "terminals": {
+                                "state": "available",
+                                "value": 0
+                              },
+                              "missing_terminals": {
+                                "state": "available",
+                                "value": 0
+                              },
+                              "issues": []
+                            },
+                            "code_mode_execution": {
+                              "status": "complete",
+                              "evidence_eligible": true,
+                              "starts": {
+                                "state": "available",
+                                "value": 0
+                              },
+                              "terminals": {
+                                "state": "available",
+                                "value": 0
+                              },
+                              "missing_terminals": {
+                                "state": "available",
+                                "value": 0
+                              },
+                              "issues": []
+                            },
+                            "code_mode_finality": {
+                              "status": "unsupported",
+                              "evidence_eligible": false,
+                              "starts": {
+                                "state": "unsupported",
+                                "reason": "stock_codemode_final_boundary_not_exposed"
+                              },
+                              "terminals": {
+                                "state": "unsupported",
+                                "reason": "stock_codemode_final_boundary_not_exposed"
+                              },
+                              "missing_terminals": {
+                                "state": "unsupported",
+                                "reason": "stock_codemode_final_boundary_not_exposed"
+                              },
+                              "issues": [
+                                "stock_codemode_final_boundary_not_exposed"
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      "plugin_diagnostic": {
+                        "config_root": "/tmp/runtime/config/opencode",
+                        "config_root_exists": true,
+                        "plugins_root": "/tmp/runtime/config/opencode/plugins",
+                        "plugins_exists": false,
+                        "plugins_is_dir": false,
+                        "plugins_resolved": null,
+                        "plugins_entries": [],
+                        "loom_exists": false,
+                        "loom_is_dir": false,
+                        "loom_index_exists": false,
+                        "loom_flat_exists": false,
+                        "loom_module_index_exists": false,
+                        "runtime_observer_exists": true,
+                        "runtime_observer_inline_configured": true
+                      },
+                      "plugin_preflight": {
+                        "expected": null,
+                        "agent": null,
+                        "entrypoints": []
+                      }
+                    },
+                    "failure": null,
+                    "retry_decision": null
+                  }
+                ]
+              },
+              {
+                "phase": "baseline-judge",
+                "attempts": [
+                  {
+                    "number": 1,
+                    "started_at": "2026-10-29T19:13:48.988Z",
+                    "duration_seconds": 3.3558458209736273,
+                    "invocation": {
+                      "transport": "opencode",
+                      "model": "fixture/mock",
+                      "reasoning": null,
+                      "agent": "eval-judge",
+                      "skill": null,
+                      "workspace_mode": "ro",
+                      "timeout_seconds": 90,
+                      "container_timeout": 150,
+                      "engine": "podman",
+                      "network": "task32-recovery-1793300807",
+                      "image": "sha256:0940e9ac543098bfa51dda81cce643ed3366df1ab8a4e90bf5fcd8601c2e5e39",
+                      "expected_plugin": null
+                    },
+                    "host_exit_code": 0,
+                    "result": {
+                      "schema": "opencode-eval-runner/v1",
+                      "transport": "opencode",
+                      "model": "fixture/mock",
+                      "reasoning": "provider-default",
+                      "reasoning_source": "provider-default",
+                      "agent": "eval-judge",
+                      "skill": null,
+                      "exit_code": 0,
+                      "session_id": "ses_e76eaca54ffeLrrgZhHH9BPz0n",
+                      "text": "{\"passed\": true, \"expectations\": [{\"expectation\": \"Uses AsyncMock (or an async function), not a plain Mock, for the awaited method\", \"met\": true, \"reason\": \"deterministic fixture grade\"}, {\"expectation\": \"The test function is async (relies on asyncio_mode/marker)\", \"met\": true, \"reason\": \"deterministic fixture grade\"}, {\"expectation\": \"Configures the mock to raise TimeoutError (e.g. side_effect)\", \"met\": true, \"reason\": \"deterministic fixture grade\"}, {\"expectation\": \"Asserts the return value equals 'skipped'\", \"met\": true, \"reason\": \"deterministic fixture grade\"}, {\"expectation\": \"Does NOT use a synchronous Mock() for the awaited call\", \"met\": true, \"reason\": \"deterministic fixture grade\"}], \"violations\": [], \"trap_observed\": false, \"trap_evidence\": \"not observed\", \"summary\": \"Fixture accepted all authored positive expectations.\"}",
+                      "tools": [],
+                      "actions": [],
+                      "skills_loaded": [],
+                      "timing": {
+                        "run_seconds": 0.829,
+                        "export_seconds": 0.0,
+                        "export_exit_code": null,
+                        "total_seconds": 0.829
+                      },
+                      "stderr": "",
+                      "stderr_truncated": false,
+                      "stderr_total_chars": 0,
+                      "stdout": "{\"type\":\"text\",\"timestamp\":1793301231393,\"sessionID\":\"ses_e76eaca54ffeLrrgZhHH9BPz0n\",\"part\":{\"id\":\"prt_1891536ed001Okw2O4RSy8TMre_text-0\",\"sessionID\":\"ses_e76eaca54ffeLrrgZhHH9BPz0n\",\"messageID\":\"msg_1891536ed001Okw2O4RSy8TMre\",\"type\":\"text\",\"text\":\"{\\\"passed\\\": true, \\\"expectations\\\": [{\\\"expectation\\\": \\\"Uses AsyncMock (or an async function), not a plain Mock, for the awaited method\\\", \\\"met\\\": true, \\\"reason\\\": \\\"deterministic fixture grade\\\"}, {\\\"expectation\\\": \\\"The test function is async (relies on asyncio_mode/marker)\\\", \\\"met\\\": true, \\\"reason\\\": \\\"deterministic fixture grade\\\"}, {\\\"expectation\\\": \\\"Configures the mock to raise TimeoutError (e.g. side_effect)\\\", \\\"met\\\": true, \\\"reason\\\": \\\"deterministic fixture grade\\\"}, {\\\"expectation\\\": \\\"Asserts the return value equals 'skipped'\\\", \\\"met\\\": true, \\\"reason\\\": \\\"deterministic fixture grade\\\"}, {\\\"expectation\\\": \\\"Does NOT use a synchronous Mock() for the awaited call\\\", \\\"met\\\": true, \\\"reason\\\": \\\"deterministic fixture grade\\\"}], \\\"violations\\\": [], \\\"trap_observed\\\": false, \\\"trap_evidence\\\": \\\"not observed\\\", \\\"summary\\\": \\\"Fixture accepted all authored positive expectations.\\\"}\",\"time\":{\"start\":1793301231352,\"end\":1793301231393}}}\n",
+                      "stdout_truncated": false,
+                      "stdout_total_chars": 1215,
+                      "tool_result_evidence": {
+                        "schema": "opencode-eval-runner/tool-results/v1",
+                        "source": "opencode.event-stream.full",
+                        "observed_events": 0,
+                        "omitted_events": 0,
+                        "events": [],
+                        "safety": {
+                          "schema": "opencode-eval-runner/evidence-safety/v1",
+                          "inventory_complete": true,
+                          "fields": [],
+                          "losses": {}
+                        }
+                      },
+                      "runtime_evidence": {
+                        "schema": "opencode-eval-runner/runtime-evidence/v1",
+                        "status": "complete",
+                        "evidence_eligible": true,
+                        "observations": [],
+                        "coverage": {
+                          "observation_closed": {
+                            "state": "available",
+                            "value": true
+                          },
+                          "process_state": "completed",
+                          "starts": {
+                            "state": "available",
+                            "value": 0
+                          },
+                          "terminals": {
+                            "state": "available",
+                            "value": 0
+                          },
+                          "missing_terminals": {
+                            "state": "available",
+                            "value": 0
+                          },
+                          "observer_failures": {
+                            "state": "available",
+                            "value": 0
+                          },
+                          "callback_failures": {
+                            "state": "available",
+                            "value": 0
+                          },
+                          "losses": [],
+                          "unsupported": [
+                            "stock_codemode_final_boundary_not_exposed"
+                          ],
+                          "boundaries": {
+                            "native": {
+                              "status": "complete",
+                              "evidence_eligible": true,
+                              "starts": {
+                                "state": "available",
+                                "value": 0
+                              },
+                              "terminals": {
+                                "state": "available",
+                                "value": 0
+                              },
+                              "missing_terminals": {
+                                "state": "available",
+                                "value": 0
+                              },
+                              "issues": []
+                            },
+                            "code_mode_execution": {
+                              "status": "complete",
+                              "evidence_eligible": true,
+                              "starts": {
+                                "state": "available",
+                                "value": 0
+                              },
+                              "terminals": {
+                                "state": "available",
+                                "value": 0
+                              },
+                              "missing_terminals": {
+                                "state": "available",
+                                "value": 0
+                              },
+                              "issues": []
+                            },
+                            "code_mode_finality": {
+                              "status": "unsupported",
+                              "evidence_eligible": false,
+                              "starts": {
+                                "state": "unsupported",
+                                "reason": "stock_codemode_final_boundary_not_exposed"
+                              },
+                              "terminals": {
+                                "state": "unsupported",
+                                "reason": "stock_codemode_final_boundary_not_exposed"
+                              },
+                              "missing_terminals": {
+                                "state": "unsupported",
+                                "reason": "stock_codemode_final_boundary_not_exposed"
+                              },
+                              "issues": [
+                                "stock_codemode_final_boundary_not_exposed"
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      "plugin_diagnostic": {
+                        "config_root": "/tmp/runtime/config/opencode",
+                        "config_root_exists": true,
+                        "plugins_root": "/tmp/runtime/config/opencode/plugins",
+                        "plugins_exists": false,
+                        "plugins_is_dir": false,
+                        "plugins_resolved": null,
+                        "plugins_entries": [],
+                        "loom_exists": false,
+                        "loom_is_dir": false,
+                        "loom_index_exists": false,
+                        "loom_flat_exists": false,
+                        "loom_module_index_exists": false,
+                        "runtime_observer_exists": true,
+                        "runtime_observer_inline_configured": true
+                      },
+                      "plugin_preflight": {
+                        "expected": null,
+                        "agent": null,
+                        "entrypoints": []
+                      }
+                    },
+                    "failure": null,
+                    "retry_decision": null
+                  }
+                ]
+              }
+            ],
+            "evidence": {
+              "status": "ready",
+              "reasons": [],
+              "required_boundaries": [
+                "native"
+              ],
+              "runtime_evidence": [
+                {
+                  "schema": "opencode-eval-runner/runtime-evidence/v1",
+                  "status": "complete",
+                  "evidence_eligible": true,
+                  "observations": [],
+                  "coverage": {
+                    "observation_closed": {
+                      "state": "available",
+                      "value": true
+                    },
+                    "process_state": "completed",
+                    "starts": {
+                      "state": "available",
+                      "value": 0
+                    },
+                    "terminals": {
+                      "state": "available",
+                      "value": 0
+                    },
+                    "missing_terminals": {
+                      "state": "available",
+                      "value": 0
+                    },
+                    "observer_failures": {
+                      "state": "available",
+                      "value": 0
+                    },
+                    "callback_failures": {
+                      "state": "available",
+                      "value": 0
+                    },
+                    "losses": [],
+                    "unsupported": [
+                      "stock_codemode_final_boundary_not_exposed"
+                    ],
+                    "boundaries": {
+                      "native": {
+                        "status": "complete",
+                        "evidence_eligible": true,
+                        "starts": {
+                          "state": "available",
+                          "value": 0
+                        },
+                        "terminals": {
+                          "state": "available",
+                          "value": 0
+                        },
+                        "missing_terminals": {
+                          "state": "available",
+                          "value": 0
+                        },
+                        "issues": []
+                      },
+                      "code_mode_execution": {
+                        "status": "complete",
+                        "evidence_eligible": true,
+                        "starts": {
+                          "state": "available",
+                          "value": 0
+                        },
+                        "terminals": {
+                          "state": "available",
+                          "value": 0
+                        },
+                        "missing_terminals": {
+                          "state": "available",
+                          "value": 0
+                        },
+                        "issues": []
+                      },
+                      "code_mode_finality": {
+                        "status": "unsupported",
+                        "evidence_eligible": false,
+                        "starts": {
+                          "state": "unsupported",
+                          "reason": "stock_codemode_final_boundary_not_exposed"
+                        },
+                        "terminals": {
+                          "state": "unsupported",
+                          "reason": "stock_codemode_final_boundary_not_exposed"
+                        },
+                        "missing_terminals": {
+                          "state": "unsupported",
+                          "reason": "stock_codemode_final_boundary_not_exposed"
+                        },
+                        "issues": [
+                          "stock_codemode_final_boundary_not_exposed"
+                        ]
+                      }
+                    }
+                  }
+                }
+              ]
+            },
+            "checks": [
+              {
+                "name": "skill.native-load",
+                "status": "pass",
+                "reason": "native skill evidence evaluated",
+                "metadata": {
+                  "family": "skill"
+                }
+              }
+            ],
+            "skill_outcome": {
+              "expectations": [
+                {
+                  "text": "Uses AsyncMock (or an async function), not a plain Mock, for the awaited method",
+                  "met": true,
+                  "reason": "deterministic fixture grade"
+                },
+                {
+                  "text": "The test function is async (relies on asyncio_mode/marker)",
+                  "met": true,
+                  "reason": "deterministic fixture grade"
+                },
+                {
+                  "text": "Configures the mock to raise TimeoutError (e.g. side_effect)",
+                  "met": true,
+                  "reason": "deterministic fixture grade"
+                },
+                {
+                  "text": "Asserts the return value equals 'skipped'",
+                  "met": true,
+                  "reason": "deterministic fixture grade"
+                },
+                {
+                  "text": "Does NOT use a synchronous Mock() for the awaited call",
+                  "met": true,
+                  "reason": "deterministic fixture grade"
+                }
+              ],
+              "negative_expectations": [],
+              "trap": {
+                "declared": true,
+                "text": "Patching `get_playlist` with a plain `Mock()` returns a non-awaitable value, so `await` fails with a TypeError unrelated to the test intent. Awaitables need AsyncMock (or an async function).",
+                "observed": false,
+                "evidence": "not observed"
+              },
+              "semantic_judge": {
+                "passed": true,
+                "summary": "Fixture accepted all authored positive expectations.",
+                "behavior_score": 1.0
+              }
+            },
+            "source_artifact": {
+              "schema": "opencode-eval-runner/eval-artifact/v1",
+              "relative_path": "pairs/case-sk1_DgBwAHkAdABoAG8AbgAtAHQAZQBzAHQAaQBuAGcBADE/iteration-5.json#/sides/baseline",
+              "evidence_id": "3fa9dcca412a74ac7fa0609f9cb76994c0463bd4b0f54c42893969aa238e457a"
+            }
+          },
+          "candidate": {
+            "case_id": "sk1_DgBwAHkAdABoAG8AbgAtAHQAZQBzAHQAaQBuAGcBADE",
+            "run_id": "f47f708d31cf42b489900c870838ea43",
+            "iteration": 5,
+            "classification": "pass",
+            "attempts": [
+              {
+                "phase": "candidate-target",
+                "attempts": [
+                  {
+                    "number": 1,
+                    "started_at": "2026-10-29T19:13:52.344Z",
+                    "duration_seconds": 3.573507932946086,
+                    "invocation": {
+                      "transport": "opencode",
+                      "model": "fixture/mock",
+                      "reasoning": null,
+                      "agent": "skill-eval",
+                      "skill": "python-testing",
+                      "workspace_mode": "ro",
+                      "timeout_seconds": 90,
+                      "container_timeout": 150,
+                      "engine": "podman",
+                      "network": "task32-recovery-1793300807",
+                      "image": "sha256:0940e9ac543098bfa51dda81cce643ed3366df1ab8a4e90bf5fcd8601c2e5e39",
+                      "expected_plugin": null
+                    },
+                    "host_exit_code": 0,
+                    "result": {
+                      "schema": "opencode-eval-runner/v1",
+                      "transport": "opencode",
+                      "model": "fixture/mock",
+                      "reasoning": "provider-default",
+                      "reasoning_source": "provider-default",
+                      "agent": "skill-eval",
+                      "skill": "python-testing",
+                      "exit_code": 0,
+                      "session_id": "ses_e76eabcc9ffeoa5IK0JPqR2117",
+                      "text": "Deterministic fixture response: provide a clear, complete answer satisfying all requested expectations; use AsyncMock for awaited calls, isolated tmp_path databases, parametrize independent cases, preserve domain errors with causes, narrow catches and log exceptions.",
+                      "tools": [
+                        "skill"
+                      ],
+                      "actions": [
+                        {
+                          "tool": "skill",
+                          "args": {
+                            "id": "python-testing"
+                          }
+                        }
+                      ],
+                      "skills_loaded": [
+                        "python-testing"
+                      ],
+                      "timing": {
+                        "run_seconds": 0.891,
+                        "export_seconds": 0.0,
+                        "export_exit_code": null,
+                        "total_seconds": 0.891
+                      },
+                      "stderr": "",
+                      "stderr_truncated": false,
+                      "stderr_total_chars": 0,
+                      "stdout": "{\"type\":\"step_start\",\"timestamp\":1793301234862,\"sessionID\":\"ses_e76eabcc9ffeoa5IK0JPqR2117\",\"part\":{\"id\":\"prt_1891544ae001IDWDlvXO9d8fBh\",\"sessionID\":\"ses_e76eabcc9ffeoa5IK0JPqR2117\",\"messageID\":\"msg_1891544880011NjIpdmNK6n3rM\",\"type\":\"step-start\"}}\n{\"type\":\"tool_use\",\"timestamp\":1793301234881,\"sessionID\":\"ses_e76eabcc9ffeoa5IK0JPqR2117\",\"part\":{\"partID\":\"prt_1891544b1001MuQRbQOZWf2o98\",\"sessionID\":\"ses_e76eabcc9ffeoa5IK0JPqR2117\",\"messageID\":\"msg_1891544880011NjIpdmNK6n3rM\",\"type\":\"tool\",\"id\":\"fixture-skill-call\",\"tool\":\"skill\",\"state\":{\"status\":\"completed\",\"input\":{\"id\":\"python-testing\"},\"output\":\"<skill_content name=\\\"python-testing\\\">\\n# Skill: python-testing\\n\\n> Pair with `python-common-practice` for shared verification guidance.\\n\\n**Persona:** You are a Python engineer who treats tests as executable specifications. You write tests to constrain behavior, not to chase a coverage number.\\n\\n# Python Testing with pytest\\n\\nTests pin behavior. A good test fails for exactly one reason and names that reason. Prefer plain `assert` (pytest rewrites it for rich diffs) over `unittest`'s `assertEqual` zoo.\\n\\n## Structure and naming\\n\\n- Files `test_*.py`, functions `test_*`, one behavior per test. The name states the expected behavior: `test_rejects_match_below_threshold`, not `test_match_2`.\\n- **Arrange / Act / Assert** with blank lines between phases. If a test needs comments to explain phases, it is doing too much.\\n- Put shared fixtures in `conftest.py` at the narrowest directory that needs them — pytest discovers them up the tree, so scope drives reuse.\\n\\n## Fixtures over setUp\\n\\nFixtures are dependency injection for tests: request what you need, get teardown for free via `yield`.\\n\\n```python\\nimport pytest\\n\\n@pytest.fixture\\ndef settings(tmp_path):\\n    # tmp_path is a per-test directory — no manual cleanup, no shared state\\n    return Settings(database_file=str(tmp_path / \\\"test.db\\\"))\\n\\n@pytest.fixture\\ndef repo(settings):\\n    conn = open_connection(settings.database_file)\\n    run_migrations(conn)\\n    yield Repository(conn)   # everything after yield is teardown\\n    conn.close()\\n```\\n\\nScope deliberately: default `function` (fresh per test, safest). Use `module`/`session` only for expensive, read-only setup — shared mutable fixtures leak state and create order-dependent flakiness.\\n\\n## Parametrize instead of loops\\n\\nA loop inside one test stops at the first failure and reports one case. `parametrize` runs each case independently and names it.\\n\\n```python\\n@pytest.mark.parametrize(\\n    (\\\"title_a\\\", \\\"title_b\\\", \\\"expected\\\"),\\n    [\\n        (\\\"Song (Live)\\\", \\\"Song\\\", True),\\n        (\\\"Song\\\", \\\"Totally Other\\\", False),\\n    ],\\n    ids=[\\\"live-suffix-matches\\\", \\\"different-titles-reject\\\"],\\n)\\ndef test_fuzzy_match(title_a, title_b, expected):\\n    assert is_match(title_a, title_b) is expected\\n```\\n\\n## Async tests (pytest-asyncio)\\n\\nWhen `pyproject.toml` sets `asyncio_mode = \\\"auto\\\"`, every `async def test_*` runs on the event loop with no decorator. Without it, mark each one `@pytest.mark.asyncio`. Know which mode the repo uses before adding tests.\\n\\n```toml\\n[tool.pytest.ini_options]\\nasyncio_mode = \\\"auto\\\"\\n```\\n\\n```python\\nasync def test_fetches_playlist(httpx_mock):\\n    httpx_mock.add_response(json={\\\"items\\\": []})\\n    result = await client.get_playlist(\\\"abc\\\")\\n    assert result == []\\n```\\n\\nAsync fixtures use the same `async def` + `yield` shape. Do not call `asyncio.run()` inside a test — you are already on the loop; nesting raises `RuntimeError`.\\n\\n## Mocking — at the boundary, not the internals\\n\\nMock I/O and external services (YouTube/Spotify APIs, the network), not your own pure functions. Prefer real objects (the `tmp_path` SQLite DB) over mocks when they are cheap — sortarr's web tests run against a real in-process SQLite DB for exactly this reason.\\n\\n```python\\ndef test_skips_on_api_error(monkeypatch):\\n    def boom(*_): raise TimeoutError\\n    monkeypatch.setattr(client, \\\"get_playlist\\\", boom)\\n    # monkeypatch auto-reverts after the test — no manual cleanup\\n```\\n\\n- `monkeypatch` for attributes/env/dicts (auto-reverted).\\n- `unittest.mock.AsyncMock` for awaitables; a plain `Mock` returns a coroutine-less value and the `await` fails.\\n- For httpx, prefer `pytest-httpx`'s `httpx_mock` or `respx` over patching internals — patch the transport, not the call site.\\n\\n## Coverage and CI\\n\\n```bash\\npytest                       # all tests\\npytest -k \\\"match and not slow\\\"   # filter by name expression\\npytest -x --ff               # stop at first failure, failed-first ordering\\npytest -q tests/test_match.py::test_fuzzy_match   # one test\\npytest --cov=src --cov-report=term-missing        # coverage with missing lines\\n```\\n\\nCoverage is a floor, not a goal: 100% coverage with no assertions tests nothing. Chase uncovered *branches* that carry risk, not the percentage.\\n\\n## Targeted mutation testing\\n\\nAfter the relevant suite is green, consider a few mutations for changed or high-risk comparisons, guards, exception paths, and state updates. Mutation testing changes production code to challenge the tests; coverage only shows execution. Neither a whole-repository run nor a fixed mutation score is required.\\n\\n**Manual fallback:** preserve current edits and use an isolated test copy containing the candidate. Run the selected pytest cases and confirm they actually collected and passed rather than only skipping/xfailing. Change one production behavior with tests fixed, rerun, and inspect the failing assertion. Verify imports resolve to the mutated source, not another installed package or a monkeypatched replacement. An import/setup/type-check failure or unexplained timeout is not an assertion-based kill. For a real survivor, add a contract-derived test and prove it rejects the mutant. Restore only the probe change, inspect the diff, and rerun the relevant suite without discarding unrelated work.\\n\\n**Automation:** [mutmut](https://mutmut.readthedocs.io/en/latest/) is an option for a compatible pytest project. Prefer the repository's pinned environment. Check the installed version's help and documentation before choosing source paths, test selection, timeout/concurrency settings, or configuration keys; these can differ between versions. Bound the scope before using `mutmut run`, then inspect outcomes with `mutmut browse`. Verify copied fixtures/configuration and imported source. Do not treat cached/incremental results as a fresh run when dependencies, configuration, fixtures, or the candidate changed without the tool accounting for them.\\n\\n`mutmut apply` writes a mutant into source. Use it only in an isolated, recoverable copy and verify restoration even after interruption. Do not install tools or publish reports merely because the command appears here; a safe manual sample or a stated limitation is preferable to unsupported setup.\\n\\nRecord candidate, tool/Python versions, source/test scope, budget, baseline, actual outcomes, and final restoration in existing verification notes. Triage survivors into real gaps, missing execution, justified equivalence/out-of-scope behavior, or unresolved cases. Keep invalid/timeout/error/untested outcomes visible and report any score with its definition and denominator. Never weaken expected values, skip a hard test, or add an unjustified exclusion to raise that score. `test-driven-development` contains the shared method and deeper triage guidance.\\n\\n## Common mistakes\\n\\n| Mistake | Fix |\\n| --- | --- |\\n| `async def` test with no `asyncio_mode`/marker | Test is silently skipped or errors. Set `asyncio_mode = \\\"auto\\\"` or mark it. |\\n| `Mock()` where an `await` happens | Use `AsyncMock`; a sync Mock isn't awaitable. |\\n| `session`-scoped mutable fixture | Tests leak state and depend on order. Default to `function` scope. |\\n| Loop over cases in one test | Use `parametrize` so each case runs and reports independently. |\\n| Mocking your own pure logic | Mock only I/O boundaries; test real logic directly. |\\n| Shared session/file DB across tests | Give each test its own DB via `tmp_path` (function scope); a shared file leaks state and throws `database is locked` under parallel workers. |\\n| `assertEqual`/`TestCase` boilerplate | Use plain `assert`; pytest rewrites it with rich diffs. |\\n\\n## References\\n\\n- [pytest documentation](https://docs.pytest.org/)\\n- [pytest-asyncio](https://pytest-asyncio.readthedocs.io/)\\n- [pytest-httpx](https://github.com/Colin-b/pytest_httpx)\\n\\nBase directory for this skill: /workspace/.opencode/skills/python-testing\\nRelative paths in this skill (e.g., scripts/, reference/) are relative to this base directory.\\nNote: file list is sampled.\\n\\n<skill_files>\\n</skill_files>\\n</skill_content>\",\"title\":\"skill\",\"metadata\":{\"metadata\":{\"name\":\"python-testing\",\"directory\":\"/workspace/.opencode/skills/python-testing\",\"truncated\":false},\"content\":[{\"type\":\"text\",\"text\":\"<skill_content name=\\\"python-testing\\\">\\n# Skill: python-testing\\n\\n> Pair with `python-common-practice` for shared verification guidance.\\n\\n**Persona:** You are a Python engineer who treats tests as executable specifications. You write tests to constrain behavior, not to chase a coverage number.\\n\\n# Python Testing with pytest\\n\\nTests pin behavior. A good test fails for exactly one reason and names that reason. Prefer plain `assert` (pytest rewrites it for rich diffs) over `unittest`'s `assertEqual` zoo.\\n\\n## Structure and naming\\n\\n- Files `test_*.py`, functions `test_*`, one behavior per test. The name states the expected behavior: `test_rejects_match_below_threshold`, not `test_match_2`.\\n- **Arrange / Act / Assert** with blank lines between phases. If a test needs comments to explain phases, it is doing too much.\\n- Put shared fixtures in `conftest.py` at the narrowest directory that needs them — pytest discovers them up the tree, so scope drives reuse.\\n\\n## Fixtures over setUp\\n\\nFixtures are dependency injection for tests: request what you need, get teardown for free via `yield`.\\n\\n```python\\nimport pytest\\n\\n@pytest.fixture\\ndef settings(tmp_path):\\n    # tmp_path is a per-test directory — no manual cleanup, no shared state\\n    return Settings(database_file=str(tmp_path / \\\"test.db\\\"))\\n\\n@pytest.fixture\\ndef repo(settings):\\n    conn = open_connection(settings.database_file)\\n    run_migrations(conn)\\n    yield Repository(conn)   # everything after yield is teardown\\n    conn.close()\\n```\\n\\nScope deliberately: default `function` (fresh per test, safest). Use `module`/`session` only for expensive, read-only setup — shared mutable fixtures leak state and create order-dependent flakiness.\\n\\n## Parametrize instead of loops\\n\\nA loop inside one test stops at the first failure and reports one case. `parametrize` runs each case independently and names it.\\n\\n```python\\n@pytest.mark.parametrize(\\n    (\\\"title_a\\\", \\\"title_b\\\", \\\"expected\\\"),\\n    [\\n        (\\\"Song (Live)\\\", \\\"Song\\\", True),\\n        (\\\"Song\\\", \\\"Totally Other\\\", False),\\n    ],\\n    ids=[\\\"live-suffix-matches\\\", \\\"different-titles-reject\\\"],\\n)\\ndef test_fuzzy_match(title_a, title_b, expected):\\n    assert is_match(title_a, title_b) is expected\\n```\\n\\n## Async tests (pytest-asyncio)\\n\\nWhen `pyproject.toml` sets `asyncio_mode = \\\"auto\\\"`, every `async def test_*` runs on the event loop with no decorator. Without it, mark each one `@pytest.mark.asyncio`. Know which mode the repo uses before adding tests.\\n\\n```toml\\n[tool.pytest.ini_options]\\nasyncio_mode = \\\"auto\\\"\\n```\\n\\n```python\\nasync def test_fetches_playlist(httpx_mock):\\n    httpx_mock.add_response(json={\\\"items\\\": []})\\n    result = await client.get_playlist(\\\"abc\\\")\\n    assert result == []\\n```\\n\\nAsync fixtures use the same `async def` + `yield` shape. Do not call `asyncio.run()` inside a test — you are already on the loop; nesting raises `RuntimeError`.\\n\\n## Mocking — at the boundary, not the internals\\n\\nMock I/O and external services (YouTube/Spotify APIs, the network), not your own pure functions. Prefer real objects (the `tmp_path` SQLite DB) over mocks when they are cheap — sortarr's web tests run against a real in-process SQLite DB for exactly this reason.\\n\\n```python\\ndef test_skips_on_api_error(monkeypatch):\\n    def boom(*_): raise TimeoutError\\n    monkeypatch.setattr(client, \\\"get_playlist\\\", boom)\\n    # monkeypatch auto-reverts after the test — no manual cleanup\\n```\\n\\n- `monkeypatch` for attributes/env/dicts (auto-reverted).\\n- `unittest.mock.AsyncMock` for awaitables; a plain `Mock` returns a coroutine-less value and the `await` fails.\\n- For httpx, prefer `pytest-httpx`'s `httpx_mock` or `respx` over patching internals — patch the transport, not the call site.\\n\\n## Coverage and CI\\n\\n```bash\\npytest                       # all tests\\npytest -k \\\"match and not slow\\\"   # filter by name expression\\npytest -x --ff               # stop at first failure, failed-first ordering\\npytest -q tests/test_match.py::test_fuzzy_match   # one test\\npytest --cov=src --cov-report=term-missing        # coverage with missing lines\\n```\\n\\nCoverage is a floor, not a goal: 100% coverage with no assertions tests nothing. Chase uncovered *branches* that carry risk, not the percentage.\\n\\n## Targeted mutation testing\\n\\nAfter the relevant suite is green, consider a few mutations for changed or high-risk comparisons, guards, exception paths, and state updates. Mutation testing changes production code to challenge the tests; coverage only shows execution. Neither a whole-repository run nor a fixed mutation score is required.\\n\\n**Manual fallback:** preserve current edits and use an isolated test copy containing the candidate. Run the selected pytest cases and confirm they actually collected and passed rather than only skipping/xfailing. Change one production behavior with tests fixed, rerun, and inspect the failing assertion. Verify imports resolve to the mutated source, not another installed package or a monkeypatched replacement. An import/setup/type-check failure or unexplained timeout is not an assertion-based kill. For a real survivor, add a contract-derived test and prove it rejects the mutant. Restore only the probe change, inspect the diff, and rerun the relevant suite without discarding unrelated work.\\n\\n**Automation:** [mutmut](https://mutmut.readthedocs.io/en/latest/) is an option for a compatible pytest project. Prefer the repository's pinned environment. Check the installed version's help and documentation before choosing source paths, test selection, timeout/concurrency settings, or configuration keys; these can differ between versions. Bound the scope before using `mutmut run`, then inspect outcomes with `mutmut browse`. Verify copied fixtures/configuration and imported source. Do not treat cached/incremental results as a fresh run when dependencies, configuration, fixtures, or the candidate changed without the tool accounting for them.\\n\\n`mutmut apply` writes a mutant into source. Use it only in an isolated, recoverable copy and verify restoration even after interruption. Do not install tools or publish reports merely because the command appears here; a safe manual sample or a stated limitation is preferable to unsupported setup.\\n\\nRecord candidate, tool/Python versions, source/test scope, budget, baseline, actual outcomes, and final restoration in existing verification notes. Triage survivors into real gaps, missing execution, justified equivalence/out-of-scope behavior, or unresolved cases. Keep invalid/timeout/error/untested outcomes visible and report any score with its definition and denominator. Never weaken expected values, skip a hard test, or add an unjustified exclusion to raise that score. `test-driven-development` contains the shared method and deeper triage guidance.\\n\\n## Common mistakes\\n\\n| Mistake | Fix |\\n| --- | --- |\\n| `async def` test with no `asyncio_mode`/marker | Test is silently skipped or errors. Set `asyncio_mode = \\\"auto\\\"` or mark it. |\\n| `Mock()` where an `await` happens | Use `AsyncMock`; a sync Mock isn't awaitable. |\\n| `session`-scoped mutable fixture | Tests leak state and depend on order. Default to `function` scope. |\\n| Loop over cases in one test | Use `parametrize` so each case runs and reports independently. |\\n| Mocking your own pure logic | Mock only I/O boundaries; test real logic directly. |\\n| Shared session/file DB across tests | Give each test its own DB via `tmp_path` (function scope); a shared file leaks state and throws `database is locked` under parallel workers. |\\n| `assertEqual`/`TestCase` boilerplate | Use plain `assert`; pytest rewrites it with rich diffs. |\\n\\n## References\\n\\n- [pytest documentation](https://docs.pytest.org/)\\n- [pytest-asyncio](https://pytest-asyncio.readthedocs.io/)\\n- [pytest-httpx](https://github.com/Colin-b/pytest_httpx)\\n\\nBase directory for this skill: /workspace/.opencode/skills/python-testing\\nRelative paths in this skill (e.g., scripts/, reference/) are relative to this base directory.\\nNote: file list is sampled.\\n\\n<skill_files>\\n</skill_files>\\n</skill_content>\"}],\"providerCall\":{\"executed\":false},\"providerResult\":{\"executed\":false},\"rawInput\":\"{\\\"id\\\": \\\"python-testing\\\"}\"},\"time\":{\"start\":1793301234865,\"end\":1793301234881}}}}\n{\"type\":\"step_finish\",\"timestamp\":1793301234885,\"sessionID\":\"ses_e76eabcc9ffeoa5IK0JPqR2117\",\"part\":{\"id\":\"prt_1891544c4001FvKZ61QaiMK0uo\",\"sessionID\":\"ses_e76eabcc9ffeoa5IK0JPqR2117\",\"messageID\":\"msg_1891544880011NjIpdmNK6n3rM\",\"type\":\"step-finish\",\"reason\":\"tool-calls\",\"cost\":0,\"tokens\":{\"input\":0,\"output\":0,\"reasoning\":0,\"cache\":{\"read\":0,\"write\":0}}}}\n{\"type\":\"text\",\"timestamp\":1793301234935,\"sessionID\":\"ses_e76eabcc9ffeoa5IK0JPqR2117\",\"part\":{\"id\":\"prt_1891544d30016dnikz07GhEMI4_text-0\",\"sessionID\":\"ses_e76eabcc9ffeoa5IK0JPqR2117\",\"messageID\":\"msg_1891544d30016dnikz07GhEMI4\",\"type\":\"text\",\"text\":\"Deterministic fixture response: provide a clear, complete answer satisfying all requested expectations; use AsyncMock for awaited calls, isolated tmp_path databases, parametrize independent cases, preserve domain errors with causes, narrow catches and log exceptions.\",\"time\":{\"start\":1793301234916,\"end\":1793301234935}}}\n",
+                      "stdout_truncated": false,
+                      "stdout_total_chars": 18199,
+                      "tool_result_evidence": {
+                        "schema": "opencode-eval-runner/tool-results/v1",
+                        "source": "opencode.event-stream.full",
+                        "observed_events": 1,
+                        "omitted_events": 0,
+                        "events": [
+                          {
+                            "sequence": 1,
+                            "tool": "skill",
+                            "call_id": "fixture-skill-call",
+                            "session_id": "ses_e76eabcc9ffeoa5IK0JPqR2117",
+                            "status": "completed",
+                            "input": {
+                              "id": "python-testing"
+                            }
+                          }
+                        ],
+                        "safety": {
+                          "schema": "opencode-eval-runner/evidence-safety/v1",
+                          "inventory_complete": true,
+                          "fields": [
+                            {
+                              "event": 0,
+                              "field": "tool",
+                              "state": "available"
+                            },
+                            {
+                              "event": 0,
+                              "field": "call_id",
+                              "state": "available"
+                            },
+                            {
+                              "event": 0,
+                              "field": "session_id",
+                              "state": "available"
+                            },
+                            {
+                              "event": 0,
+                              "field": "status",
+                              "state": "available"
+                            },
+                            {
+                              "event": 0,
+                              "field": "input",
+                              "state": "available"
+                            },
+                            {
+                              "event": 0,
+                              "field": "output",
+                              "state": "omitted",
+                              "reason": "size_limit",
+                              "stage": "before_evidence_size"
+                            }
+                          ],
+                          "losses": {
+                            "size_limit": 1
+                          }
+                        }
+                      },
+                      "runtime_evidence": {
+                        "schema": "opencode-eval-runner/runtime-evidence/v1",
+                        "status": "complete",
+                        "evidence_eligible": true,
+                        "observations": [
+                          {
+                            "invocation_id": "native:59b6ea22-8d77-45fa-8017-47845563bbbf",
+                            "tool": {
+                              "state": "available",
+                              "value": "skill"
+                            },
+                            "mode": "native",
+                            "actor": {
+                              "state": "available",
+                              "value": "skill-eval"
+                            },
+                            "session_id": {
+                              "state": "available",
+                              "value": "ses_e76eabcc9ffeoa5IK0JPqR2117"
+                            },
+                            "message_id": {
+                              "state": "available",
+                              "value": "msg_1891544880011NjIpdmNK6n3rM"
+                            },
+                            "call_id": {
+                              "state": "available",
+                              "value": "fixture-skill-call"
+                            },
+                            "parent": {
+                              "state": "available",
+                              "value": null
+                            },
+                            "input": {
+                              "state": "available",
+                              "value": {
+                                "id": "python-testing"
+                              }
+                            },
+                            "outcome": "success",
+                            "result": {
+                              "state": "available",
+                              "value": {
+                                "content": [
+                                  {
+                                    "type": "text",
+                                    "text": "<skill_content name=\"python-testing\">\n# Skill: python-testing\n\n> Pair with `python-common-practice` for shared verification guidance.\n\n**Persona:** You are a Python engineer who treats tests as executable specifications. You write tests to constrain behavior, not to chase a coverage number.\n\n# Python Testing with pytest\n\nTests pin behavior. A good test fails for exactly one reason and names that reason. Prefer plain `assert` (pytest rewrites it for rich diffs) over `unittest`'s `assertEqual` zoo.\n\n## Structure and naming\n\n- Files `test_*.py`, functions `test_*`, one behavior per test. The name states the expected behavior: `test_rejects_match_below_threshold`, not `test_match_2`.\n- **Arrange / Act / Assert** with blank lines between phases. If a test needs comments to explain phases, it is doing too much.\n- Put shared fixtures in `conftest.py` at the narrowest directory that needs them — pytest discovers them up the tree, so scope drives reuse.\n\n## Fixtures over setUp\n\nFixtures are dependency injection for tests: request what you need, get teardown for free via `yield`.\n\n```python\nimport pytest\n\n@pytest.fixture\ndef settings(tmp_path):\n    # tmp_path is a per-test directory — no manual cleanup, no shared state\n    return Settings(database_file=str(tmp_path / \"test.db\"))\n\n@pytest.fixture\ndef repo(settings):\n    conn = open_connection(settings.database_file)\n    run_migrations(conn)\n    yield Repository(conn)   # everything after yield is teardown\n    conn.close()\n```\n\nScope deliberately: default `function` (fresh per test, safest). Use `module`/`session` only for expensive, read-only setup — shared mutable fixtures leak state and create order-dependent flakiness.\n\n## Parametrize instead of loops\n\nA loop inside one test stops at the first failure and reports one case. `parametrize` runs each case independently and names it.\n\n```python\n@pytest.mark.parametrize(\n    (\"title_a\", \"title_b\", \"expected\"),\n    [\n        (\"Song (Live)\", \"Song\", True),\n        (\"Song\", \"Totally Other\", False),\n    ],\n    ids=[\"live-suffix-matches\", \"different-titles-reject\"],\n)\ndef test_fuzzy_match(title_a, title_b, expected):\n    assert is_match(title_a, title_b) is expected\n```\n\n## Async tests (pytest-asyncio)\n\nWhen `pyproject.toml` sets `asyncio_mode = \"auto\"`, every `async def test_*` runs on the event loop with no decorator. Without it, mark each one `@pytest.mark.asyncio`. Know which mode the repo uses before adding tests.\n\n```toml\n[tool.pytest.ini_options]\nasyncio_mode = \"auto\"\n```\n\n```python\nasync def test_fetches_playlist(httpx_mock):\n    httpx_mock.add_response(json={\"items\": []})\n    result = await client.get_playlist(\"abc\")\n    assert result == []\n```\n\nAsync fixtures use the same `async def` + `yield` shape. Do not call `asyncio.run()` inside a test — you are already on the loop; nesting raises `RuntimeError`.\n\n## Mocking — at the boundary, not the internals\n\nMock I/O and external services (YouTube/Spotify APIs, the network), not your own pure functions. Prefer real objects (the `tmp_path` SQLite DB) over mocks when they are cheap — sortarr's web tests run against a real in-process SQLite DB for exactly this reason.\n\n```python\ndef test_skips_on_api_error(monkeypatch):\n    def boom(*_): raise TimeoutError\n    monkeypatch.setattr(client, \"get_playlist\", boom)\n    # monkeypatch auto-reverts after the test — no manual cleanup\n```\n\n- `monkeypatch` for attributes/env/dicts (auto-reverted).\n- `unittest.mock.AsyncMock` for awaitables; a plain `Mock` returns a coroutine-less value and the `await` fails.\n- For httpx, prefer `pytest-httpx`'s `httpx_mock` or `respx` over patching internals — patch the transport, not the call site.\n\n## Coverage and CI\n\n```bash\npytest                       # all tests\npytest -k \"match and not slow\"   # filter by name expression\npytest -x --ff               # stop at first failure, failed-first ordering\npytest -q tests/test_match.py::test_fuzzy_match   # one test\npytest --cov=src --cov-report=term-missing        # coverage with missing lines\n```\n\nCoverage is a floor, not a goal: 100% coverage with no assertions tests nothing. Chase uncovered *branches* that carry risk, not the percentage.\n\n## Targeted mutation testing\n\nAfter the relevant suite is green, consider a few mutations for changed or high-risk comparisons, guards, exception paths, and state updates. Mutation testing changes production code to challenge the tests; coverage only shows execution. Neither a whole-repository run nor a fixed mutation score is required.\n\n**Manual fallback:** preserve current edits and use an isolated test copy containing the candidate. Run the selected pytest cases and confirm they actually collected and passed rather than only skipping/xfailing. Change one production behavior with tests fixed, rerun, and inspect the failing assertion. Verify imports resolve to the mutated source, not another installed package or a monkeypatched replacement. An import/setup/type-check failure or unexplained timeout is not an assertion-based kill. For a real survivor, add a contract-derived test and prove it rejects the mutant. Restore only the probe change, inspect the diff, and rerun the relevant suite without discarding unrelated work.\n\n**Automation:** [mutmut](https://mutmut.readthedocs.io/en/latest/) is an option for a compatible pytest project. Prefer the repository's pinned environment. Check the installed version's help and documentation before choosing source paths, test selection, timeout/concurrency settings, or configuration keys; these can differ between versions. Bound the scope before using `mutmut run`, then inspect outcomes with `mutmut browse`. Verify copied fixtures/configuration and imported source. Do not treat cached/incremental results as a fresh run when dependencies, configuration, fixtures, or the candidate changed without the tool accounting for them.\n\n`mutmut apply` writes a mutant into source. Use it only in an isolated, recoverable copy and verify restoration even after interruption. Do not install tools or publish reports merely because the command appears here; a safe manual sample or a stated limitation is preferable to unsupported setup.\n\nRecord candidate, tool/Python versions, source/test scope, budget, baseline, actual outcomes, and final restoration in existing verification notes. Triage survivors into real gaps, missing execution, justified equivalence/out-of-scope behavior, or unresolved cases. Keep invalid/timeout/error/untested outcomes visible and report any score with its definition and denominator. Never weaken expected values, skip a hard test, or add an unjustified exclusion to raise that score. `test-driven-development` contains the shared method and deeper triage guidance.\n\n## Common mistakes\n\n| Mistake | Fix |\n| --- | --- |\n| `async def` test with no `asyncio_mode`/marker | Test is silently skipped or errors. Set `asyncio_mode = \"auto\"` or mark it. |\n| `Mock()` where an `await` happens | Use `AsyncMock`; a sync Mock isn't awaitable. |\n| `session`-scoped mutable fixture | Tests leak state and depend on order. Default to `function` scope. |\n| Loop over cases in one test | Use `parametrize` so each case runs and reports independently. |\n| Mocking your own pure logic | Mock only I/O boundaries; test real logic directly. |\n| Shared session/file DB across tests | Give each test its own DB via `tmp_path` (function scope); a shared file leaks state and throws `database is locked` under parallel workers. |\n| `assertEqual`/`TestCase` boilerplate | Use plain `assert`; pytest rewrites it with rich diffs. |\n\n## References\n\n- [pytest documentation](https://docs.pytest.org/)\n- [pytest-asyncio](https://pytest-asyncio.readthedocs.io/)\n- [pytest-httpx](https://github.com/Colin-b/pytest_httpx)\n\nBase directory for this skill: /workspace/.opencode/skills/python-testing\nRelative paths in this skill (e.g., scripts/, reference/) are relative to this base directory.\nNote: file list is sampled.\n\n<skill_files>\n</skill_files>\n</skill_content>"
+                                  }
+                                ],
+                                "metadata": {
+                                  "name": "python-testing",
+                                  "directory": "/workspace/.opencode/skills/python-testing",
+                                  "truncated": false
+                                },
+                                "executed": false
+                              }
+                            },
+                            "error": {
+                              "state": "omitted",
+                              "reason": "not_applicable"
+                            },
+                            "start_sequence": 1,
+                            "terminal_sequence": {
+                              "state": "available",
+                              "value": 2
+                            }
+                          }
+                        ],
+                        "coverage": {
+                          "observation_closed": {
+                            "state": "available",
+                            "value": true
+                          },
+                          "process_state": "completed",
+                          "starts": {
+                            "state": "available",
+                            "value": 1
+                          },
+                          "terminals": {
+                            "state": "available",
+                            "value": 1
+                          },
+                          "missing_terminals": {
+                            "state": "available",
+                            "value": 0
+                          },
+                          "observer_failures": {
+                            "state": "available",
+                            "value": 0
+                          },
+                          "callback_failures": {
+                            "state": "available",
+                            "value": 0
+                          },
+                          "losses": [],
+                          "unsupported": [
+                            "stock_codemode_final_boundary_not_exposed"
+                          ],
+                          "boundaries": {
+                            "native": {
+                              "status": "complete",
+                              "evidence_eligible": true,
+                              "starts": {
+                                "state": "available",
+                                "value": 1
+                              },
+                              "terminals": {
+                                "state": "available",
+                                "value": 1
+                              },
+                              "missing_terminals": {
+                                "state": "available",
+                                "value": 0
+                              },
+                              "issues": []
+                            },
+                            "code_mode_execution": {
+                              "status": "complete",
+                              "evidence_eligible": true,
+                              "starts": {
+                                "state": "available",
+                                "value": 0
+                              },
+                              "terminals": {
+                                "state": "available",
+                                "value": 0
+                              },
+                              "missing_terminals": {
+                                "state": "available",
+                                "value": 0
+                              },
+                              "issues": []
+                            },
+                            "code_mode_finality": {
+                              "status": "unsupported",
+                              "evidence_eligible": false,
+                              "starts": {
+                                "state": "unsupported",
+                                "reason": "stock_codemode_final_boundary_not_exposed"
+                              },
+                              "terminals": {
+                                "state": "unsupported",
+                                "reason": "stock_codemode_final_boundary_not_exposed"
+                              },
+                              "missing_terminals": {
+                                "state": "unsupported",
+                                "reason": "stock_codemode_final_boundary_not_exposed"
+                              },
+                              "issues": [
+                                "stock_codemode_final_boundary_not_exposed"
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      "plugin_diagnostic": {
+                        "config_root": "/tmp/runtime/config/opencode",
+                        "config_root_exists": true,
+                        "plugins_root": "/tmp/runtime/config/opencode/plugins",
+                        "plugins_exists": false,
+                        "plugins_is_dir": false,
+                        "plugins_resolved": null,
+                        "plugins_entries": [],
+                        "loom_exists": false,
+                        "loom_is_dir": false,
+                        "loom_index_exists": false,
+                        "loom_flat_exists": false,
+                        "loom_module_index_exists": false,
+                        "runtime_observer_exists": true,
+                        "runtime_observer_inline_configured": true
+                      },
+                      "plugin_preflight": {
+                        "expected": null,
+                        "agent": null,
+                        "entrypoints": []
+                      }
+                    },
+                    "failure": null,
+                    "retry_decision": null
+                  }
+                ]
+              },
+              {
+                "phase": "candidate-judge",
+                "attempts": [
+                  {
+                    "number": 1,
+                    "started_at": "2026-10-29T19:13:55.918Z",
+                    "duration_seconds": 3.3795614080154337,
+                    "invocation": {
+                      "transport": "opencode",
+                      "model": "fixture/mock",
+                      "reasoning": null,
+                      "agent": "eval-judge",
+                      "skill": null,
+                      "workspace_mode": "ro",
+                      "timeout_seconds": 90,
+                      "container_timeout": 150,
+                      "engine": "podman",
+                      "network": "task32-recovery-1793300807",
+                      "image": "sha256:0940e9ac543098bfa51dda81cce643ed3366df1ab8a4e90bf5fcd8601c2e5e39",
+                      "expected_plugin": null
+                    },
+                    "host_exit_code": 0,
+                    "result": {
+                      "schema": "opencode-eval-runner/v1",
+                      "transport": "opencode",
+                      "model": "fixture/mock",
+                      "reasoning": "provider-default",
+                      "reasoning_source": "provider-default",
+                      "agent": "eval-judge",
+                      "skill": null,
+                      "exit_code": 0,
+                      "session_id": "ses_e76eaaf22ffe7f5F5I6HLW8lFM",
+                      "text": "{\"passed\": true, \"expectations\": [{\"expectation\": \"Uses AsyncMock (or an async function), not a plain Mock, for the awaited method\", \"met\": true, \"reason\": \"deterministic fixture grade\"}, {\"expectation\": \"The test function is async (relies on asyncio_mode/marker)\", \"met\": true, \"reason\": \"deterministic fixture grade\"}, {\"expectation\": \"Configures the mock to raise TimeoutError (e.g. side_effect)\", \"met\": true, \"reason\": \"deterministic fixture grade\"}, {\"expectation\": \"Asserts the return value equals 'skipped'\", \"met\": true, \"reason\": \"deterministic fixture grade\"}, {\"expectation\": \"Does NOT use a synchronous Mock() for the awaited call\", \"met\": true, \"reason\": \"deterministic fixture grade\"}], \"violations\": [], \"trap_observed\": false, \"trap_evidence\": \"not observed\", \"summary\": \"Fixture accepted all authored positive expectations.\"}",
+                      "tools": [],
+                      "actions": [],
+                      "skills_loaded": [],
+                      "timing": {
+                        "run_seconds": 0.812,
+                        "export_seconds": 0.0,
+                        "export_exit_code": null,
+                        "total_seconds": 0.812
+                      },
+                      "stderr": "",
+                      "stderr_truncated": false,
+                      "stderr_total_chars": 0,
+                      "stdout": "{\"type\":\"text\",\"timestamp\":1793301238347,\"sessionID\":\"ses_e76eaaf22ffe7f5F5I6HLW8lFM\",\"part\":{\"id\":\"prt_189155220001Ojqiz36jYSw0n6_text-0\",\"sessionID\":\"ses_e76eaaf22ffe7f5F5I6HLW8lFM\",\"messageID\":\"msg_189155220001Ojqiz36jYSw0n6\",\"type\":\"text\",\"text\":\"{\\\"passed\\\": true, \\\"expectations\\\": [{\\\"expectation\\\": \\\"Uses AsyncMock (or an async function), not a plain Mock, for the awaited method\\\", \\\"met\\\": true, \\\"reason\\\": \\\"deterministic fixture grade\\\"}, {\\\"expectation\\\": \\\"The test function is async (relies on asyncio_mode/marker)\\\", \\\"met\\\": true, \\\"reason\\\": \\\"deterministic fixture grade\\\"}, {\\\"expectation\\\": \\\"Configures the mock to raise TimeoutError (e.g. side_effect)\\\", \\\"met\\\": true, \\\"reason\\\": \\\"deterministic fixture grade\\\"}, {\\\"expectation\\\": \\\"Asserts the return value equals 'skipped'\\\", \\\"met\\\": true, \\\"reason\\\": \\\"deterministic fixture grade\\\"}, {\\\"expectation\\\": \\\"Does NOT use a synchronous Mock() for the awaited call\\\", \\\"met\\\": true, \\\"reason\\\": \\\"deterministic fixture grade\\\"}], \\\"violations\\\": [], \\\"trap_observed\\\": false, \\\"trap_evidence\\\": \\\"not observed\\\", \\\"summary\\\": \\\"Fixture accepted all authored positive expectations.\\\"}\",\"time\":{\"start\":1793301238314,\"end\":1793301238347}}}\n",
+                      "stdout_truncated": false,
+                      "stdout_total_chars": 1215,
+                      "tool_result_evidence": {
+                        "schema": "opencode-eval-runner/tool-results/v1",
+                        "source": "opencode.event-stream.full",
+                        "observed_events": 0,
+                        "omitted_events": 0,
+                        "events": [],
+                        "safety": {
+                          "schema": "opencode-eval-runner/evidence-safety/v1",
+                          "inventory_complete": true,
+                          "fields": [],
+                          "losses": {}
+                        }
+                      },
+                      "runtime_evidence": {
+                        "schema": "opencode-eval-runner/runtime-evidence/v1",
+                        "status": "complete",
+                        "evidence_eligible": true,
+                        "observations": [],
+                        "coverage": {
+                          "observation_closed": {
+                            "state": "available",
+                            "value": true
+                          },
+                          "process_state": "completed",
+                          "starts": {
+                            "state": "available",
+                            "value": 0
+                          },
+                          "terminals": {
+                            "state": "available",
+                            "value": 0
+                          },
+                          "missing_terminals": {
+                            "state": "available",
+                            "value": 0
+                          },
+                          "observer_failures": {
+                            "state": "available",
+                            "value": 0
+                          },
+                          "callback_failures": {
+                            "state": "available",
+                            "value": 0
+                          },
+                          "losses": [],
+                          "unsupported": [
+                            "stock_codemode_final_boundary_not_exposed"
+                          ],
+                          "boundaries": {
+                            "native": {
+                              "status": "complete",
+                              "evidence_eligible": true,
+                              "starts": {
+                                "state": "available",
+                                "value": 0
+                              },
+                              "terminals": {
+                                "state": "available",
+                                "value": 0
+                              },
+                              "missing_terminals": {
+                                "state": "available",
+                                "value": 0
+                              },
+                              "issues": []
+                            },
+                            "code_mode_execution": {
+                              "status": "complete",
+                              "evidence_eligible": true,
+                              "starts": {
+                                "state": "available",
+                                "value": 0
+                              },
+                              "terminals": {
+                                "state": "available",
+                                "value": 0
+                              },
+                              "missing_terminals": {
+                                "state": "available",
+                                "value": 0
+                              },
+                              "issues": []
+                            },
+                            "code_mode_finality": {
+                              "status": "unsupported",
+                              "evidence_eligible": false,
+                              "starts": {
+                                "state": "unsupported",
+                                "reason": "stock_codemode_final_boundary_not_exposed"
+                              },
+                              "terminals": {
+                                "state": "unsupported",
+                                "reason": "stock_codemode_final_boundary_not_exposed"
+                              },
+                              "missing_terminals": {
+                                "state": "unsupported",
+                                "reason": "stock_codemode_final_boundary_not_exposed"
+                              },
+                              "issues": [
+                                "stock_codemode_final_boundary_not_exposed"
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      "plugin_diagnostic": {
+                        "config_root": "/tmp/runtime/config/opencode",
+                        "config_root_exists": true,
+                        "plugins_root": "/tmp/runtime/config/opencode/plugins",
+                        "plugins_exists": false,
+                        "plugins_is_dir": false,
+                        "plugins_resolved": null,
+                        "plugins_entries": [],
+                        "loom_exists": false,
+                        "loom_is_dir": false,
+                        "loom_index_exists": false,
+                        "loom_flat_exists": false,
+                        "loom_module_index_exists": false,
+                        "runtime_observer_exists": true,
+                        "runtime_observer_inline_configured": true
+                      },
+                      "plugin_preflight": {
+                        "expected": null,
+                        "agent": null,
+                        "entrypoints": []
+                      }
+                    },
+                    "failure": null,
+                    "retry_decision": null
+                  }
+                ]
+              }
+            ],
+            "evidence": {
+              "status": "ready",
+              "reasons": [],
+              "required_boundaries": [
+                "native"
+              ],
+              "runtime_evidence": [
+                {
+                  "schema": "opencode-eval-runner/runtime-evidence/v1",
+                  "status": "complete",
+                  "evidence_eligible": true,
+                  "observations": [
+                    {
+                      "invocation_id": "native:59b6ea22-8d77-45fa-8017-47845563bbbf",
+                      "tool": {
+                        "state": "available",
+                        "value": "skill"
+                      },
+                      "mode": "native",
+                      "actor": {
+                        "state": "available",
+                        "value": "skill-eval"
+                      },
+                      "session_id": {
+                        "state": "available",
+                        "value": "ses_e76eabcc9ffeoa5IK0JPqR2117"
+                      },
+                      "message_id": {
+                        "state": "available",
+                        "value": "msg_1891544880011NjIpdmNK6n3rM"
+                      },
+                      "call_id": {
+                        "state": "available",
+                        "value": "fixture-skill-call"
+                      },
+                      "parent": {
+                        "state": "available",
+                        "value": null
+                      },
+                      "input": {
+                        "state": "available",
+                        "value": {
+                          "id": "python-testing"
+                        }
+                      },
+                      "outcome": "success",
+                      "result": {
+                        "state": "available",
+                        "value": {
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "<skill_content name=\"python-testing\">\n# Skill: python-testing\n\n> Pair with `python-common-practice` for shared verification guidance.\n\n**Persona:** You are a Python engineer who treats tests as executable specifications. You write tests to constrain behavior, not to chase a coverage number.\n\n# Python Testing with pytest\n\nTests pin behavior. A good test fails for exactly one reason and names that reason. Prefer plain `assert` (pytest rewrites it for rich diffs) over `unittest`'s `assertEqual` zoo.\n\n## Structure and naming\n\n- Files `test_*.py`, functions `test_*`, one behavior per test. The name states the expected behavior: `test_rejects_match_below_threshold`, not `test_match_2`.\n- **Arrange / Act / Assert** with blank lines between phases. If a test needs comments to explain phases, it is doing too much.\n- Put shared fixtures in `conftest.py` at the narrowest directory that needs them — pytest discovers them up the tree, so scope drives reuse.\n\n## Fixtures over setUp\n\nFixtures are dependency injection for tests: request what you need, get teardown for free via `yield`.\n\n```python\nimport pytest\n\n@pytest.fixture\ndef settings(tmp_path):\n    # tmp_path is a per-test directory — no manual cleanup, no shared state\n    return Settings(database_file=str(tmp_path / \"test.db\"))\n\n@pytest.fixture\ndef repo(settings):\n    conn = open_connection(settings.database_file)\n    run_migrations(conn)\n    yield Repository(conn)   # everything after yield is teardown\n    conn.close()\n```\n\nScope deliberately: default `function` (fresh per test, safest). Use `module`/`session` only for expensive, read-only setup — shared mutable fixtures leak state and create order-dependent flakiness.\n\n## Parametrize instead of loops\n\nA loop inside one test stops at the first failure and reports one case. `parametrize` runs each case independently and names it.\n\n```python\n@pytest.mark.parametrize(\n    (\"title_a\", \"title_b\", \"expected\"),\n    [\n        (\"Song (Live)\", \"Song\", True),\n        (\"Song\", \"Totally Other\", False),\n    ],\n    ids=[\"live-suffix-matches\", \"different-titles-reject\"],\n)\ndef test_fuzzy_match(title_a, title_b, expected):\n    assert is_match(title_a, title_b) is expected\n```\n\n## Async tests (pytest-asyncio)\n\nWhen `pyproject.toml` sets `asyncio_mode = \"auto\"`, every `async def test_*` runs on the event loop with no decorator. Without it, mark each one `@pytest.mark.asyncio`. Know which mode the repo uses before adding tests.\n\n```toml\n[tool.pytest.ini_options]\nasyncio_mode = \"auto\"\n```\n\n```python\nasync def test_fetches_playlist(httpx_mock):\n    httpx_mock.add_response(json={\"items\": []})\n    result = await client.get_playlist(\"abc\")\n    assert result == []\n```\n\nAsync fixtures use the same `async def` + `yield` shape. Do not call `asyncio.run()` inside a test — you are already on the loop; nesting raises `RuntimeError`.\n\n## Mocking — at the boundary, not the internals\n\nMock I/O and external services (YouTube/Spotify APIs, the network), not your own pure functions. Prefer real objects (the `tmp_path` SQLite DB) over mocks when they are cheap — sortarr's web tests run against a real in-process SQLite DB for exactly this reason.\n\n```python\ndef test_skips_on_api_error(monkeypatch):\n    def boom(*_): raise TimeoutError\n    monkeypatch.setattr(client, \"get_playlist\", boom)\n    # monkeypatch auto-reverts after the test — no manual cleanup\n```\n\n- `monkeypatch` for attributes/env/dicts (auto-reverted).\n- `unittest.mock.AsyncMock` for awaitables; a plain `Mock` returns a coroutine-less value and the `await` fails.\n- For httpx, prefer `pytest-httpx`'s `httpx_mock` or `respx` over patching internals — patch the transport, not the call site.\n\n## Coverage and CI\n\n```bash\npytest                       # all tests\npytest -k \"match and not slow\"   # filter by name expression\npytest -x --ff               # stop at first failure, failed-first ordering\npytest -q tests/test_match.py::test_fuzzy_match   # one test\npytest --cov=src --cov-report=term-missing        # coverage with missing lines\n```\n\nCoverage is a floor, not a goal: 100% coverage with no assertions tests nothing. Chase uncovered *branches* that carry risk, not the percentage.\n\n## Targeted mutation testing\n\nAfter the relevant suite is green, consider a few mutations for changed or high-risk comparisons, guards, exception paths, and state updates. Mutation testing changes production code to challenge the tests; coverage only shows execution. Neither a whole-repository run nor a fixed mutation score is required.\n\n**Manual fallback:** preserve current edits and use an isolated test copy containing the candidate. Run the selected pytest cases and confirm they actually collected and passed rather than only skipping/xfailing. Change one production behavior with tests fixed, rerun, and inspect the failing assertion. Verify imports resolve to the mutated source, not another installed package or a monkeypatched replacement. An import/setup/type-check failure or unexplained timeout is not an assertion-based kill. For a real survivor, add a contract-derived test and prove it rejects the mutant. Restore only the probe change, inspect the diff, and rerun the relevant suite without discarding unrelated work.\n\n**Automation:** [mutmut](https://mutmut.readthedocs.io/en/latest/) is an option for a compatible pytest project. Prefer the repository's pinned environment. Check the installed version's help and documentation before choosing source paths, test selection, timeout/concurrency settings, or configuration keys; these can differ between versions. Bound the scope before using `mutmut run`, then inspect outcomes with `mutmut browse`. Verify copied fixtures/configuration and imported source. Do not treat cached/incremental results as a fresh run when dependencies, configuration, fixtures, or the candidate changed without the tool accounting for them.\n\n`mutmut apply` writes a mutant into source. Use it only in an isolated, recoverable copy and verify restoration even after interruption. Do not install tools or publish reports merely because the command appears here; a safe manual sample or a stated limitation is preferable to unsupported setup.\n\nRecord candidate, tool/Python versions, source/test scope, budget, baseline, actual outcomes, and final restoration in existing verification notes. Triage survivors into real gaps, missing execution, justified equivalence/out-of-scope behavior, or unresolved cases. Keep invalid/timeout/error/untested outcomes visible and report any score with its definition and denominator. Never weaken expected values, skip a hard test, or add an unjustified exclusion to raise that score. `test-driven-development` contains the shared method and deeper triage guidance.\n\n## Common mistakes\n\n| Mistake | Fix |\n| --- | --- |\n| `async def` test with no `asyncio_mode`/marker | Test is silently skipped or errors. Set `asyncio_mode = \"auto\"` or mark it. |\n| `Mock()` where an `await` happens | Use `AsyncMock`; a sync Mock isn't awaitable. |\n| `session`-scoped mutable fixture | Tests leak state and depend on order. Default to `function` scope. |\n| Loop over cases in one test | Use `parametrize` so each case runs and reports independently. |\n| Mocking your own pure logic | Mock only I/O boundaries; test real logic directly. |\n| Shared session/file DB across tests | Give each test its own DB via `tmp_path` (function scope); a shared file leaks state and throws `database is locked` under parallel workers. |\n| `assertEqual`/`TestCase` boilerplate | Use plain `assert`; pytest rewrites it with rich diffs. |\n\n## References\n\n- [pytest documentation](https://docs.pytest.org/)\n- [pytest-asyncio](https://pytest-asyncio.readthedocs.io/)\n- [pytest-httpx](https://github.com/Colin-b/pytest_httpx)\n\nBase directory for this skill: /workspace/.opencode/skills/python-testing\nRelative paths in this skill (e.g., scripts/, reference/) are relative to this base directory.\nNote: file list is sampled.\n\n<skill_files>\n</skill_files>\n</skill_content>"
+                            }
+                          ],
+                          "metadata": {
+                            "name": "python-testing",
+                            "directory": "/workspace/.opencode/skills/python-testing",
+                            "truncated": false
+                          },
+                          "executed": false
+                        }
+                      },
+                      "error": {
+                        "state": "omitted",
+                        "reason": "not_applicable"
+                      },
+                      "start_sequence": 1,
+                      "terminal_sequence": {
+                        "state": "available",
+                        "value": 2
+                      }
+                    }
+                  ],
+                  "coverage": {
+                    "observation_closed": {
+                      "state": "available",
+                      "value": true
+                    },
+                    "process_state": "completed",
+                    "starts": {
+                      "state": "available",
+                      "value": 1
+                    },
+                    "terminals": {
+                      "state": "available",
+                      "value": 1
+                    },
+                    "missing_terminals": {
+                      "state": "available",
+                      "value": 0
+                    },
+                    "observer_failures": {
+                      "state": "available",
+                      "value": 0
+                    },
+                    "callback_failures": {
+                      "state": "available",
+                      "value": 0
+                    },
+                    "losses": [],
+                    "unsupported": [
+                      "stock_codemode_final_boundary_not_exposed"
+                    ],
+                    "boundaries": {
+                      "native": {
+                        "status": "complete",
+                        "evidence_eligible": true,
+                        "starts": {
+                          "state": "available",
+                          "value": 1
+                        },
+                        "terminals": {
+                          "state": "available",
+                          "value": 1
+                        },
+                        "missing_terminals": {
+                          "state": "available",
+                          "value": 0
+                        },
+                        "issues": []
+                      },
+                      "code_mode_execution": {
+                        "status": "complete",
+                        "evidence_eligible": true,
+                        "starts": {
+                          "state": "available",
+                          "value": 0
+                        },
+                        "terminals": {
+                          "state": "available",
+                          "value": 0
+                        },
+                        "missing_terminals": {
+                          "state": "available",
+                          "value": 0
+                        },
+                        "issues": []
+                      },
+                      "code_mode_finality": {
+                        "status": "unsupported",
+                        "evidence_eligible": false,
+                        "starts": {
+                          "state": "unsupported",
+                          "reason": "stock_codemode_final_boundary_not_exposed"
+                        },
+                        "terminals": {
+                          "state": "unsupported",
+                          "reason": "stock_codemode_final_boundary_not_exposed"
+                        },
+                        "missing_terminals": {
+                          "state": "unsupported",
+                          "reason": "stock_codemode_final_boundary_not_exposed"
+                        },
+                        "issues": [
+                          "stock_codemode_final_boundary_not_exposed"
+                        ]
+                      }
+                    }
+                  }
+                }
+              ]
+            },
+            "checks": [
+              {
+                "name": "skill.native-load",
+                "status": "pass",
+                "reason": "native skill evidence evaluated",
+                "metadata": {
+                  "family": "skill"
+                }
+              }
+            ],
+            "skill_outcome": {
+              "expectations": [
+                {
+                  "text": "Uses AsyncMock (or an async function), not a plain Mock, for the awaited method",
+                  "met": true,
+                  "reason": "deterministic fixture grade"
+                },
+                {
+                  "text": "The test function is async (relies on asyncio_mode/marker)",
+                  "met": true,
+                  "reason": "deterministic fixture grade"
+                },
+                {
+                  "text": "Configures the mock to raise TimeoutError (e.g. side_effect)",
+                  "met": true,
+                  "reason": "deterministic fixture grade"
+                },
+                {
+                  "text": "Asserts the return value equals 'skipped'",
+                  "met": true,
+                  "reason": "deterministic fixture grade"
+                },
+                {
+                  "text": "Does NOT use a synchronous Mock() for the awaited call",
+                  "met": true,
+                  "reason": "deterministic fixture grade"
+                }
+              ],
+              "negative_expectations": [],
+              "trap": {
+                "declared": true,
+                "text": "Patching `get_playlist` with a plain `Mock()` returns a non-awaitable value, so `await` fails with a TypeError unrelated to the test intent. Awaitables need AsyncMock (or an async function).",
+                "observed": false,
+                "evidence": "not observed"
+              },
+              "semantic_judge": {
+                "passed": true,
+                "summary": "Fixture accepted all authored positive expectations.",
+                "behavior_score": 1.0
+              }
+            },
+            "source_artifact": {
+              "schema": "opencode-eval-runner/eval-artifact/v1",
+              "relative_path": "pairs/case-sk1_DgBwAHkAdABoAG8AbgAtAHQAZQBzAHQAaQBuAGcBADE/iteration-5.json#/sides/candidate",
+              "evidence_id": "af658100c632f25c277c556239cdccfec0c486e95f0a1a95abe50a25cd8e3efe"
+            }
+          },
+          "comparison": {
+            "schema": "opencode-eval-runner/eval-comparison/v1",
+            "status": "compared",
+            "baseline_classification": "pass",
+            "candidate_classification": "pass",
+            "decision": {
+              "classification": "pass",
+              "summary": "baseline 100.00%; candidate 100.00%; delta +0.00 pp; neutral",
+              "data": {
+                "candidate_absolute_pass": true,
+                "baseline_score": 1.0,
+                "candidate_score": 1.0,
+                "delta_pp": 0.0,
+                "trap_fixed": false,
+                "trap_regression": false,
+                "skill_value": "neutral"
+              }
+            },
+            "failure": null
+          }
+        }
+      },
+      "source_input": 1,
+      "source_path": "skills/python-testing/evals/evals.json",
+      "source_sha256": "cce5b2be8186cf7aae33fdc88ee682339246b8d56e64b08caa7fa096c63d7f4b"
+    }
+  },
+  "paired_artifact_evidence_id": "e7301d71d5d6fe609697b18ba94105d0e7a1425a074bd1f80b854766e1852bf0"
+}

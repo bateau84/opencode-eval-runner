@@ -17,8 +17,10 @@ jobs:
 
       - name: Python checks
         run: |
+          python3 -m pip install -r requirements-test.txt
           python3 -m compileall -q runner container tests
           python3 -m unittest discover -s tests -p 'test_*.py' -v
+          python3 -m pytest -v tests/test_eval_input.py tests/test_eval_assertions.py tests/test_eval_builtin_cli.py
 
       - name: Build fake Copilot transport for action smoke test
         run: |

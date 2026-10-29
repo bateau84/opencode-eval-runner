@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 import time
 import uuid
@@ -21,6 +22,11 @@ from runner.eval_artifacts import (
     artifact_identity_for_job,
     claim_run_artifact_directory,
 )
+from runner.eval_builtin import (
+    AgentRuntimeAdapter,
+    SkillAblationAdapter,
+    normalized_cases,
+)
 from runner.eval_engine import build_eval_artifact, run_evaluation_phase
 from runner.eval_evidence import EvidenceRequirement
 from runner.eval_execute import (
@@ -29,9 +35,11 @@ from runner.eval_execute import (
     TransientProviderRetryPolicy,
     invoke_once,
 )
+from runner.eval_input import InputContractError, load_evaluation_inputs
+from runner.eval_output import EvalOutputError, load_verified_output, write_output
 from runner.eval_plan import EvalPlanningError, build_run_plan, list_cases
 from runner.eval_types import EvalJob, InvocationSpec, JsonValue, RunPlan
-
+from runner.oci_image import ImageSelectionError, validate_immutable_image_identity
 
 EVAL_EXIT_PASS = 0
 EVAL_EXIT_VERDICT = 1
@@ -53,12 +61,13 @@ def add_eval_parser(subparsers: Any) -> argparse.ArgumentParser:
             "Live runs require --all or explicit --cases selection."
         ),
     )
-    run.add_argument(
-        "--profile",
-        required=True,
-        metavar="MODULE:ATTRIBUTE",
-        help="Initialized EvalProfile export to load.",
-    )
+    mode = run.add_mutually_exclusive_group(required=True)
+    mode.add_argument("--profile", metavar="MODULE:ATTRIBUTE", help="Initialized EvalProfile export to load.")
+    mode.add_argument("--input", action="append", metavar="PATH", help="JSON input file for a built-in evaluation family; repeat for combined skill runs.")
+    mode.add_argument("--render-run", metavar="RUN_DIRECTORY", help="Render a completed verified run without invoking a model.")
+    run.add_argument("--family", choices=("agent-runtime", "skill"), help="Input contract family for --input.")
+    run.add_argument("--skill", action="append", metavar="NAME", help="Skill identity; repeat once per input for combined skill runs.")
+    run.add_argument("--ablation", action="store_true", help="Run the skill baseline/candidate paired lifecycle.")
     run.add_argument(
         "--list",
         action="store_true",
@@ -174,6 +183,8 @@ def add_eval_parser(subparsers: Any) -> argparse.ArgumentParser:
             f"(default: 0; range: 0-{MAX_TRANSPORT_RETRIES})."
         ),
     )
+    run.add_argument("--format", choices=("json", "yaml", "markdown", "html"), help="Built-in result format (default: json).")
+    run.add_argument("--output", metavar="PATH", help="Write the selected built-in representation atomically to PATH.")
     return run
 
 
@@ -323,7 +334,16 @@ def _execute_job(
     invoker: InvokeAdapter,
     sleep: SleepFn,
     run_id: str,
+    store: RunArtifactStore | None = None,
 ) -> dict[str, Any]:
+    paired_executor = getattr(profile, "execute_paired_job", None)
+    if callable(paired_executor):
+        if store is None:
+            raise EvalCommandError("paired built-in eval requires artifact storage")
+        return paired_executor(
+            job, run_id=run_id, retry_policy=retry_policy,
+            max_attempts=max_attempts, invoker=invoker, sleep=sleep, store=store,
+        )
     context = profile.prepare(job.case, job.iteration)
     if not hasattr(context, "__enter__") or not hasattr(context, "__exit__"):
         raise EvalCommandError(
@@ -363,6 +383,18 @@ def _execute_job(
             judge_invoker=invoker,
             judge_sleep=sleep,
         )
+        completed_metadata = (
+            getattr(profile, "completed_artifact_metadata", None)
+            if getattr(profile, "runner_builtin_family", False)
+            else None
+        )
+        if callable(completed_metadata):
+            value = completed_metadata(job.case, prepared, result)
+            if not isinstance(value, Mapping):
+                raise EvalCommandError(
+                    "profile completed_artifact_metadata must return a mapping"
+                )
+            result = replace(result, project_metadata=dict(value))
         return build_eval_artifact(
             result,
             run_id=run_id,
@@ -388,7 +420,7 @@ def _run_lane(
     def capture(job: EvalJob) -> None:
         try:
             artifacts[_job_key(job)] = execute(job)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - each job failure is a terminal run outcome
             errors[_job_key(job)] = f"{type(exc).__name__}: {exc}"
 
     if parallelism <= 1:
@@ -402,7 +434,7 @@ def _run_lane(
             job = futures[future]
             try:
                 artifacts[_job_key(job)] = future.result()
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 - each job failure is a terminal run outcome
                 errors[_job_key(job)] = f"{type(exc).__name__}: {exc}"
     return artifacts, errors
 
@@ -411,6 +443,7 @@ def _manifest_jobs(
     plan: RunPlan,
     store: RunArtifactStore,
     statuses: Mapping[tuple[str, int], str] | None = None,
+    paired: bool = False,
 ) -> list[dict[str, JsonValue]]:
     statuses = {} if statuses is None else statuses
     values: list[dict[str, JsonValue]] = []
@@ -422,7 +455,10 @@ def _manifest_jobs(
                 "iteration": job.iteration,
                 "label": job.label,
                 "lane": job.case.lane,
-                "artifact": store.job_relative_path(identity).as_posix(),
+                "artifact": (
+                    store.paired_job_relative_path(identity)
+                    if paired else store.job_relative_path(identity)
+                ).as_posix(),
                 "status": statuses.get(_job_key(job), "planned"),
             }
         )
@@ -440,8 +476,10 @@ def _run_manifest(
     iterations: int,
     statuses: Mapping[tuple[str, int], str] | None = None,
     summary: Mapping[str, JsonValue] | None = None,
+    paired: bool = False,
+    project_metadata: Mapping[str, JsonValue] | None = None,
 ) -> dict[str, JsonValue]:
-    return {
+    manifest: dict[str, JsonValue] = {
         "schema": EVAL_RUN_SCHEMA,
         "run_id": plan.run_id,
         "created_at": created_at,
@@ -456,9 +494,12 @@ def _run_manifest(
             "standard": plan.standard_parallelism,
             "runtime": plan.runtime_parallelism,
         },
-        "jobs": _manifest_jobs(plan, store, statuses),
+        "jobs": _manifest_jobs(plan, store, statuses, paired=paired),
         "summary": dict(summary or {"status": "running"}),
     }
+    if project_metadata is not None:
+        manifest["project_metadata"] = dict(project_metadata)
+    return manifest
 
 
 def _list_profile_cases(profile: EvalProfile, stdout: TextIO) -> int:
@@ -488,9 +529,20 @@ def _persist_lane(
         if artifact is None:
             continue
         identity = artifact_identity_for_job(store.run_id, job)
-        store.write_job_artifact(identity, artifact)
-        verified = store.read_job_artifact(identity)
-        classification = str(verified["classification"])
+        if artifact.get("schema") == "opencode-eval-runner/eval-paired-artifact/v1":
+            store.write_paired_job_artifact(identity, artifact)
+            verified = store.read_paired_job_artifact(identity)
+            comparison = verified.get("comparison", {})
+            if comparison.get("status") == "compared":
+                classification = str(comparison["decision"]["classification"])
+            elif comparison.get("status") == "non-evidence":
+                classification = "non-evidence"
+            else:
+                classification = "error"
+        else:
+            store.write_job_artifact(identity, artifact)
+            verified = store.read_job_artifact(identity)
+            classification = str(verified["classification"])
         statuses[key] = classification
         print(f"{job.label} ... {classification.upper()}", file=stdout)
 
@@ -524,8 +576,18 @@ def _summary_from_store(
         status = statuses.get(_job_key(job), "not-run")
         if status in counts:
             identity = artifact_identity_for_job(plan.run_id, job)
-            verified = store.read_job_artifact(identity)
-            classification = str(verified["classification"])
+            if store.paired_job_path(identity).exists():
+                verified = store.read_paired_job_artifact(identity)
+                comparison = verified.get("comparison", {})
+                if comparison.get("status") == "compared":
+                    classification = str(comparison["decision"]["classification"])
+                elif comparison.get("status") == "non-evidence":
+                    classification = "non-evidence"
+                else:
+                    classification = "error"
+            else:
+                verified = store.read_job_artifact(identity)
+                classification = str(verified["classification"])
             if classification != status:
                 raise EvalCommandError(
                     f"artifact classification changed after persistence for {job.label}"
@@ -565,14 +627,99 @@ def run_eval(
     """Run one public eval command. Provider calls occur only after safe selection."""
     stdout = sys.stdout if stdout is None else stdout
     stderr = sys.stderr if stderr is None else stderr
+    progress_stdout = stderr if getattr(args, "input", None) else stdout
 
     try:
         _validate_cli_values(args)
-        profile = load_eval_profile(args.profile)
+        if getattr(args, "render_run", None) is not None:
+            prohibited = (
+                args.profile is not None or args.input is not None or args.family is not None
+                or args.skill or args.ablation or args.list or args.all or bool(args.cases)
+                or args.target_model is not None or args.judge_model is not None
+                or args.target_transport is not None or args.judge_transport is not None
+                or args.reasoning is not None or args.target_reasoning is not None or args.judge_reasoning is not None
+                or args.engine is not None or args.network is not None or args.artifact_dir is not None
+                or args.timeout_seconds is not None or args.container_timeout is not None
+                or args.transport_retries != 0 or args.iterations != 1 or args.parallel != 1
+                or args.runtime_parallel != 1
+            )
+            if prohibited:
+                raise EvalCommandError("--render-run cannot be combined with input, selection, invocation, profile, or artifact options")
+            model = load_verified_output(args.render_run)
+            write_output(model, args.format or "json", args.output, stdout, run_directory=args.render_run)
+            return EVAL_EXIT_PASS
+        input_metadata: dict[str, JsonValue] | None = None
+        if args.input is None:
+            built_in_controls = (
+                args.family is not None
+                or args.skill
+                or args.ablation
+                or args.format is not None
+                or args.output is not None
+            )
+            if built_in_controls:
+                raise EvalCommandError("built-in eval controls cannot be combined with --profile")
+            if not args.profile:
+                raise EvalCommandError("pass --profile or --input")
+            profile = load_eval_profile(args.profile)
+            profile_reference = args.profile
+        else:
+            if args.family is None:
+                raise EvalCommandError("--family is required with --input")
+            if args.list:
+                raise EvalCommandError("--list is available only with --profile")
+            input_paths = args.input if isinstance(args.input, list) else [args.input]
+            skill_bindings = args.skill or []
+            if skill_bindings and args.family != "skill":
+                raise EvalCommandError("--skill is only valid with --family skill")
+            if args.ablation and args.family != "skill":
+                raise EvalCommandError("--ablation is only valid with --family skill")
+            if args.target_model is None or not args.target_model.strip():
+                raise EvalCommandError("--target-model is required for built-in eval")
+            target_transport = args.target_transport or "opencode"
+            judge_transport = args.judge_transport or "opencode"
+            if target_transport != "opencode" or judge_transport != "opencode":
+                raise EvalCommandError("built-in evaluations support only the opencode transport")
+            args.target_transport = target_transport
+            args.judge_transport = judge_transport
+            try:
+                args.opencode_image = validate_immutable_image_identity(
+                    os.environ.get("OPENCODE_EVAL_RUNNER_OPENCODE_IMAGE")
+                )
+            except ImageSelectionError as exc:
+                raise EvalCommandError(str(exc)) from exc
+            args.judge_model = args.judge_model or args.target_model
+            if args.family == "agent-runtime" and len(input_paths) != 1:
+                raise EvalCommandError("multiple inputs are supported only for --family skill")
+            source = load_evaluation_inputs(input_paths, family=args.family, skills=skill_bindings)
+            if len(source.inputs) > 1:
+                input_metadata = {"runner_eval_input": {
+                    "schema": "opencode-eval-runner/eval-input-set/v2", "family": source.family,
+                    "contract": source.contract,
+                    "inputs": [{"ordinal": i, "path": item.submitted_path, "skill": item.skill,
+                                "contract": item.contract, "sha256": item.sha256}
+                               for i, item in enumerate(source.inputs, 1)],
+                }}
+            else:
+                input_metadata = {"runner_eval_input": {
+                    "family": source.family, "contract": source.contract, "sha256": source.sha256,
+                }}
+            cases = normalized_cases(source)
+            profile = (
+                AgentRuntimeAdapter(cases, args, Path.cwd())
+                if source.family == "agent-runtime"
+                else SkillAblationAdapter(cases, args, Path.cwd())
+            )
+            validate_inputs = getattr(profile, "validate_inputs", None)
+            if callable(validate_inputs):
+                validate_inputs()
+            profile_reference = f"builtin:{source.family}:{source.contract}"
         if args.list:
             return _list_profile_cases(profile, stdout)
 
         selectors = _selectors(args.cases)
+        if args.input is not None and args.all == bool(selectors):
+            raise EvalCommandError("built-in eval requires exactly one of --all or --cases")
         if not args.all and not selectors:
             raise EvalCommandError(
                 "live evals spend model inference; pass --cases or --all explicitly"
@@ -604,10 +751,12 @@ def run_eval(
                 plan=plan,
                 store=store,
                 created_at=created_at,
-                profile_reference=args.profile,
+                profile_reference=profile_reference,
                 selectors=selectors,
                 select_all=args.all,
                 iterations=args.iterations,
+                paired=isinstance(profile, SkillAblationAdapter),
+                project_metadata=input_metadata,
             )
         )
 
@@ -636,6 +785,7 @@ def run_eval(
                 invoker=invoker,
                 sleep=sleep,
                 run_id=run_id,
+                store=store,
             )
 
         standard_artifacts, standard_errors = _run_lane(
@@ -647,7 +797,7 @@ def run_eval(
             jobs=standard_jobs,
             artifacts=standard_artifacts,
             store=store,
-            stdout=stdout,
+            stdout=progress_stdout,
             statuses=statuses,
         )
         _error_report(
@@ -674,7 +824,7 @@ def run_eval(
                 jobs=runtime_jobs,
                 artifacts=runtime_artifacts,
                 store=store,
-                stdout=stdout,
+                stdout=progress_stdout,
                 statuses=statuses,
             )
             _error_report(
@@ -690,14 +840,20 @@ def run_eval(
                 plan=plan,
                 store=store,
                 created_at=created_at,
-                profile_reference=args.profile,
+                profile_reference=profile_reference,
                 selectors=selectors,
                 select_all=args.all,
                 iterations=args.iterations,
                 statuses=statuses,
                 summary=summary,
+                paired=isinstance(profile, SkillAblationAdapter),
+                project_metadata=input_metadata,
             )
         )
+
+        if args.input is not None:
+            model = load_verified_output(store.root)
+            write_output(model, args.format or "json", args.output, stdout, run_directory=store.root)
 
         print(
             "Run {run_id}: {passed} pass, {failed} fail, "
@@ -711,7 +867,7 @@ def run_eval(
                 not_run=summary["not_run"],
                 artifact_dir=store.root,
             ),
-            file=stdout,
+            file=progress_stdout,
         )
 
         if summary["errors"] or summary["not_run"]:
@@ -724,7 +880,9 @@ def run_eval(
         EvalPlanningError,
         EvalArtifactError,
         EvalArtifactStorageError,
+        InputContractError,
         EvalCommandError,
+        EvalOutputError,
         OSError,
         TypeError,
         ValueError,

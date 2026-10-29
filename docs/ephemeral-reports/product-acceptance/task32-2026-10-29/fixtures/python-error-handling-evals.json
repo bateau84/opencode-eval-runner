@@ -1,0 +1,41 @@
+{
+  "skill_name": "python-error-handling",
+  "evals": [
+    {
+      "id": 1,
+      "name": "domain-error-to-409",
+      "prompt": "Saving a rule that already exists currently returns HTTP 500 because the repository lets `sqlite3.IntegrityError` propagate up to the FastAPI route. Make a duplicate return 409 instead, and keep the API layer free of any sqlite3 import.",
+      "trap": "The quick fix is a try/except in the route catching sqlite3.IntegrityError — which leaks the storage driver into the web layer. The repository should translate the driver error into a domain error (with `from`), and a single exception handler should map it to 409.",
+      "expectations": [
+        "Catches sqlite3.IntegrityError inside the repository, not in the route",
+        "Raises a domain exception with `raise ... from e` to preserve the cause",
+        "Maps the domain error to 409 via a FastAPI exception handler (not per-route try/except)",
+        "The route/API layer does not import or reference sqlite3",
+        "Does NOT wrap the route body in a broad try/except as the fix"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "broad-except-pass",
+      "prompt": "Improve the error handling in this background worker loop.\n\n```python\nwhile True:\n    job = queue.get()\n    try:\n        process(job)\n    except Exception:\n        pass\n```",
+      "trap": "It is tempting to keep the broad catch so the loop never dies. But `except Exception: pass` hides bugs and produces no diagnostics. The fix is to narrow where possible, and if catching broadly for resilience, log the traceback rather than pass.",
+      "expectations": [
+        "Flags that `except Exception: pass` silently hides bugs and loses diagnostics",
+        "Catches the specific expected exception type(s) where possible",
+        "If catching broadly to keep the loop alive, uses log.exception (captures traceback)",
+        "Does NOT leave a silent `pass`"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "preserve-exception-cause",
+      "prompt": "Wrap the low-level HTTP failure in a domain error.\n\n```python\ntry:\n    resp = await client.get(url)\n    resp.raise_for_status()\nexcept httpx.HTTPStatusError:\n    raise QuotaExceededError('quota hit')\n```",
+      "trap": "A bare `raise QuotaExceededError(...)` inside the except discards the original traceback chain, hiding the root cause. The caught exception must be bound and re-raised with `from`.",
+      "expectations": [
+        "Binds the caught exception (`as e`)",
+        "Uses `raise QuotaExceededError(...) from e` to preserve the cause",
+        "Does NOT use a bare `raise QuotaExceededError(...)` that drops the chain"
+      ]
+    }
+  ]
+}

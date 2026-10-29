@@ -1,0 +1,50 @@
+2026-10-29T20:13:20.429048000+01:00 {"path": "/v1/chat/completions", "model": "mock", "stream": true, "tools": ["glob", "grep", "question", "read", "skill", "webfetch", "websearch", "execute"]}
+2026-10-29T20:13:20.434966000+01:00 {"path": "/v1/chat/completions", "model": "mock", "stream": true, "tools": ["glob", "grep", "question", "read", "skill", "webfetch", "websearch", "execute"]}
+2026-10-29T20:13:24.374094000+01:00 {"path": "/v1/chat/completions", "model": "mock", "stream": true, "tools": []}
+2026-10-29T20:13:24.608607000+01:00 {"path": "/v1/chat/completions", "model": "mock", "stream": true, "tools": []}
+2026-10-29T20:13:27.633527000+01:00 {"path": "/v1/chat/completions", "model": "mock", "stream": true, "tools": ["glob", "grep", "question", "read", "skill", "webfetch", "websearch", "execute"]}
+2026-10-29T20:13:27.711068000+01:00 {"path": "/v1/chat/completions", "model": "mock", "stream": true, "tools": ["glob", "grep", "question", "read", "skill", "webfetch", "websearch", "execute"]}
+2026-10-29T20:13:28.372159000+01:00 {"path": "/v1/chat/completions", "model": "mock", "stream": true, "tools": ["glob", "grep", "question", "read", "skill", "webfetch", "websearch", "execute"]}
+2026-10-29T20:13:28.439333000+01:00 {"path": "/v1/chat/completions", "model": "mock", "stream": true, "tools": ["glob", "grep", "question", "read", "skill", "webfetch", "websearch", "execute"]}
+2026-10-29T20:13:31.076574000+01:00 {"path": "/v1/chat/completions", "model": "mock", "stream": true, "tools": []}
+2026-10-29T20:13:31.720811000+01:00 {"path": "/v1/chat/completions", "model": "mock", "stream": true, "tools": []}
+2026-10-29T20:13:34.448094000+01:00 {"path": "/v1/chat/completions", "model": "mock", "stream": true, "tools": ["glob", "grep", "question", "read", "skill", "webfetch", "websearch", "execute"]}
+2026-10-29T20:13:35.151977000+01:00 {"path": "/v1/chat/completions", "model": "mock", "stream": true, "tools": ["glob", "grep", "question", "read", "skill", "webfetch", "websearch", "execute"]}
+2026-10-29T20:13:37.880807000+01:00 {"path": "/v1/chat/completions", "model": "mock", "stream": true, "tools": []}
+2026-10-29T20:13:38.503663000+01:00 {"path": "/v1/chat/completions", "model": "mock", "stream": true, "tools": []}
+2026-10-29T20:13:41.245956000+01:00 {"path": "/v1/chat/completions", "model": "mock", "stream": true, "tools": ["glob", "grep", "question", "read", "skill", "webfetch", "websearch", "execute"]}
+2026-10-29T20:13:41.309497000+01:00 {"path": "/v1/chat/completions", "model": "mock", "stream": true, "tools": ["glob", "grep", "question", "read", "skill", "webfetch", "websearch", "execute"]}
+2026-10-29T20:13:41.913046000+01:00 {"path": "/v1/chat/completions", "model": "mock", "stream": true, "tools": ["glob", "grep", "question", "read", "skill", "webfetch", "websearch", "execute"]}
+2026-10-29T20:13:41.982068000+01:00 {"path": "/v1/chat/completions", "model": "mock", "stream": true, "tools": ["glob", "grep", "question", "read", "skill", "webfetch", "websearch", "execute"]}
+2026-10-29T20:13:44.620094000+01:00 {"path": "/v1/chat/completions", "model": "mock", "stream": true, "tools": []}
+2026-10-29T20:13:45.328712000+01:00 {"path": "/v1/chat/completions", "model": "mock", "stream": true, "tools": []}
+2026-10-29T20:13:48.016540000+01:00 {"path": "/v1/chat/completions", "model": "mock", "stream": true, "tools": ["glob", "grep", "question", "read", "skill", "webfetch", "websearch", "execute"]}
+2026-10-29T20:13:48.733850000+01:00 {"path": "/v1/chat/completions", "model": "mock", "stream": true, "tools": ["glob", "grep", "question", "read", "skill", "webfetch", "websearch", "execute"]}
+2026-10-29T20:13:51.356637000+01:00 {"path": "/v1/chat/completions", "model": "mock", "stream": true, "tools": []}
+2026-10-29T20:13:52.121155000+01:00 {"path": "/v1/chat/completions", "model": "mock", "stream": true, "tools": []}
+2026-10-29T20:13:54.841230000+01:00 {"path": "/v1/chat/completions", "model": "mock", "stream": true, "tools": ["glob", "grep", "question", "read", "skill", "webfetch", "websearch", "execute"]}
+2026-10-29T20:13:54.920640000+01:00 {"path": "/v1/chat/completions", "model": "mock", "stream": true, "tools": ["glob", "grep", "question", "read", "skill", "webfetch", "websearch", "execute"]}
+2026-10-29T20:13:55.661093000+01:00 {"path": "/v1/chat/completions", "model": "mock", "stream": true, "tools": ["glob", "grep", "question", "read", "skill", "webfetch", "websearch", "execute"]}
+2026-10-29T20:13:55.715516000+01:00 {"path": "/v1/chat/completions", "model": "mock", "stream": true, "tools": ["glob", "grep", "question", "read", "skill", "webfetch", "websearch", "execute"]}
+2026-10-29T20:13:58.317958000+01:00 {"path": "/v1/chat/completions", "model": "mock", "stream": true, "tools": []}
+2026-10-29T20:13:59.117827000+01:00 {"path": "/v1/chat/completions", "model": "mock", "stream": true, "tools": []}
+2026-10-29T20:14:01.779546000+01:00 {"path": "/v1/chat/completions", "model": "mock", "stream": true, "tools": ["glob", "grep", "question", "read", "skill", "webfetch", "websearch", "execute"]}
+2026-10-29T20:14:02.543003000+01:00 {"path": "/v1/chat/completions", "model": "mock", "stream": true, "tools": ["glob", "grep", "question", "read", "skill", "webfetch", "websearch", "execute"]}
+2026-10-29T20:14:05.267554000+01:00 {"path": "/v1/chat/completions", "model": "mock", "stream": true, "tools": []}
+2026-10-29T20:14:05.908167000+01:00 {"path": "/v1/chat/completions", "model": "mock", "stream": true, "tools": []}
+2026-10-29T20:14:08.766283000+01:00 {"path": "/v1/chat/completions", "model": "mock", "stream": true, "tools": ["glob", "grep", "question", "read", "skill", "webfetch", "websearch", "execute"]}
+2026-10-29T20:14:08.848043000+01:00 {"path": "/v1/chat/completions", "model": "mock", "stream": true, "tools": ["glob", "grep", "question", "read", "skill", "webfetch", "websearch", "execute"]}
+2026-10-29T20:14:09.378684000+01:00 {"path": "/v1/chat/completions", "model": "mock", "stream": true, "tools": ["glob", "grep", "question", "read", "skill", "webfetch", "websearch", "execute"]}
+2026-10-29T20:14:09.449856000+01:00 {"path": "/v1/chat/completions", "model": "mock", "stream": true, "tools": ["glob", "grep", "question", "read", "skill", "webfetch", "websearch", "execute"]}
+2026-10-29T20:14:12.196044000+01:00 {"path": "/v1/chat/completions", "model": "mock", "stream": true, "tools": []}
+2026-10-29T20:14:12.840318000+01:00 {"path": "/v1/chat/completions", "model": "mock", "stream": true, "tools": []}
+2026-10-29T20:14:15.613824000+01:00 {"path": "/v1/chat/completions", "model": "mock", "stream": true, "tools": ["glob", "grep", "question", "read", "skill", "webfetch", "websearch", "execute"]}
+2026-10-29T20:14:16.235596000+01:00 {"path": "/v1/chat/completions", "model": "mock", "stream": true, "tools": ["glob", "grep", "question", "read", "skill", "webfetch", "websearch", "execute"]}
+2026-10-29T20:14:18.968190000+01:00 {"path": "/v1/chat/completions", "model": "mock", "stream": true, "tools": []}
+2026-10-29T20:14:19.664410000+01:00 {"path": "/v1/chat/completions", "model": "mock", "stream": true, "tools": []}
+2026-10-29T20:14:22.326594000+01:00 {"path": "/v1/chat/completions", "model": "mock", "stream": true, "tools": ["glob", "grep", "question", "read", "skill", "webfetch", "websearch", "execute"]}
+2026-10-29T20:14:22.407593000+01:00 {"path": "/v1/chat/completions", "model": "mock", "stream": true, "tools": ["glob", "grep", "question", "read", "skill", "webfetch", "websearch", "execute"]}
+2026-10-29T20:14:23.072441000+01:00 {"path": "/v1/chat/completions", "model": "mock", "stream": true, "tools": ["glob", "grep", "question", "read", "skill", "webfetch", "websearch", "execute"]}
+2026-10-29T20:14:23.146368000+01:00 {"path": "/v1/chat/completions", "model": "mock", "stream": true, "tools": ["glob", "grep", "question", "read", "skill", "webfetch", "websearch", "execute"]}
+2026-10-29T20:14:25.753073000+01:00 {"path": "/v1/chat/completions", "model": "mock", "stream": true, "tools": []}
+2026-10-29T20:14:26.470997000+01:00 {"path": "/v1/chat/completions", "model": "mock", "stream": true, "tools": []}

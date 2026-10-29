@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from pathlib import Path
 import json
 import os
 import subprocess
 import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 from container.invoke import (
@@ -17,6 +17,7 @@ from container.invoke import (
     resolve_opencode_reasoning,
     verify_expected_plugin,
 )
+from runner.oci_image import SUPPORTED_INVOKE_ADAPTER_ID, SUPPORTED_OPENCODE_VERSION
 
 
 class OpenCodeTransportTests(unittest.TestCase):
@@ -647,7 +648,12 @@ class OpenCodeTransportTests(unittest.TestCase):
         containerfile = (Path(__file__).resolve().parents[1] / "Containerfile").read_text(
             encoding="utf-8"
         )
-        self.assertIn("ARG OPENCODE_VERSION=2.0.23", containerfile)
+        self.assertIn(f"ARG OPENCODE_VERSION={SUPPORTED_OPENCODE_VERSION}", containerfile)
+        self.assertIn('org.opencontainers.image.version="${OPENCODE_VERSION}"', containerfile)
+        self.assertIn(
+            f'io.opencode-eval-runner.invoke-adapter="{SUPPORTED_INVOKE_ADAPTER_ID}"',
+            containerfile,
+        )
         self.assertNotIn("ARG OPENCODE_VERSION=2.0.15", containerfile)
 
     def test_container_pins_base_images_and_copilot_release_asset(self):

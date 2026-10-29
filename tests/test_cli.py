@@ -4,14 +4,14 @@ import argparse
 import json
 import os
 import sqlite3
+import subprocess
 import tempfile
 import unittest
-import subprocess
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from container.evidence_safety import JSON_SOURCE_LIMIT, MODEL_CATALOG_SOURCE_LIMIT
-
 from runner.cli import (
     COPILOT_AUTH_ENVS,
     DEFAULT_IMAGES,
@@ -21,10 +21,29 @@ from runner.cli import (
     default_database_path,
     default_models_path,
     extra_mount_arg,
-    sanitize_database_seed,
-    resolve_engine,
     host_environment_for_transport,
+    resolve_engine,
+    sanitize_database_seed,
 )
+from runner.oci_image import SUPPORTED_INVOKE_ADAPTER_ID, SUPPORTED_OPENCODE_VERSION
+
+
+def inspected_image_result(
+    image: str, *, version=None, adapter=None, image_id=None,
+    repo_digest=None, returncode=0,
+):
+    labels = {}
+    if version is not None:
+        labels["org.opencontainers.image.version"] = version
+    if adapter is not None:
+        labels["io.opencode-eval-runner.invoke-adapter"] = adapter
+    result = {
+        "Id": "sha256:" + (image_id or "a" * 64),
+        "RepoDigests": [repo_digest if repo_digest is not None else image]
+        if "@" in image else [],
+        "Config": {"Labels": labels},
+    }
+    return SimpleNamespace(returncode=returncode, stdout=json.dumps(result), stderr="")
 
 
 class RunnerCliTests(unittest.TestCase):
@@ -46,6 +65,241 @@ class RunnerCliTests(unittest.TestCase):
             DEFAULT_IMAGES["opencode"],
             DEFAULT_IMAGES["github-copilot-cli"],
         )
+
+    def test_builtin_eval_accepts_multiple_caller_selected_immutable_local_images(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            workspace, input_dir, output_dir = (
+                root / "workspace", root / "input", root / "output"
+            )
+            for path in (workspace, input_dir, output_dir):
+                path.mkdir()
+            identities = (
+                ("a" * 64, "a" * 64),
+                ("sha256:" + "b" * 64, "b" * 64),
+                ("registry.example/opencode@sha256:" + "c" * 64, "d" * 64),
+            )
+            for image, image_id in identities:
+                args = argparse.Namespace(
+                    engine="docker",
+                    image=image,
+                    require_local_opencode_image=True,
+                    workspace=str(workspace),
+                    workspace_mode="ro",
+                    output=str(root / "result.json"),
+                    transport="opencode",
+                    model="openai/test",
+                    agent="general",
+                    timeout_seconds=30,
+                    env=[],
+                    auth=None,
+                    config=None,
+                    models_catalog=None,
+                )
+                inspect = inspected_image_result(
+                    image,
+                    version=SUPPORTED_OPENCODE_VERSION,
+                    adapter=SUPPORTED_INVOKE_ADAPTER_ID,
+                    image_id=image_id,
+                )
+                calls: list[tuple[list[str], dict]] = []
+
+                def fake_run(command, *, capture=calls, result=inspect, **kwargs):
+                    capture.append((command, kwargs))
+                    return result
+
+                with patch("runner.cli.shutil.which", return_value="/usr/bin/docker"), patch(
+                    "runner.cli.subprocess.run", side_effect=fake_run
+                ):
+                    command, _ = build_container_command(
+                        args, input_dir, output_dir,
+                        host_env={"OPENCODE_EVAL_RUNNER_OPENCODE_IMAGE": image},
+                    )
+
+                self.assertEqual(command[-1], image)
+                self.assertIn("--pull=never", command)
+                self.assertEqual(len(calls), 1)
+                inspect_command, inspect_kwargs = calls[0]
+                self.assertIn("image", inspect_command)
+                self.assertIn("inspect", inspect_command)
+                self.assertNotIn("pull", inspect_command)
+                self.assertIn("--host", inspect_command)
+                self.assertIn("unix:///var/run/docker.sock", inspect_command)
+                self.assertNotIn("DOCKER_HOST", inspect_kwargs["env"])
+                self.assertNotIn("DOCKER_CONTEXT", inspect_kwargs["env"])
+
+    def test_builtin_eval_rejects_invalid_or_incompatible_images_before_run(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            workspace, input_dir, output_dir = (
+                root / "workspace", root / "input", root / "output"
+            )
+            for path in (workspace, input_dir, output_dir):
+                path.mkdir()
+            cases = (
+                (None, None, None, 0, None),
+                ("registry.example/opencode:latest", None, None, 0, None),
+                ("registry.example/opencode@sha256:" + "e" * 64, None, None, 1, None),
+                ("f" * 64, "9.9.9", SUPPORTED_INVOKE_ADAPTER_ID, 0, None),
+                ("1" * 64, SUPPORTED_OPENCODE_VERSION, "wrong-adapter", 0, None),
+                ("2" * 64, None, SUPPORTED_INVOKE_ADAPTER_ID, 0, None),
+                ("registry.example/opencode@sha256:" + "3" * 64,
+                 SUPPORTED_OPENCODE_VERSION, SUPPORTED_INVOKE_ADAPTER_ID, 0,
+                 "registry.example/opencode@sha256:" + "4" * 64),
+                ("5" * 64, SUPPORTED_OPENCODE_VERSION, SUPPORTED_INVOKE_ADAPTER_ID, 1, None),
+            )
+            for image, version, adapter, inspect_returncode, repo_digest in cases:
+                args = argparse.Namespace(
+                    engine="docker",
+                    image=image,
+                    require_local_opencode_image=True,
+                    workspace=str(workspace),
+                    workspace_mode="ro",
+                    output=str(root / "result.json"),
+                    transport="opencode",
+                    model="openai/test",
+                    agent="general",
+                    timeout_seconds=30,
+                    env=[],
+                    auth=None,
+                    config=None,
+                    models_catalog=None,
+                )
+                calls = []
+
+                def fake_run(
+                    command,
+                    *,
+                    capture=calls,
+                    selected_image=image,
+                    selected_version=version,
+                    selected_adapter=adapter,
+                    selected_repo_digest=repo_digest,
+                    inspect_result=inspect_returncode,
+                    **kwargs,
+                ):
+                    capture.append(command)
+                    return inspected_image_result(
+                        selected_image or "",
+                        version=selected_version,
+                        adapter=selected_adapter,
+                        image_id="f" * 64,
+                        repo_digest=selected_repo_digest,
+                        returncode=inspect_result,
+                    )
+
+                host_env = (
+                    {"OPENCODE_EVAL_RUNNER_IMAGE": "registry.example/default:latest"}
+                    if image is None else
+                    {"OPENCODE_EVAL_RUNNER_OPENCODE_IMAGE": image}
+                )
+                with self.subTest(image=image, version=version, adapter=adapter), patch(
+                    "runner.cli.shutil.which", return_value="/usr/bin/docker"
+                ), patch("runner.cli.subprocess.run", side_effect=fake_run):
+                    with self.assertRaises(RunnerError) as raised:
+                        build_container_command(args, input_dir, output_dir, host_env=host_env)
+                    self.assertNotIn(image or "<missing>", str(raised.exception))
+                    self.assertFalse(any("run" in call for call in calls))
+                    if image is None or ":latest" in image:
+                        self.assertEqual(calls, [])
+                    else:
+                        self.assertEqual(len(calls), 1)
+
+            selected = "a" * 64
+            args = argparse.Namespace(
+                engine="docker", image=selected, require_local_opencode_image=True,
+                workspace=str(workspace), workspace_mode="ro",
+                output=str(root / "result.json"), transport="opencode",
+                model="openai/test", agent="general", timeout_seconds=30,
+                env=[], auth=None, config=None, models_catalog=None,
+            )
+            with (
+                patch("runner.cli.shutil.which", return_value="/usr/bin/docker"),
+                patch("runner.cli.subprocess.run") as inspect,
+            ):
+                with self.assertRaisesRegex(RunnerError, "selection changed"):
+                    build_container_command(
+                        args, input_dir, output_dir,
+                        host_env={"OPENCODE_EVAL_RUNNER_OPENCODE_IMAGE": "b" * 64},
+                    )
+            inspect.assert_not_called()
+
+    def test_builtin_eval_rejects_remote_engine_endpoints_without_invoking_them(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            workspace, input_dir, output_dir = (
+                root / "workspace", root / "input", root / "output"
+            )
+            for path in (workspace, input_dir, output_dir):
+                path.mkdir()
+            image = "a" * 64
+            args = argparse.Namespace(
+                engine="docker", image=image, require_local_opencode_image=True,
+                workspace=str(workspace), workspace_mode="ro",
+                output=str(root / "result.json"), transport="opencode",
+                model="openai/test", agent="general", timeout_seconds=30,
+                env=[], auth=None, config=None, models_catalog=None,
+            )
+            with (
+                patch("runner.cli.shutil.which", return_value="/usr/bin/docker"),
+                patch("runner.cli.subprocess.run") as inspect,
+            ):
+                with self.assertRaisesRegex(RunnerError, "local Docker Unix socket"):
+                    build_container_command(
+                        args, input_dir, output_dir,
+                        host_env={
+                            "OPENCODE_EVAL_RUNNER_OPENCODE_IMAGE": image,
+                            "DOCKER_HOST": "tcp://remote.example:2376",
+                        },
+                    )
+            inspect.assert_not_called()
+
+    def test_builtin_eval_forces_podman_local_metadata_and_pull_never(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            workspace, input_dir, output_dir = (
+                root / "workspace", root / "input", root / "output"
+            )
+            for path in (workspace, input_dir, output_dir):
+                path.mkdir()
+            image = "9" * 64
+            args = argparse.Namespace(
+                engine="podman", image=image, require_local_opencode_image=True,
+                workspace=str(workspace), workspace_mode="ro",
+                output=str(root / "result.json"), transport="opencode",
+                model="openai/test", agent="general", timeout_seconds=30,
+                env=[], auth=None, config=None, models_catalog=None,
+            )
+            inspect = inspected_image_result(
+                image,
+                version=SUPPORTED_OPENCODE_VERSION,
+                adapter=SUPPORTED_INVOKE_ADAPTER_ID,
+                image_id=image,
+            )
+            calls = []
+
+            def fake_run(command, **kwargs):
+                calls.append((command, kwargs))
+                return inspect
+
+            with patch("runner.cli.shutil.which", return_value="/usr/bin/podman"), patch(
+                "runner.cli.subprocess.run", side_effect=fake_run
+            ):
+                command, _ = build_container_command(
+                    args,
+                    input_dir,
+                    output_dir,
+                    host_env={
+                        "OPENCODE_EVAL_RUNNER_OPENCODE_IMAGE": image,
+                        "CONTAINER_HOST": "tcp://remote.example:2376",
+                    },
+                )
+
+            self.assertEqual(command[:3], ["podman", "--remote=false", "run"])
+            self.assertEqual(command[-1], image)
+            self.assertIn("--pull=never", command)
+            self.assertIn("--remote=false", calls[0][0])
+            self.assertNotIn("CONTAINER_HOST", calls[0][1]["env"])
 
     def test_default_models_uses_xdg_cache_home(self):
         with tempfile.TemporaryDirectory() as tmp, patch.dict(os.environ, {"XDG_CACHE_HOME": tmp}, clear=False):
@@ -80,9 +334,13 @@ class RunnerCliTests(unittest.TestCase):
             with (
                 patch("runner.cli.shutil.which", return_value="/usr/bin/docker"),
                 patch.dict(os.environ, {}, clear=True),
+                patch("runner.cli.subprocess.run") as inspect,
             ):
                 command, _ = build_container_command(args, input_dir, output_dir)
             self.assertIn(f"{catalog.resolve()}:/seed/models.json:ro", command)
+            self.assertEqual(command[-1], "reviewed-image")
+            self.assertNotIn("--pull=never", command)
+            inspect.assert_not_called()
 
     def test_invalid_model_catalog_fails_before_container_execution(self):
         with tempfile.TemporaryDirectory() as tmp:

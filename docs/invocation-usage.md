@@ -6,7 +6,7 @@ This document is the reference for the **one-invocation** boundary:
 opencode-eval-runner invoke ...
 ~~~
 
-One <code>invoke</code> means exactly one isolated OpenCode or GitHub Copilot CLI invocation. It does not discover cases, run iterations, schedule suites, retry automatically, or decide behavioral PASS/FAIL.
+One <code>invoke</code> means exactly one isolated OpenCode or GitHub Copilot CLI invocation. It does not discover cases, run iterations, schedule suites, retry automatically, or decide behavioral PASS/FAIL. This transport flexibility belongs to the invocation boundary and existing profile mode; it does not mean built-in `eval` supports both transports.
 
 The repository also provides a separate public generic orchestration command:
 
@@ -14,28 +14,30 @@ The repository also provides a separate public generic orchestration command:
 opencode-eval-runner eval ...
 ~~~
 
-That command consumes project-supplied cases through the frozen <code>EvalProfile</code> contract while preserving <code>invoke</code> as the one-attempt primitive. See [Public eval CLI and profile reference](eval-usage.md) for the complete <code>eval</code> interface.
+That command has a preserved external <code>EvalProfile</code> mode and additive built-in modes for explicit runner-owned agent/runtime and skill input families, plus persisted-run rendering. Built-in target and judge invocations are OpenCode-only; existing profile mode retains its transport flexibility. Built-in evaluation and rendering run on the host and formats derive from verified persisted results. See [Public eval CLI and profile reference](eval-usage.md) and [ARS-001](architecture/eval-format-ownership/specifications/ars-001-runner-eval-contract.md).
 
 An invocation path remains:
 
 ~~~text
-generic eval or project harness
+profile or built-in eval / project harness
   -> invocation inputs
   -> opencode-eval-runner invoke
   -> isolated OpenCode or GitHub Copilot CLI process
   -> result/v1 + runtime-evidence/v1
-  -> project/profile assertions and judging
+  -> profile-owned or built-in family assertions and judging
 ~~~
 
 ## Input contract
 
 There is currently **no input JSON request API**.
 
-The supported invocation input contracts are:
+The supported one-invocation input contracts are:
 
 1. the host CLI: <code>opencode-eval-runner invoke ...</code>;
 2. the GitHub Action inputs in <code>action.yml</code>;
 3. a repository-owned harness that calls the host CLI one or more times.
+
+Built-in eval additionally accepts its runner-owned evaluation input files (`agent-runtime/v1` and `skill-cases/v1`) through `eval --input --family`. Those are suite/case contracts, not an invocation JSON request API: the host validates and orchestrates them, while every actual phase still calls one `invoke`. See ARS-001 for accepted shapes and semantics.
 
 Prompt and system content are supplied as UTF-8 files rather than as a JSON request body.
 
@@ -285,11 +287,11 @@ Every official result includes <code>runtime_evidence</code>:
 - Copilot results report runtime evidence as explicitly <code>unsupported</code>.
 - the host validates <code>runtime_evidence</code> before persisting the result artifact.
 
-For runtime assertions, follow the evidence-readiness decision procedure in [runtime-evidence-contract.md](runtime-evidence-contract.md). Diagnostic fields such as <code>tools</code>, <code>actions</code>, <code>tool_result_evidence</code>, stdout/stderr, and model text cannot substitute for missing authoritative evidence.
+For runtime assertions, follow the evidence-readiness decision procedure in [runtime-evidence-contract.md](runtime-evidence-contract.md). Diagnostic fields such as <code>tools</code>, <code>actions</code>, <code>tool_result_evidence</code>, stdout/stderr, and model text cannot substitute for missing authoritative evidence. Built-in eval is OpenCode-only; Copilot's unsupported runtime evidence remains usable only where the selected invocation/profile semantics do not require OpenCode runtime evidence. Built-in retries default to zero and are orchestration policy outside `invoke`.
 
 ## What remains project-owned
 
-Even when using the public <code>eval</code> command, the project/profile remains responsible for:
+In existing profile mode, the project/profile remains responsible for:
 
 - case definitions and project-specific selector meaning;
 - fixture/workspace preparation;
@@ -302,4 +304,4 @@ Even when using the public <code>eval</code> command, the project/profile remain
 - project scores, thresholds, traps, and reporting metadata;
 - future ablation/baseline-candidate comparison semantics.
 
-The generic <code>eval</code> layer owns only reusable orchestration mechanics. It does not move project semantics into this runner. See [Public eval CLI and profile reference](eval-usage.md).
+Built-in mode instead uses runner-owned family contracts and adapters as specified in ARS-001; that does not create a universal assertion DSL. Neither mode moves multi-case orchestration into the image. See [Public eval CLI and profile reference](eval-usage.md).

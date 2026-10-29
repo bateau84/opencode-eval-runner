@@ -1,0 +1,3 @@
+{"path": "/v1/chat/completions", "model": "mock", "stream": true, "action": "target-tool-request", "tools": ["edit", "glob", "grep", "question", "read", "shell", "skill", "subagent", "webfetch", "websearch", "write", "execute"]}
+{"path": "/v1/chat/completions", "model": "mock", "stream": true, "action": "target-final", "tools": ["edit", "glob", "grep", "question", "read", "shell", "skill", "subagent", "webfetch", "websearch", "write", "execute"]}
+{"path": "/v1/chat/completions", "model": "mock", "stream": true, "action": "judge", "tools": []}

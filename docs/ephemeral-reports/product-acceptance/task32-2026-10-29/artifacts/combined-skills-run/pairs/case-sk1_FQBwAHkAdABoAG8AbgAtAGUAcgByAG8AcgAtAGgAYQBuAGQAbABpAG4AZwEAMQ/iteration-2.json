@@ -1,0 +1,2333 @@
+{
+  "schema": "opencode-eval-runner/eval-paired-artifact/v1",
+  "run_id": "f47f708d31cf42b489900c870838ea43",
+  "case": "sk1_FQBwAHkAdABoAG8AbgAtAGUAcgByAG8AcgAtAGgAYQBuAGQAbABpAG4AZwEAMQ",
+  "iteration": 2,
+  "pair_id": "d40aa62e638090d9795dc82d10bbf1d809593364c37d894939b1fc31e6bc0d32",
+  "execution_policy": {
+    "mode": "sequential",
+    "order": [
+      "baseline",
+      "candidate"
+    ]
+  },
+  "sides": {
+    "baseline": {
+      "schema": "opencode-eval-runner/eval-artifact/v1",
+      "run_id": "f47f708d31cf42b489900c870838ea43",
+      "case": "sk1_FQBwAHkAdABoAG8AbgAtAGUAcgByAG8AcgAtAGgAYQBuAGQAbABpAG4AZwEAMQ",
+      "iteration": 2,
+      "lane": "runtime",
+      "classification": "pass",
+      "timing": {
+        "started_at": "2026-10-29T19:13:59.312Z",
+        "duration_seconds": 6.998184097988997,
+        "target_seconds": 3.470903303998057,
+        "judge_seconds": 3.52728079399094
+      },
+      "target": {
+        "attempts": [
+          {
+            "attempt": 1,
+            "started_at": "2026-10-29T19:13:59.312Z",
+            "duration_seconds": 3.470903303998057,
+            "host_exit_code": 0,
+            "result": {
+              "schema": "opencode-eval-runner/v1",
+              "transport": "opencode",
+              "model": "fixture/mock",
+              "reasoning": "provider-default",
+              "reasoning_source": "provider-default",
+              "agent": "skill-baseline",
+              "skill": null,
+              "exit_code": 0,
+              "session_id": "ses_e76eaa1c2ffeLqO373K6d0xoCc",
+              "text": "Deterministic fixture response: provide a clear, complete answer satisfying all requested expectations; use AsyncMock for awaited calls, isolated tmp_path databases, parametrize independent cases, preserve domain errors with causes, narrow catches and log exceptions.",
+              "tools": [],
+              "actions": [],
+              "skills_loaded": [],
+              "timing": {
+                "run_seconds": 0.907,
+                "export_seconds": 0.0,
+                "export_exit_code": null,
+                "total_seconds": 0.907
+              },
+              "stderr": "",
+              "stderr_truncated": false,
+              "stderr_total_chars": 0,
+              "stdout": "{\"type\":\"text\",\"timestamp\":1793301241819,\"sessionID\":\"ses_e76eaa1c2ffeLqO373K6d0xoCc\",\"part\":{\"id\":\"prt_189155f9d001zE8W2Lh4Z1pPt4_text-0\",\"sessionID\":\"ses_e76eaa1c2ffeLqO373K6d0xoCc\",\"messageID\":\"msg_189155f9d001zE8W2Lh4Z1pPt4\",\"type\":\"text\",\"text\":\"Deterministic fixture response: provide a clear, complete answer satisfying all requested expectations; use AsyncMock for awaited calls, isolated tmp_path databases, parametrize independent cases, preserve domain errors with causes, narrow catches and log exceptions.\",\"time\":{\"start\":1793301241773,\"end\":1793301241819}}}\n",
+              "stdout_truncated": false,
+              "stdout_total_chars": 573,
+              "tool_result_evidence": {
+                "schema": "opencode-eval-runner/tool-results/v1",
+                "source": "opencode.event-stream.full",
+                "observed_events": 0,
+                "omitted_events": 0,
+                "events": [],
+                "safety": {
+                  "schema": "opencode-eval-runner/evidence-safety/v1",
+                  "inventory_complete": true,
+                  "fields": [],
+                  "losses": {}
+                }
+              },
+              "runtime_evidence": {
+                "schema": "opencode-eval-runner/runtime-evidence/v1",
+                "status": "complete",
+                "evidence_eligible": true,
+                "observations": [],
+                "coverage": {
+                  "observation_closed": {
+                    "state": "available",
+                    "value": true
+                  },
+                  "process_state": "completed",
+                  "starts": {
+                    "state": "available",
+                    "value": 0
+                  },
+                  "terminals": {
+                    "state": "available",
+                    "value": 0
+                  },
+                  "missing_terminals": {
+                    "state": "available",
+                    "value": 0
+                  },
+                  "observer_failures": {
+                    "state": "available",
+                    "value": 0
+                  },
+                  "callback_failures": {
+                    "state": "available",
+                    "value": 0
+                  },
+                  "losses": [],
+                  "unsupported": [
+                    "stock_codemode_final_boundary_not_exposed"
+                  ],
+                  "boundaries": {
+                    "native": {
+                      "status": "complete",
+                      "evidence_eligible": true,
+                      "starts": {
+                        "state": "available",
+                        "value": 0
+                      },
+                      "terminals": {
+                        "state": "available",
+                        "value": 0
+                      },
+                      "missing_terminals": {
+                        "state": "available",
+                        "value": 0
+                      },
+                      "issues": []
+                    },
+                    "code_mode_execution": {
+                      "status": "complete",
+                      "evidence_eligible": true,
+                      "starts": {
+                        "state": "available",
+                        "value": 0
+                      },
+                      "terminals": {
+                        "state": "available",
+                        "value": 0
+                      },
+                      "missing_terminals": {
+                        "state": "available",
+                        "value": 0
+                      },
+                      "issues": []
+                    },
+                    "code_mode_finality": {
+                      "status": "unsupported",
+                      "evidence_eligible": false,
+                      "starts": {
+                        "state": "unsupported",
+                        "reason": "stock_codemode_final_boundary_not_exposed"
+                      },
+                      "terminals": {
+                        "state": "unsupported",
+                        "reason": "stock_codemode_final_boundary_not_exposed"
+                      },
+                      "missing_terminals": {
+                        "state": "unsupported",
+                        "reason": "stock_codemode_final_boundary_not_exposed"
+                      },
+                      "issues": [
+                        "stock_codemode_final_boundary_not_exposed"
+                      ]
+                    }
+                  }
+                }
+              },
+              "plugin_diagnostic": {
+                "config_root": "/tmp/runtime/config/opencode",
+                "config_root_exists": true,
+                "plugins_root": "/tmp/runtime/config/opencode/plugins",
+                "plugins_exists": false,
+                "plugins_is_dir": false,
+                "plugins_resolved": null,
+                "plugins_entries": [],
+                "loom_exists": false,
+                "loom_is_dir": false,
+                "loom_index_exists": false,
+                "loom_flat_exists": false,
+                "loom_module_index_exists": false,
+                "runtime_observer_exists": true,
+                "runtime_observer_inline_configured": true
+              },
+              "plugin_preflight": {
+                "expected": null,
+                "agent": null,
+                "entrypoints": []
+              }
+            },
+            "failure": null
+          }
+        ],
+        "evidence_readiness": {
+          "status": "ready",
+          "reasons": [],
+          "required_boundaries": [
+            "native"
+          ]
+        }
+      },
+      "deterministic_checks": [
+        {
+          "name": "skill.native-load",
+          "status": "pass",
+          "reason": "native skill evidence evaluated",
+          "metadata": {
+            "family": "skill"
+          }
+        }
+      ],
+      "judge": {
+        "attempts": [
+          {
+            "attempt": 1,
+            "started_at": "2026-10-29T19:14:02.783Z",
+            "duration_seconds": 3.52728079399094,
+            "host_exit_code": 0,
+            "result": {
+              "schema": "opencode-eval-runner/v1",
+              "transport": "opencode",
+              "model": "fixture/mock",
+              "reasoning": "provider-default",
+              "reasoning_source": "provider-default",
+              "agent": "eval-judge",
+              "skill": null,
+              "exit_code": 0,
+              "session_id": "ses_e76ea9418ffehxofEvUXY5kQv3",
+              "text": "{\"passed\": true, \"expectations\": [{\"expectation\": \"Catches sqlite3.IntegrityError inside the repository, not in the route\", \"met\": true, \"reason\": \"deterministic fixture grade\"}, {\"expectation\": \"Raises a domain exception with `raise ... from e` to preserve the cause\", \"met\": true, \"reason\": \"deterministic fixture grade\"}, {\"expectation\": \"Maps the domain error to 409 via a FastAPI exception handler (not per-route try/except)\", \"met\": true, \"reason\": \"deterministic fixture grade\"}, {\"expectation\": \"The route/API layer does not import or reference sqlite3\", \"met\": true, \"reason\": \"deterministic fixture grade\"}, {\"expectation\": \"Does NOT wrap the route body in a broad try/except as the fix\", \"met\": true, \"reason\": \"deterministic fixture grade\"}], \"violations\": [], \"trap_observed\": false, \"trap_evidence\": \"not observed\", \"summary\": \"Fixture accepted all authored positive expectations.\"}",
+              "tools": [],
+              "actions": [],
+              "skills_loaded": [],
+              "timing": {
+                "run_seconds": 0.863,
+                "export_seconds": 0.0,
+                "export_exit_code": null,
+                "total_seconds": 0.863
+              },
+              "stderr": "",
+              "stderr_truncated": false,
+              "stderr_total_chars": 0,
+              "stdout": "{\"type\":\"text\",\"timestamp\":1793301245306,\"sessionID\":\"ses_e76ea9418ffehxofEvUXY5kQv3\",\"part\":{\"id\":\"prt_189156d43001zet1nvBdE8TmMi_text-0\",\"sessionID\":\"ses_e76ea9418ffehxofEvUXY5kQv3\",\"messageID\":\"msg_189156d43001zet1nvBdE8TmMi\",\"type\":\"text\",\"text\":\"{\\\"passed\\\": true, \\\"expectations\\\": [{\\\"expectation\\\": \\\"Catches sqlite3.IntegrityError inside the repository, not in the route\\\", \\\"met\\\": true, \\\"reason\\\": \\\"deterministic fixture grade\\\"}, {\\\"expectation\\\": \\\"Raises a domain exception with `raise ... from e` to preserve the cause\\\", \\\"met\\\": true, \\\"reason\\\": \\\"deterministic fixture grade\\\"}, {\\\"expectation\\\": \\\"Maps the domain error to 409 via a FastAPI exception handler (not per-route try/except)\\\", \\\"met\\\": true, \\\"reason\\\": \\\"deterministic fixture grade\\\"}, {\\\"expectation\\\": \\\"The route/API layer does not import or reference sqlite3\\\", \\\"met\\\": true, \\\"reason\\\": \\\"deterministic fixture grade\\\"}, {\\\"expectation\\\": \\\"Does NOT wrap the route body in a broad try/except as the fix\\\", \\\"met\\\": true, \\\"reason\\\": \\\"deterministic fixture grade\\\"}], \\\"violations\\\": [], \\\"trap_observed\\\": false, \\\"trap_evidence\\\": \\\"not observed\\\", \\\"summary\\\": \\\"Fixture accepted all authored positive expectations.\\\"}\",\"time\":{\"start\":1793301245264,\"end\":1793301245306}}}\n",
+              "stdout_truncated": false,
+              "stdout_total_chars": 1268,
+              "tool_result_evidence": {
+                "schema": "opencode-eval-runner/tool-results/v1",
+                "source": "opencode.event-stream.full",
+                "observed_events": 0,
+                "omitted_events": 0,
+                "events": [],
+                "safety": {
+                  "schema": "opencode-eval-runner/evidence-safety/v1",
+                  "inventory_complete": true,
+                  "fields": [],
+                  "losses": {}
+                }
+              },
+              "runtime_evidence": {
+                "schema": "opencode-eval-runner/runtime-evidence/v1",
+                "status": "complete",
+                "evidence_eligible": true,
+                "observations": [],
+                "coverage": {
+                  "observation_closed": {
+                    "state": "available",
+                    "value": true
+                  },
+                  "process_state": "completed",
+                  "starts": {
+                    "state": "available",
+                    "value": 0
+                  },
+                  "terminals": {
+                    "state": "available",
+                    "value": 0
+                  },
+                  "missing_terminals": {
+                    "state": "available",
+                    "value": 0
+                  },
+                  "observer_failures": {
+                    "state": "available",
+                    "value": 0
+                  },
+                  "callback_failures": {
+                    "state": "available",
+                    "value": 0
+                  },
+                  "losses": [],
+                  "unsupported": [
+                    "stock_codemode_final_boundary_not_exposed"
+                  ],
+                  "boundaries": {
+                    "native": {
+                      "status": "complete",
+                      "evidence_eligible": true,
+                      "starts": {
+                        "state": "available",
+                        "value": 0
+                      },
+                      "terminals": {
+                        "state": "available",
+                        "value": 0
+                      },
+                      "missing_terminals": {
+                        "state": "available",
+                        "value": 0
+                      },
+                      "issues": []
+                    },
+                    "code_mode_execution": {
+                      "status": "complete",
+                      "evidence_eligible": true,
+                      "starts": {
+                        "state": "available",
+                        "value": 0
+                      },
+                      "terminals": {
+                        "state": "available",
+                        "value": 0
+                      },
+                      "missing_terminals": {
+                        "state": "available",
+                        "value": 0
+                      },
+                      "issues": []
+                    },
+                    "code_mode_finality": {
+                      "status": "unsupported",
+                      "evidence_eligible": false,
+                      "starts": {
+                        "state": "unsupported",
+                        "reason": "stock_codemode_final_boundary_not_exposed"
+                      },
+                      "terminals": {
+                        "state": "unsupported",
+                        "reason": "stock_codemode_final_boundary_not_exposed"
+                      },
+                      "missing_terminals": {
+                        "state": "unsupported",
+                        "reason": "stock_codemode_final_boundary_not_exposed"
+                      },
+                      "issues": [
+                        "stock_codemode_final_boundary_not_exposed"
+                      ]
+                    }
+                  }
+                }
+              },
+              "plugin_diagnostic": {
+                "config_root": "/tmp/runtime/config/opencode",
+                "config_root_exists": true,
+                "plugins_root": "/tmp/runtime/config/opencode/plugins",
+                "plugins_exists": false,
+                "plugins_is_dir": false,
+                "plugins_resolved": null,
+                "plugins_entries": [],
+                "loom_exists": false,
+                "loom_is_dir": false,
+                "loom_index_exists": false,
+                "loom_flat_exists": false,
+                "loom_module_index_exists": false,
+                "runtime_observer_exists": true,
+                "runtime_observer_inline_configured": true
+              },
+              "plugin_preflight": {
+                "expected": null,
+                "agent": null,
+                "entrypoints": []
+              }
+            },
+            "failure": null
+          }
+        ],
+        "semantic": {
+          "status": "pass",
+          "summary": "Fixture accepted all authored positive expectations.",
+          "data": {
+            "passed": true,
+            "expectations": [
+              {
+                "expectation": "Catches sqlite3.IntegrityError inside the repository, not in the route",
+                "met": true,
+                "reason": "deterministic fixture grade"
+              },
+              {
+                "expectation": "Raises a domain exception with `raise ... from e` to preserve the cause",
+                "met": true,
+                "reason": "deterministic fixture grade"
+              },
+              {
+                "expectation": "Maps the domain error to 409 via a FastAPI exception handler (not per-route try/except)",
+                "met": true,
+                "reason": "deterministic fixture grade"
+              },
+              {
+                "expectation": "The route/API layer does not import or reference sqlite3",
+                "met": true,
+                "reason": "deterministic fixture grade"
+              },
+              {
+                "expectation": "Does NOT wrap the route body in a broad try/except as the fix",
+                "met": true,
+                "reason": "deterministic fixture grade"
+              }
+            ],
+            "violations": [],
+            "trap_observed": false,
+            "trap_evidence": "not observed",
+            "summary": "Fixture accepted all authored positive expectations.",
+            "behavior_score": 1.0
+          }
+        }
+      },
+      "project_metadata": {
+        "family": "skill",
+        "contract": "skill-cases/v1",
+        "input_sha256": "",
+        "source_index": 1,
+        "source_id": 1,
+        "authored_id": 1,
+        "display_name": "domain-error-to-409",
+        "skill": "python-error-handling",
+        "source_input": 2,
+        "source_path": "skills/python-error-handling/evals/evals.json",
+        "source_sha256": "e834048256f8c142f92930e320ff90e682f5d01b310edfdb13c61526e4cee61b",
+        "input_count": 2,
+        "side": "baseline",
+        "runner_eval_invocations": [
+          {
+            "transport": "opencode",
+            "model": "fixture/mock",
+            "reasoning": null,
+            "agent": "skill-baseline",
+            "skill": null,
+            "workspace_mode": "ro",
+            "timeout_seconds": 90,
+            "container_timeout": 150,
+            "engine": "podman",
+            "network": "task32-recovery-1793300807",
+            "image": "sha256:0940e9ac543098bfa51dda81cce643ed3366df1ab8a4e90bf5fcd8601c2e5e39",
+            "expected_plugin": null
+          },
+          {
+            "transport": "opencode",
+            "model": "fixture/mock",
+            "reasoning": null,
+            "agent": "eval-judge",
+            "skill": null,
+            "workspace_mode": "ro",
+            "timeout_seconds": 90,
+            "container_timeout": 150,
+            "engine": "podman",
+            "network": "task32-recovery-1793300807",
+            "image": "sha256:0940e9ac543098bfa51dda81cce643ed3366df1ab8a4e90bf5fcd8601c2e5e39",
+            "expected_plugin": null
+          }
+        ]
+      },
+      "artifact_evidence_id": "bde17f83a25b9d54074a7df9e3c1cc97bfc96b5f3b4aa8046d4dbc5c680a21ba"
+    },
+    "candidate": {
+      "schema": "opencode-eval-runner/eval-artifact/v1",
+      "run_id": "f47f708d31cf42b489900c870838ea43",
+      "case": "sk1_FQBwAHkAdABoAG8AbgAtAGUAcgByAG8AcgAtAGgAYQBuAGQAbABpAG4AZwEAMQ",
+      "iteration": 2,
+      "lane": "runtime",
+      "classification": "pass",
+      "timing": {
+        "started_at": "2026-10-29T19:14:06.310Z",
+        "duration_seconds": 6.832204570993781,
+        "target_seconds": 3.4783875870052725,
+        "judge_seconds": 3.3538169839885086
+      },
+      "target": {
+        "attempts": [
+          {
+            "attempt": 1,
+            "started_at": "2026-10-29T19:14:06.310Z",
+            "duration_seconds": 3.4783875870052725,
+            "host_exit_code": 0,
+            "result": {
+              "schema": "opencode-eval-runner/v1",
+              "transport": "opencode",
+              "model": "fixture/mock",
+              "reasoning": "provider-default",
+              "reasoning_source": "provider-default",
+              "agent": "skill-eval",
+              "skill": "python-error-handling",
+              "exit_code": 0,
+              "session_id": "ses_e76ea868cffeMl2OX1v6iMBFty",
+              "text": "Deterministic fixture response: provide a clear, complete answer satisfying all requested expectations; use AsyncMock for awaited calls, isolated tmp_path databases, parametrize independent cases, preserve domain errors with causes, narrow catches and log exceptions.",
+              "tools": [
+                "skill"
+              ],
+              "actions": [
+                {
+                  "tool": "skill",
+                  "args": {
+                    "id": "python-error-handling"
+                  }
+                }
+              ],
+              "skills_loaded": [
+                "python-error-handling"
+              ],
+              "timing": {
+                "run_seconds": 0.968,
+                "export_seconds": 0.0,
+                "export_exit_code": null,
+                "total_seconds": 0.968
+              },
+              "stderr": "",
+              "stderr_truncated": false,
+              "stderr_total_chars": 0,
+              "stdout": "{\"type\":\"step_start\",\"timestamp\":1793301248788,\"sessionID\":\"ses_e76ea868cffeMl2OX1v6iMBFty\",\"part\":{\"id\":\"prt_189157b140013ddNRXgn1EVg78\",\"sessionID\":\"ses_e76ea868cffeMl2OX1v6iMBFty\",\"messageID\":\"msg_189157ae9001uYEa7XezZAEvtA\",\"type\":\"step-start\"}}\n{\"type\":\"tool_use\",\"timestamp\":1793301248808,\"sessionID\":\"ses_e76ea868cffeMl2OX1v6iMBFty\",\"part\":{\"partID\":\"prt_189157b170017HkMZM0oht5XN1\",\"sessionID\":\"ses_e76ea868cffeMl2OX1v6iMBFty\",\"messageID\":\"msg_189157ae9001uYEa7XezZAEvtA\",\"type\":\"tool\",\"id\":\"fixture-skill-call\",\"tool\":\"skill\",\"state\":{\"status\":\"completed\",\"input\":{\"id\":\"python-error-handling\"},\"output\":\"<skill_content name=\\\"python-error-handling\\\">\\n# Skill: python-error-handling\\n\\n> Pair with `python-common-practice`, `python-fastapi` (HTTP mapping), `python-async` (CancelledError), and `python-observability` (logging errors) as relevant.\\n\\n**Persona:** You are a Python engineer who treats exceptions as part of the API. You catch what you can handle and let the rest propagate to someone who can.\\n\\n# Error Handling\\n\\nPython prefers **EAFP** (\\\"easier to ask forgiveness than permission\\\") — try the operation and handle the exception rather than pre-checking. Pre-checks race with reality; the exception is the truth.\\n\\n```python\\n# ✓ EAFP — one atomic attempt\\ntry:\\n    return cache[key]\\nexcept KeyError:\\n    return load(key)\\n\\n# ✗ LBYL — racy for I/O; fine when a simple guard avoids broad catching\\nif key in cache:\\n    return cache[key]\\n```\\n\\n**EAFP is a convention, not a universal rule.** Broad catches can hide failures from both humans and agents. Prefer EAFP where the exception type is known and the catch is narrow; inspect the framework's actual error behavior rather than guessing at its hierarchy. Use explicit checks where they express the contract more clearly, while accounting for race conditions between checking and acting.\\n\\n## Catch narrowly\\n\\nCatch the **specific** exception you can handle. A bare `except:` or `except Exception:` swallows bugs, `KeyboardInterrupt`, and (in async) cancellation — turning a crash you'd fix into silent wrong behavior.\\n\\n```python\\n# ✗ Bad — hides programming errors and makes debugging impossible\\ntry:\\n    sync_playlist(p)\\nexcept Exception:\\n    pass\\n\\n# ✓ Good — handle the failures you expect; let the rest surface\\ntry:\\n    sync_playlist(p)\\nexcept (httpx.HTTPError, TimeoutError) as e:\\n    log.warning(\\\"sync failed for %s: %s\\\", p.id, e)\\n    metrics.errors_total.inc()\\n```\\n\\nIf you must catch broadly (a top-level worker loop that must not die), log with `log.exception(...)` to capture the traceback, then continue or re-raise — never `pass`.\\n\\n## Agent navigability — narrow exception surfaces\\n\\nPrefer narrow exception surfaces: agents catching from broad hierarchies must guess error object shapes — a predictable interface failure, not a model failure.\\n\\n**Framework guidance — catch the specific exception, not the family:**\\n\\n| Framework | Broad (avoid) | Narrow (prefer) |\\n| --- | --- | --- |\\n| `requests` / `httpx` | `requests.exceptions.RequestException` | `httpx.TimeoutException`, `httpx.HTTPStatusError` |\\n| `django` ORM | `django.core.exceptions.ObjectDoesNotExist` | `MyModel.DoesNotExist` |\\n| SQLAlchemy | `sqlalchemy.exc.SQLAlchemyError` | `sqlalchemy.exc.IntegrityError`, `sqlalchemy.exc.OperationalError` |\\n\\nWrap framework exceptions at the boundary into domain exceptions. This collapses the broad hierarchy into a predictable, narrow surface for all downstream code.\\n\\n## Custom exceptions — a hierarchy with a common base\\n\\nGive your package one base exception; specific errors subclass it. Callers can then catch the whole family or a specific case. This is what lets a FastAPI handler map *all* your domain errors in one place.\\n\\n```python\\nclass SortarrError(Exception):\\n    \\\"\\\"\\\"Base for all sortarr domain errors.\\\"\\\"\\\"\\n\\nclass AuthRequiredError(SortarrError): ...\\nclass QuotaExceededError(SortarrError): ...\\n```\\n\\nSubclass the most specific stdlib type when it fits (`ValueError`, `LookupError`); invent a new hierarchy only for domain concepts the stdlib doesn't model.\\n\\n## Chain exceptions — preserve the cause\\n\\nWhen you wrap a low-level error in a domain one, use `raise ... from` so the original traceback survives. Bare `raise NewError(...)` inside an `except` hides the root cause.\\n\\n```python\\ntry:\\n    resp = await client.get(url)\\n    resp.raise_for_status()\\nexcept httpx.HTTPStatusError as e:\\n    raise QuotaExceededError(\\\"YouTube quota hit\\\") from e   # ✓ keeps the cause\\n```\\n\\nTo deliberately suppress the context, use `from None` — and only when the cause is genuinely noise.\\n\\nThis is also how you keep storage details out of the API: the **repository** catches the driver error and raises a domain error, so the route never imports `sqlite3` or sees a driver exception.\\n\\n```python\\nimport sqlite3\\n\\ndef save_rule(self, rule: Rule) -> None:\\n    try:\\n        self._con.execute(\\\"INSERT INTO rules (id, pattern) VALUES (?, ?)\\\", (rule.id, rule.pattern))\\n    except sqlite3.IntegrityError as e:\\n        raise DuplicateRuleError(rule.id) from e   # domain error — a handler maps it to 409\\n```\\n\\n## else and finally\\n\\n`else` runs only when `try` didn't raise — put success logic there. `finally` always runs; prefer a **context manager** over manual try/finally.\\n\\n```python\\nwith open_connection(db_path) as conn:   # closed on any exit path\\n    conn.execute(...)\\n```\\n\\nWrite your own with `contextlib.contextmanager` or `__enter__/__exit__`; use `async with` for async resources.\\n\\n## Re-raise, don't return error sentinels\\n\\nReturning `None`/`-1`/`False` to signal failure forces every caller to remember to check, and the type checker can't help. Raise instead — the failure can't be silently ignored. (Return `X | None` only when \\\"not found\\\" is a *normal, expected* outcome, not an error.)\\n\\nIn async code, **never swallow `asyncio.CancelledError`** — re-raise it so shutdown and timeouts work (→ See `python-async`).\\n\\n## Mapping to HTTP\\n\\nIn FastAPI, register one exception handler per domain base class rather than try/except in every route (→ See `python-fastapi`):\\n\\n```python\\n@app.exception_handler(AuthRequiredError)\\nasync def _auth(_: Request, exc: AuthRequiredError):\\n    return JSONResponse(status_code=401, content={\\\"detail\\\": str(exc)})\\n```\\n\\nNever leak a stack trace or internal message to a client — log the detail server-side, return a clean message.\\n\\n## Common mistakes\\n\\n| Mistake | Fix |\\n| --- | --- |\\n| `except Exception: pass` | Catch the specific type; if broad, `log.exception` then re-raise. |\\n| Bare `raise FooError()` inside `except` | `raise FooError() from err` to preserve the cause. |\\n| `except:` (bare) | Catches `KeyboardInterrupt`/`SystemExit`/cancellation too — name the type. |\\n| Manual try/finally for cleanup | Use a context manager (`with`). |\\n| Returning `None`/`-1` for errors | Raise an exception; reserve `None` for expected absence. |\\n| Swallowing `CancelledError` in async | Re-raise it. |\\n| Leaking tracebacks to API clients | Log server-side; return a sanitized message. |\\n| EAFP with broad `except` on a framework hierarchy | Prefer LBYL guard or narrow catch; wrap at the boundary into a domain exception. |\\n\\n**Diagnose:** 1- `ruff check` (bugbear `B`) — flags overly broad `except` and `raise` without `from` 2- read the full traceback (don't truncate) — the chained `from` cause usually names the real failure.\\n\\n## References\\n\\n- [Errors and Exceptions — tutorial](https://docs.python.org/3/tutorial/errors.html)\\n- [Built-in Exceptions](https://docs.python.org/3/library/exceptions.html)\\n- [Glossary — EAFP / LBYL](https://docs.python.org/3/glossary.html)\\n- [Alexis King — Parse, don't validate](https://lexi-lambda.github.io/blog/2019/11/05/parse-don-t-validate/)\\n\\nBase directory for this skill: /workspace/.opencode/skills/python-error-handling\\nRelative paths in this skill (e.g., scripts/, reference/) are relative to this base directory.\\nNote: file list is sampled.\\n\\n<skill_files>\\n</skill_files>\\n</skill_content>\",\"title\":\"skill\",\"metadata\":{\"metadata\":{\"name\":\"python-error-handling\",\"directory\":\"/workspace/.opencode/skills/python-error-handling\",\"truncated\":false},\"content\":[{\"type\":\"text\",\"text\":\"<skill_content name=\\\"python-error-handling\\\">\\n# Skill: python-error-handling\\n\\n> Pair with `python-common-practice`, `python-fastapi` (HTTP mapping), `python-async` (CancelledError), and `python-observability` (logging errors) as relevant.\\n\\n**Persona:** You are a Python engineer who treats exceptions as part of the API. You catch what you can handle and let the rest propagate to someone who can.\\n\\n# Error Handling\\n\\nPython prefers **EAFP** (\\\"easier to ask forgiveness than permission\\\") — try the operation and handle the exception rather than pre-checking. Pre-checks race with reality; the exception is the truth.\\n\\n```python\\n# ✓ EAFP — one atomic attempt\\ntry:\\n    return cache[key]\\nexcept KeyError:\\n    return load(key)\\n\\n# ✗ LBYL — racy for I/O; fine when a simple guard avoids broad catching\\nif key in cache:\\n    return cache[key]\\n```\\n\\n**EAFP is a convention, not a universal rule.** Broad catches can hide failures from both humans and agents. Prefer EAFP where the exception type is known and the catch is narrow; inspect the framework's actual error behavior rather than guessing at its hierarchy. Use explicit checks where they express the contract more clearly, while accounting for race conditions between checking and acting.\\n\\n## Catch narrowly\\n\\nCatch the **specific** exception you can handle. A bare `except:` or `except Exception:` swallows bugs, `KeyboardInterrupt`, and (in async) cancellation — turning a crash you'd fix into silent wrong behavior.\\n\\n```python\\n# ✗ Bad — hides programming errors and makes debugging impossible\\ntry:\\n    sync_playlist(p)\\nexcept Exception:\\n    pass\\n\\n# ✓ Good — handle the failures you expect; let the rest surface\\ntry:\\n    sync_playlist(p)\\nexcept (httpx.HTTPError, TimeoutError) as e:\\n    log.warning(\\\"sync failed for %s: %s\\\", p.id, e)\\n    metrics.errors_total.inc()\\n```\\n\\nIf you must catch broadly (a top-level worker loop that must not die), log with `log.exception(...)` to capture the traceback, then continue or re-raise — never `pass`.\\n\\n## Agent navigability — narrow exception surfaces\\n\\nPrefer narrow exception surfaces: agents catching from broad hierarchies must guess error object shapes — a predictable interface failure, not a model failure.\\n\\n**Framework guidance — catch the specific exception, not the family:**\\n\\n| Framework | Broad (avoid) | Narrow (prefer) |\\n| --- | --- | --- |\\n| `requests` / `httpx` | `requests.exceptions.RequestException` | `httpx.TimeoutException`, `httpx.HTTPStatusError` |\\n| `django` ORM | `django.core.exceptions.ObjectDoesNotExist` | `MyModel.DoesNotExist` |\\n| SQLAlchemy | `sqlalchemy.exc.SQLAlchemyError` | `sqlalchemy.exc.IntegrityError`, `sqlalchemy.exc.OperationalError` |\\n\\nWrap framework exceptions at the boundary into domain exceptions. This collapses the broad hierarchy into a predictable, narrow surface for all downstream code.\\n\\n## Custom exceptions — a hierarchy with a common base\\n\\nGive your package one base exception; specific errors subclass it. Callers can then catch the whole family or a specific case. This is what lets a FastAPI handler map *all* your domain errors in one place.\\n\\n```python\\nclass SortarrError(Exception):\\n    \\\"\\\"\\\"Base for all sortarr domain errors.\\\"\\\"\\\"\\n\\nclass AuthRequiredError(SortarrError): ...\\nclass QuotaExceededError(SortarrError): ...\\n```\\n\\nSubclass the most specific stdlib type when it fits (`ValueError`, `LookupError`); invent a new hierarchy only for domain concepts the stdlib doesn't model.\\n\\n## Chain exceptions — preserve the cause\\n\\nWhen you wrap a low-level error in a domain one, use `raise ... from` so the original traceback survives. Bare `raise NewError(...)` inside an `except` hides the root cause.\\n\\n```python\\ntry:\\n    resp = await client.get(url)\\n    resp.raise_for_status()\\nexcept httpx.HTTPStatusError as e:\\n    raise QuotaExceededError(\\\"YouTube quota hit\\\") from e   # ✓ keeps the cause\\n```\\n\\nTo deliberately suppress the context, use `from None` — and only when the cause is genuinely noise.\\n\\nThis is also how you keep storage details out of the API: the **repository** catches the driver error and raises a domain error, so the route never imports `sqlite3` or sees a driver exception.\\n\\n```python\\nimport sqlite3\\n\\ndef save_rule(self, rule: Rule) -> None:\\n    try:\\n        self._con.execute(\\\"INSERT INTO rules (id, pattern) VALUES (?, ?)\\\", (rule.id, rule.pattern))\\n    except sqlite3.IntegrityError as e:\\n        raise DuplicateRuleError(rule.id) from e   # domain error — a handler maps it to 409\\n```\\n\\n## else and finally\\n\\n`else` runs only when `try` didn't raise — put success logic there. `finally` always runs; prefer a **context manager** over manual try/finally.\\n\\n```python\\nwith open_connection(db_path) as conn:   # closed on any exit path\\n    conn.execute(...)\\n```\\n\\nWrite your own with `contextlib.contextmanager` or `__enter__/__exit__`; use `async with` for async resources.\\n\\n## Re-raise, don't return error sentinels\\n\\nReturning `None`/`-1`/`False` to signal failure forces every caller to remember to check, and the type checker can't help. Raise instead — the failure can't be silently ignored. (Return `X | None` only when \\\"not found\\\" is a *normal, expected* outcome, not an error.)\\n\\nIn async code, **never swallow `asyncio.CancelledError`** — re-raise it so shutdown and timeouts work (→ See `python-async`).\\n\\n## Mapping to HTTP\\n\\nIn FastAPI, register one exception handler per domain base class rather than try/except in every route (→ See `python-fastapi`):\\n\\n```python\\n@app.exception_handler(AuthRequiredError)\\nasync def _auth(_: Request, exc: AuthRequiredError):\\n    return JSONResponse(status_code=401, content={\\\"detail\\\": str(exc)})\\n```\\n\\nNever leak a stack trace or internal message to a client — log the detail server-side, return a clean message.\\n\\n## Common mistakes\\n\\n| Mistake | Fix |\\n| --- | --- |\\n| `except Exception: pass` | Catch the specific type; if broad, `log.exception` then re-raise. |\\n| Bare `raise FooError()` inside `except` | `raise FooError() from err` to preserve the cause. |\\n| `except:` (bare) | Catches `KeyboardInterrupt`/`SystemExit`/cancellation too — name the type. |\\n| Manual try/finally for cleanup | Use a context manager (`with`). |\\n| Returning `None`/`-1` for errors | Raise an exception; reserve `None` for expected absence. |\\n| Swallowing `CancelledError` in async | Re-raise it. |\\n| Leaking tracebacks to API clients | Log server-side; return a sanitized message. |\\n| EAFP with broad `except` on a framework hierarchy | Prefer LBYL guard or narrow catch; wrap at the boundary into a domain exception. |\\n\\n**Diagnose:** 1- `ruff check` (bugbear `B`) — flags overly broad `except` and `raise` without `from` 2- read the full traceback (don't truncate) — the chained `from` cause usually names the real failure.\\n\\n## References\\n\\n- [Errors and Exceptions — tutorial](https://docs.python.org/3/tutorial/errors.html)\\n- [Built-in Exceptions](https://docs.python.org/3/library/exceptions.html)\\n- [Glossary — EAFP / LBYL](https://docs.python.org/3/glossary.html)\\n- [Alexis King — Parse, don't validate](https://lexi-lambda.github.io/blog/2019/11/05/parse-don-t-validate/)\\n\\nBase directory for this skill: /workspace/.opencode/skills/python-error-handling\\nRelative paths in this skill (e.g., scripts/, reference/) are relative to this base directory.\\nNote: file list is sampled.\\n\\n<skill_files>\\n</skill_files>\\n</skill_content>\"}],\"providerCall\":{\"executed\":false},\"providerResult\":{\"executed\":false},\"rawInput\":\"{\\\"id\\\": \\\"python-error-handling\\\"}\"},\"time\":{\"start\":1793301248791,\"end\":1793301248808}}}}\n{\"type\":\"step_finish\",\"timestamp\":1793301248813,\"sessionID\":\"ses_e76ea868cffeMl2OX1v6iMBFty\",\"part\":{\"id\":\"prt_189157b2d001qw8InmUMctChpg\",\"sessionID\":\"ses_e76ea868cffeMl2OX1v6iMBFty\",\"messageID\":\"msg_189157ae9001uYEa7XezZAEvtA\",\"type\":\"step-finish\",\"reason\":\"tool-calls\",\"cost\":0,\"tokens\":{\"input\":0,\"output\":0,\"reasoning\":0,\"cache\":{\"read\":0,\"write\":0}}}}\n{\"type\":\"text\",\"timestamp\":1793301248865,\"sessionID\":\"ses_e76ea868cffeMl2OX1v6iMBFty\",\"part\":{\"id\":\"prt_189157b3a001DPTZyTOOtGE3PE_text-0\",\"sessionID\":\"ses_e76ea868cffeMl2OX1v6iMBFty\",\"messageID\":\"msg_189157b3a001DPTZyTOOtGE3PE\",\"type\":\"text\",\"text\":\"Deterministic fixture response: provide a clear, complete answer satisfying all requested expectations; use AsyncMock for awaited calls, isolated tmp_path databases, parametrize independent cases, preserve domain errors with causes, narrow catches and log exceptions.\",\"time\":{\"start\":1793301248842,\"end\":1793301248865}}}\n",
+              "stdout_truncated": false,
+              "stdout_total_chars": 16885,
+              "tool_result_evidence": {
+                "schema": "opencode-eval-runner/tool-results/v1",
+                "source": "opencode.event-stream.full",
+                "observed_events": 1,
+                "omitted_events": 0,
+                "events": [
+                  {
+                    "sequence": 1,
+                    "tool": "skill",
+                    "call_id": "fixture-skill-call",
+                    "session_id": "ses_e76ea868cffeMl2OX1v6iMBFty",
+                    "status": "completed",
+                    "input": {
+                      "id": "python-error-handling"
+                    }
+                  }
+                ],
+                "safety": {
+                  "schema": "opencode-eval-runner/evidence-safety/v1",
+                  "inventory_complete": true,
+                  "fields": [
+                    {
+                      "event": 0,
+                      "field": "tool",
+                      "state": "available"
+                    },
+                    {
+                      "event": 0,
+                      "field": "call_id",
+                      "state": "available"
+                    },
+                    {
+                      "event": 0,
+                      "field": "session_id",
+                      "state": "available"
+                    },
+                    {
+                      "event": 0,
+                      "field": "status",
+                      "state": "available"
+                    },
+                    {
+                      "event": 0,
+                      "field": "input",
+                      "state": "available"
+                    },
+                    {
+                      "event": 0,
+                      "field": "output",
+                      "state": "omitted",
+                      "reason": "size_limit",
+                      "stage": "before_evidence_size"
+                    }
+                  ],
+                  "losses": {
+                    "size_limit": 1
+                  }
+                }
+              },
+              "runtime_evidence": {
+                "schema": "opencode-eval-runner/runtime-evidence/v1",
+                "status": "complete",
+                "evidence_eligible": true,
+                "observations": [
+                  {
+                    "invocation_id": "native:ae06e975-d97e-486d-b072-40c98210df42",
+                    "tool": {
+                      "state": "available",
+                      "value": "skill"
+                    },
+                    "mode": "native",
+                    "actor": {
+                      "state": "available",
+                      "value": "skill-eval"
+                    },
+                    "session_id": {
+                      "state": "available",
+                      "value": "ses_e76ea868cffeMl2OX1v6iMBFty"
+                    },
+                    "message_id": {
+                      "state": "available",
+                      "value": "msg_189157ae9001uYEa7XezZAEvtA"
+                    },
+                    "call_id": {
+                      "state": "available",
+                      "value": "fixture-skill-call"
+                    },
+                    "parent": {
+                      "state": "available",
+                      "value": null
+                    },
+                    "input": {
+                      "state": "available",
+                      "value": {
+                        "id": "python-error-handling"
+                      }
+                    },
+                    "outcome": "success",
+                    "result": {
+                      "state": "available",
+                      "value": {
+                        "content": [
+                          {
+                            "type": "text",
+                            "text": "<skill_content name=\"python-error-handling\">\n# Skill: python-error-handling\n\n> Pair with `python-common-practice`, `python-fastapi` (HTTP mapping), `python-async` (CancelledError), and `python-observability` (logging errors) as relevant.\n\n**Persona:** You are a Python engineer who treats exceptions as part of the API. You catch what you can handle and let the rest propagate to someone who can.\n\n# Error Handling\n\nPython prefers **EAFP** (\"easier to ask forgiveness than permission\") — try the operation and handle the exception rather than pre-checking. Pre-checks race with reality; the exception is the truth.\n\n```python\n# ✓ EAFP — one atomic attempt\ntry:\n    return cache[key]\nexcept KeyError:\n    return load(key)\n\n# ✗ LBYL — racy for I/O; fine when a simple guard avoids broad catching\nif key in cache:\n    return cache[key]\n```\n\n**EAFP is a convention, not a universal rule.** Broad catches can hide failures from both humans and agents. Prefer EAFP where the exception type is known and the catch is narrow; inspect the framework's actual error behavior rather than guessing at its hierarchy. Use explicit checks where they express the contract more clearly, while accounting for race conditions between checking and acting.\n\n## Catch narrowly\n\nCatch the **specific** exception you can handle. A bare `except:` or `except Exception:` swallows bugs, `KeyboardInterrupt`, and (in async) cancellation — turning a crash you'd fix into silent wrong behavior.\n\n```python\n# ✗ Bad — hides programming errors and makes debugging impossible\ntry:\n    sync_playlist(p)\nexcept Exception:\n    pass\n\n# ✓ Good — handle the failures you expect; let the rest surface\ntry:\n    sync_playlist(p)\nexcept (httpx.HTTPError, TimeoutError) as e:\n    log.warning(\"sync failed for %s: %s\", p.id, e)\n    metrics.errors_total.inc()\n```\n\nIf you must catch broadly (a top-level worker loop that must not die), log with `log.exception(...)` to capture the traceback, then continue or re-raise — never `pass`.\n\n## Agent navigability — narrow exception surfaces\n\nPrefer narrow exception surfaces: agents catching from broad hierarchies must guess error object shapes — a predictable interface failure, not a model failure.\n\n**Framework guidance — catch the specific exception, not the family:**\n\n| Framework | Broad (avoid) | Narrow (prefer) |\n| --- | --- | --- |\n| `requests` / `httpx` | `requests.exceptions.RequestException` | `httpx.TimeoutException`, `httpx.HTTPStatusError` |\n| `django` ORM | `django.core.exceptions.ObjectDoesNotExist` | `MyModel.DoesNotExist` |\n| SQLAlchemy | `sqlalchemy.exc.SQLAlchemyError` | `sqlalchemy.exc.IntegrityError`, `sqlalchemy.exc.OperationalError` |\n\nWrap framework exceptions at the boundary into domain exceptions. This collapses the broad hierarchy into a predictable, narrow surface for all downstream code.\n\n## Custom exceptions — a hierarchy with a common base\n\nGive your package one base exception; specific errors subclass it. Callers can then catch the whole family or a specific case. This is what lets a FastAPI handler map *all* your domain errors in one place.\n\n```python\nclass SortarrError(Exception):\n    \"\"\"Base for all sortarr domain errors.\"\"\"\n\nclass AuthRequiredError(SortarrError): ...\nclass QuotaExceededError(SortarrError): ...\n```\n\nSubclass the most specific stdlib type when it fits (`ValueError`, `LookupError`); invent a new hierarchy only for domain concepts the stdlib doesn't model.\n\n## Chain exceptions — preserve the cause\n\nWhen you wrap a low-level error in a domain one, use `raise ... from` so the original traceback survives. Bare `raise NewError(...)` inside an `except` hides the root cause.\n\n```python\ntry:\n    resp = await client.get(url)\n    resp.raise_for_status()\nexcept httpx.HTTPStatusError as e:\n    raise QuotaExceededError(\"YouTube quota hit\") from e   # ✓ keeps the cause\n```\n\nTo deliberately suppress the context, use `from None` — and only when the cause is genuinely noise.\n\nThis is also how you keep storage details out of the API: the **repository** catches the driver error and raises a domain error, so the route never imports `sqlite3` or sees a driver exception.\n\n```python\nimport sqlite3\n\ndef save_rule(self, rule: Rule) -> None:\n    try:\n        self._con.execute(\"INSERT INTO rules (id, pattern) VALUES (?, ?)\", (rule.id, rule.pattern))\n    except sqlite3.IntegrityError as e:\n        raise DuplicateRuleError(rule.id) from e   # domain error — a handler maps it to 409\n```\n\n## else and finally\n\n`else` runs only when `try` didn't raise — put success logic there. `finally` always runs; prefer a **context manager** over manual try/finally.\n\n```python\nwith open_connection(db_path) as conn:   # closed on any exit path\n    conn.execute(...)\n```\n\nWrite your own with `contextlib.contextmanager` or `__enter__/__exit__`; use `async with` for async resources.\n\n## Re-raise, don't return error sentinels\n\nReturning `None`/`-1`/`False` to signal failure forces every caller to remember to check, and the type checker can't help. Raise instead — the failure can't be silently ignored. (Return `X | None` only when \"not found\" is a *normal, expected* outcome, not an error.)\n\nIn async code, **never swallow `asyncio.CancelledError`** — re-raise it so shutdown and timeouts work (→ See `python-async`).\n\n## Mapping to HTTP\n\nIn FastAPI, register one exception handler per domain base class rather than try/except in every route (→ See `python-fastapi`):\n\n```python\n@app.exception_handler(AuthRequiredError)\nasync def _auth(_: Request, exc: AuthRequiredError):\n    return JSONResponse(status_code=401, content={\"detail\": str(exc)})\n```\n\nNever leak a stack trace or internal message to a client — log the detail server-side, return a clean message.\n\n## Common mistakes\n\n| Mistake | Fix |\n| --- | --- |\n| `except Exception: pass` | Catch the specific type; if broad, `log.exception` then re-raise. |\n| Bare `raise FooError()` inside `except` | `raise FooError() from err` to preserve the cause. |\n| `except:` (bare) | Catches `KeyboardInterrupt`/`SystemExit`/cancellation too — name the type. |\n| Manual try/finally for cleanup | Use a context manager (`with`). |\n| Returning `None`/`-1` for errors | Raise an exception; reserve `None` for expected absence. |\n| Swallowing `CancelledError` in async | Re-raise it. |\n| Leaking tracebacks to API clients | Log server-side; return a sanitized message. |\n| EAFP with broad `except` on a framework hierarchy | Prefer LBYL guard or narrow catch; wrap at the boundary into a domain exception. |\n\n**Diagnose:** 1- `ruff check` (bugbear `B`) — flags overly broad `except` and `raise` without `from` 2- read the full traceback (don't truncate) — the chained `from` cause usually names the real failure.\n\n## References\n\n- [Errors and Exceptions — tutorial](https://docs.python.org/3/tutorial/errors.html)\n- [Built-in Exceptions](https://docs.python.org/3/library/exceptions.html)\n- [Glossary — EAFP / LBYL](https://docs.python.org/3/glossary.html)\n- [Alexis King — Parse, don't validate](https://lexi-lambda.github.io/blog/2019/11/05/parse-don-t-validate/)\n\nBase directory for this skill: /workspace/.opencode/skills/python-error-handling\nRelative paths in this skill (e.g., scripts/, reference/) are relative to this base directory.\nNote: file list is sampled.\n\n<skill_files>\n</skill_files>\n</skill_content>"
+                          }
+                        ],
+                        "metadata": {
+                          "name": "python-error-handling",
+                          "directory": "/workspace/.opencode/skills/python-error-handling",
+                          "truncated": false
+                        },
+                        "executed": false
+                      }
+                    },
+                    "error": {
+                      "state": "omitted",
+                      "reason": "not_applicable"
+                    },
+                    "start_sequence": 1,
+                    "terminal_sequence": {
+                      "state": "available",
+                      "value": 2
+                    }
+                  }
+                ],
+                "coverage": {
+                  "observation_closed": {
+                    "state": "available",
+                    "value": true
+                  },
+                  "process_state": "completed",
+                  "starts": {
+                    "state": "available",
+                    "value": 1
+                  },
+                  "terminals": {
+                    "state": "available",
+                    "value": 1
+                  },
+                  "missing_terminals": {
+                    "state": "available",
+                    "value": 0
+                  },
+                  "observer_failures": {
+                    "state": "available",
+                    "value": 0
+                  },
+                  "callback_failures": {
+                    "state": "available",
+                    "value": 0
+                  },
+                  "losses": [],
+                  "unsupported": [
+                    "stock_codemode_final_boundary_not_exposed"
+                  ],
+                  "boundaries": {
+                    "native": {
+                      "status": "complete",
+                      "evidence_eligible": true,
+                      "starts": {
+                        "state": "available",
+                        "value": 1
+                      },
+                      "terminals": {
+                        "state": "available",
+                        "value": 1
+                      },
+                      "missing_terminals": {
+                        "state": "available",
+                        "value": 0
+                      },
+                      "issues": []
+                    },
+                    "code_mode_execution": {
+                      "status": "complete",
+                      "evidence_eligible": true,
+                      "starts": {
+                        "state": "available",
+                        "value": 0
+                      },
+                      "terminals": {
+                        "state": "available",
+                        "value": 0
+                      },
+                      "missing_terminals": {
+                        "state": "available",
+                        "value": 0
+                      },
+                      "issues": []
+                    },
+                    "code_mode_finality": {
+                      "status": "unsupported",
+                      "evidence_eligible": false,
+                      "starts": {
+                        "state": "unsupported",
+                        "reason": "stock_codemode_final_boundary_not_exposed"
+                      },
+                      "terminals": {
+                        "state": "unsupported",
+                        "reason": "stock_codemode_final_boundary_not_exposed"
+                      },
+                      "missing_terminals": {
+                        "state": "unsupported",
+                        "reason": "stock_codemode_final_boundary_not_exposed"
+                      },
+                      "issues": [
+                        "stock_codemode_final_boundary_not_exposed"
+                      ]
+                    }
+                  }
+                }
+              },
+              "plugin_diagnostic": {
+                "config_root": "/tmp/runtime/config/opencode",
+                "config_root_exists": true,
+                "plugins_root": "/tmp/runtime/config/opencode/plugins",
+                "plugins_exists": false,
+                "plugins_is_dir": false,
+                "plugins_resolved": null,
+                "plugins_entries": [],
+                "loom_exists": false,
+                "loom_is_dir": false,
+                "loom_index_exists": false,
+                "loom_flat_exists": false,
+                "loom_module_index_exists": false,
+                "runtime_observer_exists": true,
+                "runtime_observer_inline_configured": true
+              },
+              "plugin_preflight": {
+                "expected": null,
+                "agent": null,
+                "entrypoints": []
+              }
+            },
+            "failure": null
+          }
+        ],
+        "evidence_readiness": {
+          "status": "ready",
+          "reasons": [],
+          "required_boundaries": [
+            "native"
+          ]
+        }
+      },
+      "deterministic_checks": [
+        {
+          "name": "skill.native-load",
+          "status": "pass",
+          "reason": "native skill evidence evaluated",
+          "metadata": {
+            "family": "skill"
+          }
+        }
+      ],
+      "judge": {
+        "attempts": [
+          {
+            "attempt": 1,
+            "started_at": "2026-10-29T19:14:09.789Z",
+            "duration_seconds": 3.3538169839885086,
+            "host_exit_code": 0,
+            "result": {
+              "schema": "opencode-eval-runner/v1",
+              "transport": "opencode",
+              "model": "fixture/mock",
+              "reasoning": "provider-default",
+              "reasoning_source": "provider-default",
+              "agent": "eval-judge",
+              "skill": null,
+              "exit_code": 0,
+              "session_id": "ses_e76ea7905ffe5JQha7SvpnFv4J",
+              "text": "{\"passed\": true, \"expectations\": [{\"expectation\": \"Catches sqlite3.IntegrityError inside the repository, not in the route\", \"met\": true, \"reason\": \"deterministic fixture grade\"}, {\"expectation\": \"Raises a domain exception with `raise ... from e` to preserve the cause\", \"met\": true, \"reason\": \"deterministic fixture grade\"}, {\"expectation\": \"Maps the domain error to 409 via a FastAPI exception handler (not per-route try/except)\", \"met\": true, \"reason\": \"deterministic fixture grade\"}, {\"expectation\": \"The route/API layer does not import or reference sqlite3\", \"met\": true, \"reason\": \"deterministic fixture grade\"}, {\"expectation\": \"Does NOT wrap the route body in a broad try/except as the fix\", \"met\": true, \"reason\": \"deterministic fixture grade\"}], \"violations\": [], \"trap_observed\": false, \"trap_evidence\": \"not observed\", \"summary\": \"Fixture accepted all authored positive expectations.\"}",
+              "tools": [],
+              "actions": [],
+              "skills_loaded": [],
+              "timing": {
+                "run_seconds": 0.853,
+                "export_seconds": 0.0,
+                "export_exit_code": null,
+                "total_seconds": 0.853
+              },
+              "stderr": "",
+              "stderr_truncated": false,
+              "stderr_total_chars": 0,
+              "stdout": "{\"type\":\"text\",\"timestamp\":1793301252229,\"sessionID\":\"ses_e76ea7905ffe5JQha7SvpnFv4J\",\"part\":{\"id\":\"prt_189158851001YPWduCx6dbcta2_text-0\",\"sessionID\":\"ses_e76ea7905ffe5JQha7SvpnFv4J\",\"messageID\":\"msg_189158851001YPWduCx6dbcta2\",\"type\":\"text\",\"text\":\"{\\\"passed\\\": true, \\\"expectations\\\": [{\\\"expectation\\\": \\\"Catches sqlite3.IntegrityError inside the repository, not in the route\\\", \\\"met\\\": true, \\\"reason\\\": \\\"deterministic fixture grade\\\"}, {\\\"expectation\\\": \\\"Raises a domain exception with `raise ... from e` to preserve the cause\\\", \\\"met\\\": true, \\\"reason\\\": \\\"deterministic fixture grade\\\"}, {\\\"expectation\\\": \\\"Maps the domain error to 409 via a FastAPI exception handler (not per-route try/except)\\\", \\\"met\\\": true, \\\"reason\\\": \\\"deterministic fixture grade\\\"}, {\\\"expectation\\\": \\\"The route/API layer does not import or reference sqlite3\\\", \\\"met\\\": true, \\\"reason\\\": \\\"deterministic fixture grade\\\"}, {\\\"expectation\\\": \\\"Does NOT wrap the route body in a broad try/except as the fix\\\", \\\"met\\\": true, \\\"reason\\\": \\\"deterministic fixture grade\\\"}], \\\"violations\\\": [], \\\"trap_observed\\\": false, \\\"trap_evidence\\\": \\\"not observed\\\", \\\"summary\\\": \\\"Fixture accepted all authored positive expectations.\\\"}\",\"time\":{\"start\":1793301252191,\"end\":1793301252229}}}\n",
+              "stdout_truncated": false,
+              "stdout_total_chars": 1268,
+              "tool_result_evidence": {
+                "schema": "opencode-eval-runner/tool-results/v1",
+                "source": "opencode.event-stream.full",
+                "observed_events": 0,
+                "omitted_events": 0,
+                "events": [],
+                "safety": {
+                  "schema": "opencode-eval-runner/evidence-safety/v1",
+                  "inventory_complete": true,
+                  "fields": [],
+                  "losses": {}
+                }
+              },
+              "runtime_evidence": {
+                "schema": "opencode-eval-runner/runtime-evidence/v1",
+                "status": "complete",
+                "evidence_eligible": true,
+                "observations": [],
+                "coverage": {
+                  "observation_closed": {
+                    "state": "available",
+                    "value": true
+                  },
+                  "process_state": "completed",
+                  "starts": {
+                    "state": "available",
+                    "value": 0
+                  },
+                  "terminals": {
+                    "state": "available",
+                    "value": 0
+                  },
+                  "missing_terminals": {
+                    "state": "available",
+                    "value": 0
+                  },
+                  "observer_failures": {
+                    "state": "available",
+                    "value": 0
+                  },
+                  "callback_failures": {
+                    "state": "available",
+                    "value": 0
+                  },
+                  "losses": [],
+                  "unsupported": [
+                    "stock_codemode_final_boundary_not_exposed"
+                  ],
+                  "boundaries": {
+                    "native": {
+                      "status": "complete",
+                      "evidence_eligible": true,
+                      "starts": {
+                        "state": "available",
+                        "value": 0
+                      },
+                      "terminals": {
+                        "state": "available",
+                        "value": 0
+                      },
+                      "missing_terminals": {
+                        "state": "available",
+                        "value": 0
+                      },
+                      "issues": []
+                    },
+                    "code_mode_execution": {
+                      "status": "complete",
+                      "evidence_eligible": true,
+                      "starts": {
+                        "state": "available",
+                        "value": 0
+                      },
+                      "terminals": {
+                        "state": "available",
+                        "value": 0
+                      },
+                      "missing_terminals": {
+                        "state": "available",
+                        "value": 0
+                      },
+                      "issues": []
+                    },
+                    "code_mode_finality": {
+                      "status": "unsupported",
+                      "evidence_eligible": false,
+                      "starts": {
+                        "state": "unsupported",
+                        "reason": "stock_codemode_final_boundary_not_exposed"
+                      },
+                      "terminals": {
+                        "state": "unsupported",
+                        "reason": "stock_codemode_final_boundary_not_exposed"
+                      },
+                      "missing_terminals": {
+                        "state": "unsupported",
+                        "reason": "stock_codemode_final_boundary_not_exposed"
+                      },
+                      "issues": [
+                        "stock_codemode_final_boundary_not_exposed"
+                      ]
+                    }
+                  }
+                }
+              },
+              "plugin_diagnostic": {
+                "config_root": "/tmp/runtime/config/opencode",
+                "config_root_exists": true,
+                "plugins_root": "/tmp/runtime/config/opencode/plugins",
+                "plugins_exists": false,
+                "plugins_is_dir": false,
+                "plugins_resolved": null,
+                "plugins_entries": [],
+                "loom_exists": false,
+                "loom_is_dir": false,
+                "loom_index_exists": false,
+                "loom_flat_exists": false,
+                "loom_module_index_exists": false,
+                "runtime_observer_exists": true,
+                "runtime_observer_inline_configured": true
+              },
+              "plugin_preflight": {
+                "expected": null,
+                "agent": null,
+                "entrypoints": []
+              }
+            },
+            "failure": null
+          }
+        ],
+        "semantic": {
+          "status": "pass",
+          "summary": "Fixture accepted all authored positive expectations.",
+          "data": {
+            "passed": true,
+            "expectations": [
+              {
+                "expectation": "Catches sqlite3.IntegrityError inside the repository, not in the route",
+                "met": true,
+                "reason": "deterministic fixture grade"
+              },
+              {
+                "expectation": "Raises a domain exception with `raise ... from e` to preserve the cause",
+                "met": true,
+                "reason": "deterministic fixture grade"
+              },
+              {
+                "expectation": "Maps the domain error to 409 via a FastAPI exception handler (not per-route try/except)",
+                "met": true,
+                "reason": "deterministic fixture grade"
+              },
+              {
+                "expectation": "The route/API layer does not import or reference sqlite3",
+                "met": true,
+                "reason": "deterministic fixture grade"
+              },
+              {
+                "expectation": "Does NOT wrap the route body in a broad try/except as the fix",
+                "met": true,
+                "reason": "deterministic fixture grade"
+              }
+            ],
+            "violations": [],
+            "trap_observed": false,
+            "trap_evidence": "not observed",
+            "summary": "Fixture accepted all authored positive expectations.",
+            "behavior_score": 1.0
+          }
+        }
+      },
+      "project_metadata": {
+        "family": "skill",
+        "contract": "skill-cases/v1",
+        "input_sha256": "",
+        "source_index": 1,
+        "source_id": 1,
+        "authored_id": 1,
+        "display_name": "domain-error-to-409",
+        "skill": "python-error-handling",
+        "source_input": 2,
+        "source_path": "skills/python-error-handling/evals/evals.json",
+        "source_sha256": "e834048256f8c142f92930e320ff90e682f5d01b310edfdb13c61526e4cee61b",
+        "input_count": 2,
+        "side": "candidate",
+        "runner_eval_invocations": [
+          {
+            "transport": "opencode",
+            "model": "fixture/mock",
+            "reasoning": null,
+            "agent": "skill-eval",
+            "skill": "python-error-handling",
+            "workspace_mode": "ro",
+            "timeout_seconds": 90,
+            "container_timeout": 150,
+            "engine": "podman",
+            "network": "task32-recovery-1793300807",
+            "image": "sha256:0940e9ac543098bfa51dda81cce643ed3366df1ab8a4e90bf5fcd8601c2e5e39",
+            "expected_plugin": null
+          },
+          {
+            "transport": "opencode",
+            "model": "fixture/mock",
+            "reasoning": null,
+            "agent": "eval-judge",
+            "skill": null,
+            "workspace_mode": "ro",
+            "timeout_seconds": 90,
+            "container_timeout": 150,
+            "engine": "podman",
+            "network": "task32-recovery-1793300807",
+            "image": "sha256:0940e9ac543098bfa51dda81cce643ed3366df1ab8a4e90bf5fcd8601c2e5e39",
+            "expected_plugin": null
+          }
+        ]
+      },
+      "artifact_evidence_id": "0f07bc4bee660b70f7ab5f123b0ec3c1717d0cf3aa36cc2d16a0b43bb9febd6d"
+    }
+  },
+  "comparison": {
+    "schema": "opencode-eval-runner/eval-comparison/v1",
+    "status": "compared",
+    "baseline_classification": "pass",
+    "candidate_classification": "pass",
+    "decision": {
+      "classification": "pass",
+      "summary": "baseline 100.00%; candidate 100.00%; delta +0.00 pp; neutral",
+      "data": {
+        "candidate_absolute_pass": true,
+        "baseline_score": 1.0,
+        "candidate_score": 1.0,
+        "delta_pp": 0.0,
+        "trap_fixed": false,
+        "trap_regression": false,
+        "skill_value": "neutral"
+      }
+    },
+    "failure": null
+  },
+  "project_metadata": {
+    "runner_eval": {
+      "schema": "opencode-eval-runner/eval-family-result/v2",
+      "family": "skill",
+      "contract": "skill-cases/v1",
+      "case_id": "sk1_FQBwAHkAdABoAG8AbgAtAGUAcgByAG8AcgAtAGgAYQBuAGQAbABpAG4AZwEAMQ",
+      "family_result": {
+        "kind": "skill/v1",
+        "skill": "python-error-handling",
+        "case_identity": {
+          "case_id": "sk1_FQBwAHkAdABoAG8AbgAtAGUAcgByAG8AcgAtAGgAYQBuAGQAbABpAG4AZwEAMQ",
+          "source_id": 1,
+          "authored_id": 1,
+          "source_index": 1,
+          "display_name": "domain-error-to-409"
+        },
+        "prompt": "Saving a rule that already exists currently returns HTTP 500 because the repository lets `sqlite3.IntegrityError` propagate up to the FastAPI route. Make a duplicate return 409 instead, and keep the API layer free of any sqlite3 import.",
+        "fixture_files": [],
+        "expectations": [
+          "Catches sqlite3.IntegrityError inside the repository, not in the route",
+          "Raises a domain exception with `raise ... from e` to preserve the cause",
+          "Maps the domain error to 409 via a FastAPI exception handler (not per-route try/except)",
+          "The route/API layer does not import or reference sqlite3",
+          "Does NOT wrap the route body in a broad try/except as the fix"
+        ],
+        "negative_expectations": [],
+        "trap": {
+          "declared": true,
+          "text": "The quick fix is a try/except in the route catching sqlite3.IntegrityError — which leaks the storage driver into the web layer. The repository should translate the driver error into a domain error (with `from`), and a single exception handler should map it to 409."
+        },
+        "ablation": {
+          "baseline": {
+            "case_id": "sk1_FQBwAHkAdABoAG8AbgAtAGUAcgByAG8AcgAtAGgAYQBuAGQAbABpAG4AZwEAMQ",
+            "run_id": "f47f708d31cf42b489900c870838ea43",
+            "iteration": 2,
+            "classification": "pass",
+            "attempts": [
+              {
+                "phase": "baseline-target",
+                "attempts": [
+                  {
+                    "number": 1,
+                    "started_at": "2026-10-29T19:13:59.312Z",
+                    "duration_seconds": 3.470903303998057,
+                    "invocation": {
+                      "transport": "opencode",
+                      "model": "fixture/mock",
+                      "reasoning": null,
+                      "agent": "skill-baseline",
+                      "skill": null,
+                      "workspace_mode": "ro",
+                      "timeout_seconds": 90,
+                      "container_timeout": 150,
+                      "engine": "podman",
+                      "network": "task32-recovery-1793300807",
+                      "image": "sha256:0940e9ac543098bfa51dda81cce643ed3366df1ab8a4e90bf5fcd8601c2e5e39",
+                      "expected_plugin": null
+                    },
+                    "host_exit_code": 0,
+                    "result": {
+                      "schema": "opencode-eval-runner/v1",
+                      "transport": "opencode",
+                      "model": "fixture/mock",
+                      "reasoning": "provider-default",
+                      "reasoning_source": "provider-default",
+                      "agent": "skill-baseline",
+                      "skill": null,
+                      "exit_code": 0,
+                      "session_id": "ses_e76eaa1c2ffeLqO373K6d0xoCc",
+                      "text": "Deterministic fixture response: provide a clear, complete answer satisfying all requested expectations; use AsyncMock for awaited calls, isolated tmp_path databases, parametrize independent cases, preserve domain errors with causes, narrow catches and log exceptions.",
+                      "tools": [],
+                      "actions": [],
+                      "skills_loaded": [],
+                      "timing": {
+                        "run_seconds": 0.907,
+                        "export_seconds": 0.0,
+                        "export_exit_code": null,
+                        "total_seconds": 0.907
+                      },
+                      "stderr": "",
+                      "stderr_truncated": false,
+                      "stderr_total_chars": 0,
+                      "stdout": "{\"type\":\"text\",\"timestamp\":1793301241819,\"sessionID\":\"ses_e76eaa1c2ffeLqO373K6d0xoCc\",\"part\":{\"id\":\"prt_189155f9d001zE8W2Lh4Z1pPt4_text-0\",\"sessionID\":\"ses_e76eaa1c2ffeLqO373K6d0xoCc\",\"messageID\":\"msg_189155f9d001zE8W2Lh4Z1pPt4\",\"type\":\"text\",\"text\":\"Deterministic fixture response: provide a clear, complete answer satisfying all requested expectations; use AsyncMock for awaited calls, isolated tmp_path databases, parametrize independent cases, preserve domain errors with causes, narrow catches and log exceptions.\",\"time\":{\"start\":1793301241773,\"end\":1793301241819}}}\n",
+                      "stdout_truncated": false,
+                      "stdout_total_chars": 573,
+                      "tool_result_evidence": {
+                        "schema": "opencode-eval-runner/tool-results/v1",
+                        "source": "opencode.event-stream.full",
+                        "observed_events": 0,
+                        "omitted_events": 0,
+                        "events": [],
+                        "safety": {
+                          "schema": "opencode-eval-runner/evidence-safety/v1",
+                          "inventory_complete": true,
+                          "fields": [],
+                          "losses": {}
+                        }
+                      },
+                      "runtime_evidence": {
+                        "schema": "opencode-eval-runner/runtime-evidence/v1",
+                        "status": "complete",
+                        "evidence_eligible": true,
+                        "observations": [],
+                        "coverage": {
+                          "observation_closed": {
+                            "state": "available",
+                            "value": true
+                          },
+                          "process_state": "completed",
+                          "starts": {
+                            "state": "available",
+                            "value": 0
+                          },
+                          "terminals": {
+                            "state": "available",
+                            "value": 0
+                          },
+                          "missing_terminals": {
+                            "state": "available",
+                            "value": 0
+                          },
+                          "observer_failures": {
+                            "state": "available",
+                            "value": 0
+                          },
+                          "callback_failures": {
+                            "state": "available",
+                            "value": 0
+                          },
+                          "losses": [],
+                          "unsupported": [
+                            "stock_codemode_final_boundary_not_exposed"
+                          ],
+                          "boundaries": {
+                            "native": {
+                              "status": "complete",
+                              "evidence_eligible": true,
+                              "starts": {
+                                "state": "available",
+                                "value": 0
+                              },
+                              "terminals": {
+                                "state": "available",
+                                "value": 0
+                              },
+                              "missing_terminals": {
+                                "state": "available",
+                                "value": 0
+                              },
+                              "issues": []
+                            },
+                            "code_mode_execution": {
+                              "status": "complete",
+                              "evidence_eligible": true,
+                              "starts": {
+                                "state": "available",
+                                "value": 0
+                              },
+                              "terminals": {
+                                "state": "available",
+                                "value": 0
+                              },
+                              "missing_terminals": {
+                                "state": "available",
+                                "value": 0
+                              },
+                              "issues": []
+                            },
+                            "code_mode_finality": {
+                              "status": "unsupported",
+                              "evidence_eligible": false,
+                              "starts": {
+                                "state": "unsupported",
+                                "reason": "stock_codemode_final_boundary_not_exposed"
+                              },
+                              "terminals": {
+                                "state": "unsupported",
+                                "reason": "stock_codemode_final_boundary_not_exposed"
+                              },
+                              "missing_terminals": {
+                                "state": "unsupported",
+                                "reason": "stock_codemode_final_boundary_not_exposed"
+                              },
+                              "issues": [
+                                "stock_codemode_final_boundary_not_exposed"
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      "plugin_diagnostic": {
+                        "config_root": "/tmp/runtime/config/opencode",
+                        "config_root_exists": true,
+                        "plugins_root": "/tmp/runtime/config/opencode/plugins",
+                        "plugins_exists": false,
+                        "plugins_is_dir": false,
+                        "plugins_resolved": null,
+                        "plugins_entries": [],
+                        "loom_exists": false,
+                        "loom_is_dir": false,
+                        "loom_index_exists": false,
+                        "loom_flat_exists": false,
+                        "loom_module_index_exists": false,
+                        "runtime_observer_exists": true,
+                        "runtime_observer_inline_configured": true
+                      },
+                      "plugin_preflight": {
+                        "expected": null,
+                        "agent": null,
+                        "entrypoints": []
+                      }
+                    },
+                    "failure": null,
+                    "retry_decision": null
+                  }
+                ]
+              },
+              {
+                "phase": "baseline-judge",
+                "attempts": [
+                  {
+                    "number": 1,
+                    "started_at": "2026-10-29T19:14:02.783Z",
+                    "duration_seconds": 3.52728079399094,
+                    "invocation": {
+                      "transport": "opencode",
+                      "model": "fixture/mock",
+                      "reasoning": null,
+                      "agent": "eval-judge",
+                      "skill": null,
+                      "workspace_mode": "ro",
+                      "timeout_seconds": 90,
+                      "container_timeout": 150,
+                      "engine": "podman",
+                      "network": "task32-recovery-1793300807",
+                      "image": "sha256:0940e9ac543098bfa51dda81cce643ed3366df1ab8a4e90bf5fcd8601c2e5e39",
+                      "expected_plugin": null
+                    },
+                    "host_exit_code": 0,
+                    "result": {
+                      "schema": "opencode-eval-runner/v1",
+                      "transport": "opencode",
+                      "model": "fixture/mock",
+                      "reasoning": "provider-default",
+                      "reasoning_source": "provider-default",
+                      "agent": "eval-judge",
+                      "skill": null,
+                      "exit_code": 0,
+                      "session_id": "ses_e76ea9418ffehxofEvUXY5kQv3",
+                      "text": "{\"passed\": true, \"expectations\": [{\"expectation\": \"Catches sqlite3.IntegrityError inside the repository, not in the route\", \"met\": true, \"reason\": \"deterministic fixture grade\"}, {\"expectation\": \"Raises a domain exception with `raise ... from e` to preserve the cause\", \"met\": true, \"reason\": \"deterministic fixture grade\"}, {\"expectation\": \"Maps the domain error to 409 via a FastAPI exception handler (not per-route try/except)\", \"met\": true, \"reason\": \"deterministic fixture grade\"}, {\"expectation\": \"The route/API layer does not import or reference sqlite3\", \"met\": true, \"reason\": \"deterministic fixture grade\"}, {\"expectation\": \"Does NOT wrap the route body in a broad try/except as the fix\", \"met\": true, \"reason\": \"deterministic fixture grade\"}], \"violations\": [], \"trap_observed\": false, \"trap_evidence\": \"not observed\", \"summary\": \"Fixture accepted all authored positive expectations.\"}",
+                      "tools": [],
+                      "actions": [],
+                      "skills_loaded": [],
+                      "timing": {
+                        "run_seconds": 0.863,
+                        "export_seconds": 0.0,
+                        "export_exit_code": null,
+                        "total_seconds": 0.863
+                      },
+                      "stderr": "",
+                      "stderr_truncated": false,
+                      "stderr_total_chars": 0,
+                      "stdout": "{\"type\":\"text\",\"timestamp\":1793301245306,\"sessionID\":\"ses_e76ea9418ffehxofEvUXY5kQv3\",\"part\":{\"id\":\"prt_189156d43001zet1nvBdE8TmMi_text-0\",\"sessionID\":\"ses_e76ea9418ffehxofEvUXY5kQv3\",\"messageID\":\"msg_189156d43001zet1nvBdE8TmMi\",\"type\":\"text\",\"text\":\"{\\\"passed\\\": true, \\\"expectations\\\": [{\\\"expectation\\\": \\\"Catches sqlite3.IntegrityError inside the repository, not in the route\\\", \\\"met\\\": true, \\\"reason\\\": \\\"deterministic fixture grade\\\"}, {\\\"expectation\\\": \\\"Raises a domain exception with `raise ... from e` to preserve the cause\\\", \\\"met\\\": true, \\\"reason\\\": \\\"deterministic fixture grade\\\"}, {\\\"expectation\\\": \\\"Maps the domain error to 409 via a FastAPI exception handler (not per-route try/except)\\\", \\\"met\\\": true, \\\"reason\\\": \\\"deterministic fixture grade\\\"}, {\\\"expectation\\\": \\\"The route/API layer does not import or reference sqlite3\\\", \\\"met\\\": true, \\\"reason\\\": \\\"deterministic fixture grade\\\"}, {\\\"expectation\\\": \\\"Does NOT wrap the route body in a broad try/except as the fix\\\", \\\"met\\\": true, \\\"reason\\\": \\\"deterministic fixture grade\\\"}], \\\"violations\\\": [], \\\"trap_observed\\\": false, \\\"trap_evidence\\\": \\\"not observed\\\", \\\"summary\\\": \\\"Fixture accepted all authored positive expectations.\\\"}\",\"time\":{\"start\":1793301245264,\"end\":1793301245306}}}\n",
+                      "stdout_truncated": false,
+                      "stdout_total_chars": 1268,
+                      "tool_result_evidence": {
+                        "schema": "opencode-eval-runner/tool-results/v1",
+                        "source": "opencode.event-stream.full",
+                        "observed_events": 0,
+                        "omitted_events": 0,
+                        "events": [],
+                        "safety": {
+                          "schema": "opencode-eval-runner/evidence-safety/v1",
+                          "inventory_complete": true,
+                          "fields": [],
+                          "losses": {}
+                        }
+                      },
+                      "runtime_evidence": {
+                        "schema": "opencode-eval-runner/runtime-evidence/v1",
+                        "status": "complete",
+                        "evidence_eligible": true,
+                        "observations": [],
+                        "coverage": {
+                          "observation_closed": {
+                            "state": "available",
+                            "value": true
+                          },
+                          "process_state": "completed",
+                          "starts": {
+                            "state": "available",
+                            "value": 0
+                          },
+                          "terminals": {
+                            "state": "available",
+                            "value": 0
+                          },
+                          "missing_terminals": {
+                            "state": "available",
+                            "value": 0
+                          },
+                          "observer_failures": {
+                            "state": "available",
+                            "value": 0
+                          },
+                          "callback_failures": {
+                            "state": "available",
+                            "value": 0
+                          },
+                          "losses": [],
+                          "unsupported": [
+                            "stock_codemode_final_boundary_not_exposed"
+                          ],
+                          "boundaries": {
+                            "native": {
+                              "status": "complete",
+                              "evidence_eligible": true,
+                              "starts": {
+                                "state": "available",
+                                "value": 0
+                              },
+                              "terminals": {
+                                "state": "available",
+                                "value": 0
+                              },
+                              "missing_terminals": {
+                                "state": "available",
+                                "value": 0
+                              },
+                              "issues": []
+                            },
+                            "code_mode_execution": {
+                              "status": "complete",
+                              "evidence_eligible": true,
+                              "starts": {
+                                "state": "available",
+                                "value": 0
+                              },
+                              "terminals": {
+                                "state": "available",
+                                "value": 0
+                              },
+                              "missing_terminals": {
+                                "state": "available",
+                                "value": 0
+                              },
+                              "issues": []
+                            },
+                            "code_mode_finality": {
+                              "status": "unsupported",
+                              "evidence_eligible": false,
+                              "starts": {
+                                "state": "unsupported",
+                                "reason": "stock_codemode_final_boundary_not_exposed"
+                              },
+                              "terminals": {
+                                "state": "unsupported",
+                                "reason": "stock_codemode_final_boundary_not_exposed"
+                              },
+                              "missing_terminals": {
+                                "state": "unsupported",
+                                "reason": "stock_codemode_final_boundary_not_exposed"
+                              },
+                              "issues": [
+                                "stock_codemode_final_boundary_not_exposed"
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      "plugin_diagnostic": {
+                        "config_root": "/tmp/runtime/config/opencode",
+                        "config_root_exists": true,
+                        "plugins_root": "/tmp/runtime/config/opencode/plugins",
+                        "plugins_exists": false,
+                        "plugins_is_dir": false,
+                        "plugins_resolved": null,
+                        "plugins_entries": [],
+                        "loom_exists": false,
+                        "loom_is_dir": false,
+                        "loom_index_exists": false,
+                        "loom_flat_exists": false,
+                        "loom_module_index_exists": false,
+                        "runtime_observer_exists": true,
+                        "runtime_observer_inline_configured": true
+                      },
+                      "plugin_preflight": {
+                        "expected": null,
+                        "agent": null,
+                        "entrypoints": []
+                      }
+                    },
+                    "failure": null,
+                    "retry_decision": null
+                  }
+                ]
+              }
+            ],
+            "evidence": {
+              "status": "ready",
+              "reasons": [],
+              "required_boundaries": [
+                "native"
+              ],
+              "runtime_evidence": [
+                {
+                  "schema": "opencode-eval-runner/runtime-evidence/v1",
+                  "status": "complete",
+                  "evidence_eligible": true,
+                  "observations": [],
+                  "coverage": {
+                    "observation_closed": {
+                      "state": "available",
+                      "value": true
+                    },
+                    "process_state": "completed",
+                    "starts": {
+                      "state": "available",
+                      "value": 0
+                    },
+                    "terminals": {
+                      "state": "available",
+                      "value": 0
+                    },
+                    "missing_terminals": {
+                      "state": "available",
+                      "value": 0
+                    },
+                    "observer_failures": {
+                      "state": "available",
+                      "value": 0
+                    },
+                    "callback_failures": {
+                      "state": "available",
+                      "value": 0
+                    },
+                    "losses": [],
+                    "unsupported": [
+                      "stock_codemode_final_boundary_not_exposed"
+                    ],
+                    "boundaries": {
+                      "native": {
+                        "status": "complete",
+                        "evidence_eligible": true,
+                        "starts": {
+                          "state": "available",
+                          "value": 0
+                        },
+                        "terminals": {
+                          "state": "available",
+                          "value": 0
+                        },
+                        "missing_terminals": {
+                          "state": "available",
+                          "value": 0
+                        },
+                        "issues": []
+                      },
+                      "code_mode_execution": {
+                        "status": "complete",
+                        "evidence_eligible": true,
+                        "starts": {
+                          "state": "available",
+                          "value": 0
+                        },
+                        "terminals": {
+                          "state": "available",
+                          "value": 0
+                        },
+                        "missing_terminals": {
+                          "state": "available",
+                          "value": 0
+                        },
+                        "issues": []
+                      },
+                      "code_mode_finality": {
+                        "status": "unsupported",
+                        "evidence_eligible": false,
+                        "starts": {
+                          "state": "unsupported",
+                          "reason": "stock_codemode_final_boundary_not_exposed"
+                        },
+                        "terminals": {
+                          "state": "unsupported",
+                          "reason": "stock_codemode_final_boundary_not_exposed"
+                        },
+                        "missing_terminals": {
+                          "state": "unsupported",
+                          "reason": "stock_codemode_final_boundary_not_exposed"
+                        },
+                        "issues": [
+                          "stock_codemode_final_boundary_not_exposed"
+                        ]
+                      }
+                    }
+                  }
+                }
+              ]
+            },
+            "checks": [
+              {
+                "name": "skill.native-load",
+                "status": "pass",
+                "reason": "native skill evidence evaluated",
+                "metadata": {
+                  "family": "skill"
+                }
+              }
+            ],
+            "skill_outcome": {
+              "expectations": [
+                {
+                  "text": "Catches sqlite3.IntegrityError inside the repository, not in the route",
+                  "met": true,
+                  "reason": "deterministic fixture grade"
+                },
+                {
+                  "text": "Raises a domain exception with `raise ... from e` to preserve the cause",
+                  "met": true,
+                  "reason": "deterministic fixture grade"
+                },
+                {
+                  "text": "Maps the domain error to 409 via a FastAPI exception handler (not per-route try/except)",
+                  "met": true,
+                  "reason": "deterministic fixture grade"
+                },
+                {
+                  "text": "The route/API layer does not import or reference sqlite3",
+                  "met": true,
+                  "reason": "deterministic fixture grade"
+                },
+                {
+                  "text": "Does NOT wrap the route body in a broad try/except as the fix",
+                  "met": true,
+                  "reason": "deterministic fixture grade"
+                }
+              ],
+              "negative_expectations": [],
+              "trap": {
+                "declared": true,
+                "text": "The quick fix is a try/except in the route catching sqlite3.IntegrityError — which leaks the storage driver into the web layer. The repository should translate the driver error into a domain error (with `from`), and a single exception handler should map it to 409.",
+                "observed": false,
+                "evidence": "not observed"
+              },
+              "semantic_judge": {
+                "passed": true,
+                "summary": "Fixture accepted all authored positive expectations.",
+                "behavior_score": 1.0
+              }
+            },
+            "source_artifact": {
+              "schema": "opencode-eval-runner/eval-artifact/v1",
+              "relative_path": "pairs/case-sk1_FQBwAHkAdABoAG8AbgAtAGUAcgByAG8AcgAtAGgAYQBuAGQAbABpAG4AZwEAMQ/iteration-2.json#/sides/baseline",
+              "evidence_id": "bde17f83a25b9d54074a7df9e3c1cc97bfc96b5f3b4aa8046d4dbc5c680a21ba"
+            }
+          },
+          "candidate": {
+            "case_id": "sk1_FQBwAHkAdABoAG8AbgAtAGUAcgByAG8AcgAtAGgAYQBuAGQAbABpAG4AZwEAMQ",
+            "run_id": "f47f708d31cf42b489900c870838ea43",
+            "iteration": 2,
+            "classification": "pass",
+            "attempts": [
+              {
+                "phase": "candidate-target",
+                "attempts": [
+                  {
+                    "number": 1,
+                    "started_at": "2026-10-29T19:14:06.310Z",
+                    "duration_seconds": 3.4783875870052725,
+                    "invocation": {
+                      "transport": "opencode",
+                      "model": "fixture/mock",
+                      "reasoning": null,
+                      "agent": "skill-eval",
+                      "skill": "python-error-handling",
+                      "workspace_mode": "ro",
+                      "timeout_seconds": 90,
+                      "container_timeout": 150,
+                      "engine": "podman",
+                      "network": "task32-recovery-1793300807",
+                      "image": "sha256:0940e9ac543098bfa51dda81cce643ed3366df1ab8a4e90bf5fcd8601c2e5e39",
+                      "expected_plugin": null
+                    },
+                    "host_exit_code": 0,
+                    "result": {
+                      "schema": "opencode-eval-runner/v1",
+                      "transport": "opencode",
+                      "model": "fixture/mock",
+                      "reasoning": "provider-default",
+                      "reasoning_source": "provider-default",
+                      "agent": "skill-eval",
+                      "skill": "python-error-handling",
+                      "exit_code": 0,
+                      "session_id": "ses_e76ea868cffeMl2OX1v6iMBFty",
+                      "text": "Deterministic fixture response: provide a clear, complete answer satisfying all requested expectations; use AsyncMock for awaited calls, isolated tmp_path databases, parametrize independent cases, preserve domain errors with causes, narrow catches and log exceptions.",
+                      "tools": [
+                        "skill"
+                      ],
+                      "actions": [
+                        {
+                          "tool": "skill",
+                          "args": {
+                            "id": "python-error-handling"
+                          }
+                        }
+                      ],
+                      "skills_loaded": [
+                        "python-error-handling"
+                      ],
+                      "timing": {
+                        "run_seconds": 0.968,
+                        "export_seconds": 0.0,
+                        "export_exit_code": null,
+                        "total_seconds": 0.968
+                      },
+                      "stderr": "",
+                      "stderr_truncated": false,
+                      "stderr_total_chars": 0,
+                      "stdout": "{\"type\":\"step_start\",\"timestamp\":1793301248788,\"sessionID\":\"ses_e76ea868cffeMl2OX1v6iMBFty\",\"part\":{\"id\":\"prt_189157b140013ddNRXgn1EVg78\",\"sessionID\":\"ses_e76ea868cffeMl2OX1v6iMBFty\",\"messageID\":\"msg_189157ae9001uYEa7XezZAEvtA\",\"type\":\"step-start\"}}\n{\"type\":\"tool_use\",\"timestamp\":1793301248808,\"sessionID\":\"ses_e76ea868cffeMl2OX1v6iMBFty\",\"part\":{\"partID\":\"prt_189157b170017HkMZM0oht5XN1\",\"sessionID\":\"ses_e76ea868cffeMl2OX1v6iMBFty\",\"messageID\":\"msg_189157ae9001uYEa7XezZAEvtA\",\"type\":\"tool\",\"id\":\"fixture-skill-call\",\"tool\":\"skill\",\"state\":{\"status\":\"completed\",\"input\":{\"id\":\"python-error-handling\"},\"output\":\"<skill_content name=\\\"python-error-handling\\\">\\n# Skill: python-error-handling\\n\\n> Pair with `python-common-practice`, `python-fastapi` (HTTP mapping), `python-async` (CancelledError), and `python-observability` (logging errors) as relevant.\\n\\n**Persona:** You are a Python engineer who treats exceptions as part of the API. You catch what you can handle and let the rest propagate to someone who can.\\n\\n# Error Handling\\n\\nPython prefers **EAFP** (\\\"easier to ask forgiveness than permission\\\") — try the operation and handle the exception rather than pre-checking. Pre-checks race with reality; the exception is the truth.\\n\\n```python\\n# ✓ EAFP — one atomic attempt\\ntry:\\n    return cache[key]\\nexcept KeyError:\\n    return load(key)\\n\\n# ✗ LBYL — racy for I/O; fine when a simple guard avoids broad catching\\nif key in cache:\\n    return cache[key]\\n```\\n\\n**EAFP is a convention, not a universal rule.** Broad catches can hide failures from both humans and agents. Prefer EAFP where the exception type is known and the catch is narrow; inspect the framework's actual error behavior rather than guessing at its hierarchy. Use explicit checks where they express the contract more clearly, while accounting for race conditions between checking and acting.\\n\\n## Catch narrowly\\n\\nCatch the **specific** exception you can handle. A bare `except:` or `except Exception:` swallows bugs, `KeyboardInterrupt`, and (in async) cancellation — turning a crash you'd fix into silent wrong behavior.\\n\\n```python\\n# ✗ Bad — hides programming errors and makes debugging impossible\\ntry:\\n    sync_playlist(p)\\nexcept Exception:\\n    pass\\n\\n# ✓ Good — handle the failures you expect; let the rest surface\\ntry:\\n    sync_playlist(p)\\nexcept (httpx.HTTPError, TimeoutError) as e:\\n    log.warning(\\\"sync failed for %s: %s\\\", p.id, e)\\n    metrics.errors_total.inc()\\n```\\n\\nIf you must catch broadly (a top-level worker loop that must not die), log with `log.exception(...)` to capture the traceback, then continue or re-raise — never `pass`.\\n\\n## Agent navigability — narrow exception surfaces\\n\\nPrefer narrow exception surfaces: agents catching from broad hierarchies must guess error object shapes — a predictable interface failure, not a model failure.\\n\\n**Framework guidance — catch the specific exception, not the family:**\\n\\n| Framework | Broad (avoid) | Narrow (prefer) |\\n| --- | --- | --- |\\n| `requests` / `httpx` | `requests.exceptions.RequestException` | `httpx.TimeoutException`, `httpx.HTTPStatusError` |\\n| `django` ORM | `django.core.exceptions.ObjectDoesNotExist` | `MyModel.DoesNotExist` |\\n| SQLAlchemy | `sqlalchemy.exc.SQLAlchemyError` | `sqlalchemy.exc.IntegrityError`, `sqlalchemy.exc.OperationalError` |\\n\\nWrap framework exceptions at the boundary into domain exceptions. This collapses the broad hierarchy into a predictable, narrow surface for all downstream code.\\n\\n## Custom exceptions — a hierarchy with a common base\\n\\nGive your package one base exception; specific errors subclass it. Callers can then catch the whole family or a specific case. This is what lets a FastAPI handler map *all* your domain errors in one place.\\n\\n```python\\nclass SortarrError(Exception):\\n    \\\"\\\"\\\"Base for all sortarr domain errors.\\\"\\\"\\\"\\n\\nclass AuthRequiredError(SortarrError): ...\\nclass QuotaExceededError(SortarrError): ...\\n```\\n\\nSubclass the most specific stdlib type when it fits (`ValueError`, `LookupError`); invent a new hierarchy only for domain concepts the stdlib doesn't model.\\n\\n## Chain exceptions — preserve the cause\\n\\nWhen you wrap a low-level error in a domain one, use `raise ... from` so the original traceback survives. Bare `raise NewError(...)` inside an `except` hides the root cause.\\n\\n```python\\ntry:\\n    resp = await client.get(url)\\n    resp.raise_for_status()\\nexcept httpx.HTTPStatusError as e:\\n    raise QuotaExceededError(\\\"YouTube quota hit\\\") from e   # ✓ keeps the cause\\n```\\n\\nTo deliberately suppress the context, use `from None` — and only when the cause is genuinely noise.\\n\\nThis is also how you keep storage details out of the API: the **repository** catches the driver error and raises a domain error, so the route never imports `sqlite3` or sees a driver exception.\\n\\n```python\\nimport sqlite3\\n\\ndef save_rule(self, rule: Rule) -> None:\\n    try:\\n        self._con.execute(\\\"INSERT INTO rules (id, pattern) VALUES (?, ?)\\\", (rule.id, rule.pattern))\\n    except sqlite3.IntegrityError as e:\\n        raise DuplicateRuleError(rule.id) from e   # domain error — a handler maps it to 409\\n```\\n\\n## else and finally\\n\\n`else` runs only when `try` didn't raise — put success logic there. `finally` always runs; prefer a **context manager** over manual try/finally.\\n\\n```python\\nwith open_connection(db_path) as conn:   # closed on any exit path\\n    conn.execute(...)\\n```\\n\\nWrite your own with `contextlib.contextmanager` or `__enter__/__exit__`; use `async with` for async resources.\\n\\n## Re-raise, don't return error sentinels\\n\\nReturning `None`/`-1`/`False` to signal failure forces every caller to remember to check, and the type checker can't help. Raise instead — the failure can't be silently ignored. (Return `X | None` only when \\\"not found\\\" is a *normal, expected* outcome, not an error.)\\n\\nIn async code, **never swallow `asyncio.CancelledError`** — re-raise it so shutdown and timeouts work (→ See `python-async`).\\n\\n## Mapping to HTTP\\n\\nIn FastAPI, register one exception handler per domain base class rather than try/except in every route (→ See `python-fastapi`):\\n\\n```python\\n@app.exception_handler(AuthRequiredError)\\nasync def _auth(_: Request, exc: AuthRequiredError):\\n    return JSONResponse(status_code=401, content={\\\"detail\\\": str(exc)})\\n```\\n\\nNever leak a stack trace or internal message to a client — log the detail server-side, return a clean message.\\n\\n## Common mistakes\\n\\n| Mistake | Fix |\\n| --- | --- |\\n| `except Exception: pass` | Catch the specific type; if broad, `log.exception` then re-raise. |\\n| Bare `raise FooError()` inside `except` | `raise FooError() from err` to preserve the cause. |\\n| `except:` (bare) | Catches `KeyboardInterrupt`/`SystemExit`/cancellation too — name the type. |\\n| Manual try/finally for cleanup | Use a context manager (`with`). |\\n| Returning `None`/`-1` for errors | Raise an exception; reserve `None` for expected absence. |\\n| Swallowing `CancelledError` in async | Re-raise it. |\\n| Leaking tracebacks to API clients | Log server-side; return a sanitized message. |\\n| EAFP with broad `except` on a framework hierarchy | Prefer LBYL guard or narrow catch; wrap at the boundary into a domain exception. |\\n\\n**Diagnose:** 1- `ruff check` (bugbear `B`) — flags overly broad `except` and `raise` without `from` 2- read the full traceback (don't truncate) — the chained `from` cause usually names the real failure.\\n\\n## References\\n\\n- [Errors and Exceptions — tutorial](https://docs.python.org/3/tutorial/errors.html)\\n- [Built-in Exceptions](https://docs.python.org/3/library/exceptions.html)\\n- [Glossary — EAFP / LBYL](https://docs.python.org/3/glossary.html)\\n- [Alexis King — Parse, don't validate](https://lexi-lambda.github.io/blog/2019/11/05/parse-don-t-validate/)\\n\\nBase directory for this skill: /workspace/.opencode/skills/python-error-handling\\nRelative paths in this skill (e.g., scripts/, reference/) are relative to this base directory.\\nNote: file list is sampled.\\n\\n<skill_files>\\n</skill_files>\\n</skill_content>\",\"title\":\"skill\",\"metadata\":{\"metadata\":{\"name\":\"python-error-handling\",\"directory\":\"/workspace/.opencode/skills/python-error-handling\",\"truncated\":false},\"content\":[{\"type\":\"text\",\"text\":\"<skill_content name=\\\"python-error-handling\\\">\\n# Skill: python-error-handling\\n\\n> Pair with `python-common-practice`, `python-fastapi` (HTTP mapping), `python-async` (CancelledError), and `python-observability` (logging errors) as relevant.\\n\\n**Persona:** You are a Python engineer who treats exceptions as part of the API. You catch what you can handle and let the rest propagate to someone who can.\\n\\n# Error Handling\\n\\nPython prefers **EAFP** (\\\"easier to ask forgiveness than permission\\\") — try the operation and handle the exception rather than pre-checking. Pre-checks race with reality; the exception is the truth.\\n\\n```python\\n# ✓ EAFP — one atomic attempt\\ntry:\\n    return cache[key]\\nexcept KeyError:\\n    return load(key)\\n\\n# ✗ LBYL — racy for I/O; fine when a simple guard avoids broad catching\\nif key in cache:\\n    return cache[key]\\n```\\n\\n**EAFP is a convention, not a universal rule.** Broad catches can hide failures from both humans and agents. Prefer EAFP where the exception type is known and the catch is narrow; inspect the framework's actual error behavior rather than guessing at its hierarchy. Use explicit checks where they express the contract more clearly, while accounting for race conditions between checking and acting.\\n\\n## Catch narrowly\\n\\nCatch the **specific** exception you can handle. A bare `except:` or `except Exception:` swallows bugs, `KeyboardInterrupt`, and (in async) cancellation — turning a crash you'd fix into silent wrong behavior.\\n\\n```python\\n# ✗ Bad — hides programming errors and makes debugging impossible\\ntry:\\n    sync_playlist(p)\\nexcept Exception:\\n    pass\\n\\n# ✓ Good — handle the failures you expect; let the rest surface\\ntry:\\n    sync_playlist(p)\\nexcept (httpx.HTTPError, TimeoutError) as e:\\n    log.warning(\\\"sync failed for %s: %s\\\", p.id, e)\\n    metrics.errors_total.inc()\\n```\\n\\nIf you must catch broadly (a top-level worker loop that must not die), log with `log.exception(...)` to capture the traceback, then continue or re-raise — never `pass`.\\n\\n## Agent navigability — narrow exception surfaces\\n\\nPrefer narrow exception surfaces: agents catching from broad hierarchies must guess error object shapes — a predictable interface failure, not a model failure.\\n\\n**Framework guidance — catch the specific exception, not the family:**\\n\\n| Framework | Broad (avoid) | Narrow (prefer) |\\n| --- | --- | --- |\\n| `requests` / `httpx` | `requests.exceptions.RequestException` | `httpx.TimeoutException`, `httpx.HTTPStatusError` |\\n| `django` ORM | `django.core.exceptions.ObjectDoesNotExist` | `MyModel.DoesNotExist` |\\n| SQLAlchemy | `sqlalchemy.exc.SQLAlchemyError` | `sqlalchemy.exc.IntegrityError`, `sqlalchemy.exc.OperationalError` |\\n\\nWrap framework exceptions at the boundary into domain exceptions. This collapses the broad hierarchy into a predictable, narrow surface for all downstream code.\\n\\n## Custom exceptions — a hierarchy with a common base\\n\\nGive your package one base exception; specific errors subclass it. Callers can then catch the whole family or a specific case. This is what lets a FastAPI handler map *all* your domain errors in one place.\\n\\n```python\\nclass SortarrError(Exception):\\n    \\\"\\\"\\\"Base for all sortarr domain errors.\\\"\\\"\\\"\\n\\nclass AuthRequiredError(SortarrError): ...\\nclass QuotaExceededError(SortarrError): ...\\n```\\n\\nSubclass the most specific stdlib type when it fits (`ValueError`, `LookupError`); invent a new hierarchy only for domain concepts the stdlib doesn't model.\\n\\n## Chain exceptions — preserve the cause\\n\\nWhen you wrap a low-level error in a domain one, use `raise ... from` so the original traceback survives. Bare `raise NewError(...)` inside an `except` hides the root cause.\\n\\n```python\\ntry:\\n    resp = await client.get(url)\\n    resp.raise_for_status()\\nexcept httpx.HTTPStatusError as e:\\n    raise QuotaExceededError(\\\"YouTube quota hit\\\") from e   # ✓ keeps the cause\\n```\\n\\nTo deliberately suppress the context, use `from None` — and only when the cause is genuinely noise.\\n\\nThis is also how you keep storage details out of the API: the **repository** catches the driver error and raises a domain error, so the route never imports `sqlite3` or sees a driver exception.\\n\\n```python\\nimport sqlite3\\n\\ndef save_rule(self, rule: Rule) -> None:\\n    try:\\n        self._con.execute(\\\"INSERT INTO rules (id, pattern) VALUES (?, ?)\\\", (rule.id, rule.pattern))\\n    except sqlite3.IntegrityError as e:\\n        raise DuplicateRuleError(rule.id) from e   # domain error — a handler maps it to 409\\n```\\n\\n## else and finally\\n\\n`else` runs only when `try` didn't raise — put success logic there. `finally` always runs; prefer a **context manager** over manual try/finally.\\n\\n```python\\nwith open_connection(db_path) as conn:   # closed on any exit path\\n    conn.execute(...)\\n```\\n\\nWrite your own with `contextlib.contextmanager` or `__enter__/__exit__`; use `async with` for async resources.\\n\\n## Re-raise, don't return error sentinels\\n\\nReturning `None`/`-1`/`False` to signal failure forces every caller to remember to check, and the type checker can't help. Raise instead — the failure can't be silently ignored. (Return `X | None` only when \\\"not found\\\" is a *normal, expected* outcome, not an error.)\\n\\nIn async code, **never swallow `asyncio.CancelledError`** — re-raise it so shutdown and timeouts work (→ See `python-async`).\\n\\n## Mapping to HTTP\\n\\nIn FastAPI, register one exception handler per domain base class rather than try/except in every route (→ See `python-fastapi`):\\n\\n```python\\n@app.exception_handler(AuthRequiredError)\\nasync def _auth(_: Request, exc: AuthRequiredError):\\n    return JSONResponse(status_code=401, content={\\\"detail\\\": str(exc)})\\n```\\n\\nNever leak a stack trace or internal message to a client — log the detail server-side, return a clean message.\\n\\n## Common mistakes\\n\\n| Mistake | Fix |\\n| --- | --- |\\n| `except Exception: pass` | Catch the specific type; if broad, `log.exception` then re-raise. |\\n| Bare `raise FooError()` inside `except` | `raise FooError() from err` to preserve the cause. |\\n| `except:` (bare) | Catches `KeyboardInterrupt`/`SystemExit`/cancellation too — name the type. |\\n| Manual try/finally for cleanup | Use a context manager (`with`). |\\n| Returning `None`/`-1` for errors | Raise an exception; reserve `None` for expected absence. |\\n| Swallowing `CancelledError` in async | Re-raise it. |\\n| Leaking tracebacks to API clients | Log server-side; return a sanitized message. |\\n| EAFP with broad `except` on a framework hierarchy | Prefer LBYL guard or narrow catch; wrap at the boundary into a domain exception. |\\n\\n**Diagnose:** 1- `ruff check` (bugbear `B`) — flags overly broad `except` and `raise` without `from` 2- read the full traceback (don't truncate) — the chained `from` cause usually names the real failure.\\n\\n## References\\n\\n- [Errors and Exceptions — tutorial](https://docs.python.org/3/tutorial/errors.html)\\n- [Built-in Exceptions](https://docs.python.org/3/library/exceptions.html)\\n- [Glossary — EAFP / LBYL](https://docs.python.org/3/glossary.html)\\n- [Alexis King — Parse, don't validate](https://lexi-lambda.github.io/blog/2019/11/05/parse-don-t-validate/)\\n\\nBase directory for this skill: /workspace/.opencode/skills/python-error-handling\\nRelative paths in this skill (e.g., scripts/, reference/) are relative to this base directory.\\nNote: file list is sampled.\\n\\n<skill_files>\\n</skill_files>\\n</skill_content>\"}],\"providerCall\":{\"executed\":false},\"providerResult\":{\"executed\":false},\"rawInput\":\"{\\\"id\\\": \\\"python-error-handling\\\"}\"},\"time\":{\"start\":1793301248791,\"end\":1793301248808}}}}\n{\"type\":\"step_finish\",\"timestamp\":1793301248813,\"sessionID\":\"ses_e76ea868cffeMl2OX1v6iMBFty\",\"part\":{\"id\":\"prt_189157b2d001qw8InmUMctChpg\",\"sessionID\":\"ses_e76ea868cffeMl2OX1v6iMBFty\",\"messageID\":\"msg_189157ae9001uYEa7XezZAEvtA\",\"type\":\"step-finish\",\"reason\":\"tool-calls\",\"cost\":0,\"tokens\":{\"input\":0,\"output\":0,\"reasoning\":0,\"cache\":{\"read\":0,\"write\":0}}}}\n{\"type\":\"text\",\"timestamp\":1793301248865,\"sessionID\":\"ses_e76ea868cffeMl2OX1v6iMBFty\",\"part\":{\"id\":\"prt_189157b3a001DPTZyTOOtGE3PE_text-0\",\"sessionID\":\"ses_e76ea868cffeMl2OX1v6iMBFty\",\"messageID\":\"msg_189157b3a001DPTZyTOOtGE3PE\",\"type\":\"text\",\"text\":\"Deterministic fixture response: provide a clear, complete answer satisfying all requested expectations; use AsyncMock for awaited calls, isolated tmp_path databases, parametrize independent cases, preserve domain errors with causes, narrow catches and log exceptions.\",\"time\":{\"start\":1793301248842,\"end\":1793301248865}}}\n",
+                      "stdout_truncated": false,
+                      "stdout_total_chars": 16885,
+                      "tool_result_evidence": {
+                        "schema": "opencode-eval-runner/tool-results/v1",
+                        "source": "opencode.event-stream.full",
+                        "observed_events": 1,
+                        "omitted_events": 0,
+                        "events": [
+                          {
+                            "sequence": 1,
+                            "tool": "skill",
+                            "call_id": "fixture-skill-call",
+                            "session_id": "ses_e76ea868cffeMl2OX1v6iMBFty",
+                            "status": "completed",
+                            "input": {
+                              "id": "python-error-handling"
+                            }
+                          }
+                        ],
+                        "safety": {
+                          "schema": "opencode-eval-runner/evidence-safety/v1",
+                          "inventory_complete": true,
+                          "fields": [
+                            {
+                              "event": 0,
+                              "field": "tool",
+                              "state": "available"
+                            },
+                            {
+                              "event": 0,
+                              "field": "call_id",
+                              "state": "available"
+                            },
+                            {
+                              "event": 0,
+                              "field": "session_id",
+                              "state": "available"
+                            },
+                            {
+                              "event": 0,
+                              "field": "status",
+                              "state": "available"
+                            },
+                            {
+                              "event": 0,
+                              "field": "input",
+                              "state": "available"
+                            },
+                            {
+                              "event": 0,
+                              "field": "output",
+                              "state": "omitted",
+                              "reason": "size_limit",
+                              "stage": "before_evidence_size"
+                            }
+                          ],
+                          "losses": {
+                            "size_limit": 1
+                          }
+                        }
+                      },
+                      "runtime_evidence": {
+                        "schema": "opencode-eval-runner/runtime-evidence/v1",
+                        "status": "complete",
+                        "evidence_eligible": true,
+                        "observations": [
+                          {
+                            "invocation_id": "native:ae06e975-d97e-486d-b072-40c98210df42",
+                            "tool": {
+                              "state": "available",
+                              "value": "skill"
+                            },
+                            "mode": "native",
+                            "actor": {
+                              "state": "available",
+                              "value": "skill-eval"
+                            },
+                            "session_id": {
+                              "state": "available",
+                              "value": "ses_e76ea868cffeMl2OX1v6iMBFty"
+                            },
+                            "message_id": {
+                              "state": "available",
+                              "value": "msg_189157ae9001uYEa7XezZAEvtA"
+                            },
+                            "call_id": {
+                              "state": "available",
+                              "value": "fixture-skill-call"
+                            },
+                            "parent": {
+                              "state": "available",
+                              "value": null
+                            },
+                            "input": {
+                              "state": "available",
+                              "value": {
+                                "id": "python-error-handling"
+                              }
+                            },
+                            "outcome": "success",
+                            "result": {
+                              "state": "available",
+                              "value": {
+                                "content": [
+                                  {
+                                    "type": "text",
+                                    "text": "<skill_content name=\"python-error-handling\">\n# Skill: python-error-handling\n\n> Pair with `python-common-practice`, `python-fastapi` (HTTP mapping), `python-async` (CancelledError), and `python-observability` (logging errors) as relevant.\n\n**Persona:** You are a Python engineer who treats exceptions as part of the API. You catch what you can handle and let the rest propagate to someone who can.\n\n# Error Handling\n\nPython prefers **EAFP** (\"easier to ask forgiveness than permission\") — try the operation and handle the exception rather than pre-checking. Pre-checks race with reality; the exception is the truth.\n\n```python\n# ✓ EAFP — one atomic attempt\ntry:\n    return cache[key]\nexcept KeyError:\n    return load(key)\n\n# ✗ LBYL — racy for I/O; fine when a simple guard avoids broad catching\nif key in cache:\n    return cache[key]\n```\n\n**EAFP is a convention, not a universal rule.** Broad catches can hide failures from both humans and agents. Prefer EAFP where the exception type is known and the catch is narrow; inspect the framework's actual error behavior rather than guessing at its hierarchy. Use explicit checks where they express the contract more clearly, while accounting for race conditions between checking and acting.\n\n## Catch narrowly\n\nCatch the **specific** exception you can handle. A bare `except:` or `except Exception:` swallows bugs, `KeyboardInterrupt`, and (in async) cancellation — turning a crash you'd fix into silent wrong behavior.\n\n```python\n# ✗ Bad — hides programming errors and makes debugging impossible\ntry:\n    sync_playlist(p)\nexcept Exception:\n    pass\n\n# ✓ Good — handle the failures you expect; let the rest surface\ntry:\n    sync_playlist(p)\nexcept (httpx.HTTPError, TimeoutError) as e:\n    log.warning(\"sync failed for %s: %s\", p.id, e)\n    metrics.errors_total.inc()\n```\n\nIf you must catch broadly (a top-level worker loop that must not die), log with `log.exception(...)` to capture the traceback, then continue or re-raise — never `pass`.\n\n## Agent navigability — narrow exception surfaces\n\nPrefer narrow exception surfaces: agents catching from broad hierarchies must guess error object shapes — a predictable interface failure, not a model failure.\n\n**Framework guidance — catch the specific exception, not the family:**\n\n| Framework | Broad (avoid) | Narrow (prefer) |\n| --- | --- | --- |\n| `requests` / `httpx` | `requests.exceptions.RequestException` | `httpx.TimeoutException`, `httpx.HTTPStatusError` |\n| `django` ORM | `django.core.exceptions.ObjectDoesNotExist` | `MyModel.DoesNotExist` |\n| SQLAlchemy | `sqlalchemy.exc.SQLAlchemyError` | `sqlalchemy.exc.IntegrityError`, `sqlalchemy.exc.OperationalError` |\n\nWrap framework exceptions at the boundary into domain exceptions. This collapses the broad hierarchy into a predictable, narrow surface for all downstream code.\n\n## Custom exceptions — a hierarchy with a common base\n\nGive your package one base exception; specific errors subclass it. Callers can then catch the whole family or a specific case. This is what lets a FastAPI handler map *all* your domain errors in one place.\n\n```python\nclass SortarrError(Exception):\n    \"\"\"Base for all sortarr domain errors.\"\"\"\n\nclass AuthRequiredError(SortarrError): ...\nclass QuotaExceededError(SortarrError): ...\n```\n\nSubclass the most specific stdlib type when it fits (`ValueError`, `LookupError`); invent a new hierarchy only for domain concepts the stdlib doesn't model.\n\n## Chain exceptions — preserve the cause\n\nWhen you wrap a low-level error in a domain one, use `raise ... from` so the original traceback survives. Bare `raise NewError(...)` inside an `except` hides the root cause.\n\n```python\ntry:\n    resp = await client.get(url)\n    resp.raise_for_status()\nexcept httpx.HTTPStatusError as e:\n    raise QuotaExceededError(\"YouTube quota hit\") from e   # ✓ keeps the cause\n```\n\nTo deliberately suppress the context, use `from None` — and only when the cause is genuinely noise.\n\nThis is also how you keep storage details out of the API: the **repository** catches the driver error and raises a domain error, so the route never imports `sqlite3` or sees a driver exception.\n\n```python\nimport sqlite3\n\ndef save_rule(self, rule: Rule) -> None:\n    try:\n        self._con.execute(\"INSERT INTO rules (id, pattern) VALUES (?, ?)\", (rule.id, rule.pattern))\n    except sqlite3.IntegrityError as e:\n        raise DuplicateRuleError(rule.id) from e   # domain error — a handler maps it to 409\n```\n\n## else and finally\n\n`else` runs only when `try` didn't raise — put success logic there. `finally` always runs; prefer a **context manager** over manual try/finally.\n\n```python\nwith open_connection(db_path) as conn:   # closed on any exit path\n    conn.execute(...)\n```\n\nWrite your own with `contextlib.contextmanager` or `__enter__/__exit__`; use `async with` for async resources.\n\n## Re-raise, don't return error sentinels\n\nReturning `None`/`-1`/`False` to signal failure forces every caller to remember to check, and the type checker can't help. Raise instead — the failure can't be silently ignored. (Return `X | None` only when \"not found\" is a *normal, expected* outcome, not an error.)\n\nIn async code, **never swallow `asyncio.CancelledError`** — re-raise it so shutdown and timeouts work (→ See `python-async`).\n\n## Mapping to HTTP\n\nIn FastAPI, register one exception handler per domain base class rather than try/except in every route (→ See `python-fastapi`):\n\n```python\n@app.exception_handler(AuthRequiredError)\nasync def _auth(_: Request, exc: AuthRequiredError):\n    return JSONResponse(status_code=401, content={\"detail\": str(exc)})\n```\n\nNever leak a stack trace or internal message to a client — log the detail server-side, return a clean message.\n\n## Common mistakes\n\n| Mistake | Fix |\n| --- | --- |\n| `except Exception: pass` | Catch the specific type; if broad, `log.exception` then re-raise. |\n| Bare `raise FooError()` inside `except` | `raise FooError() from err` to preserve the cause. |\n| `except:` (bare) | Catches `KeyboardInterrupt`/`SystemExit`/cancellation too — name the type. |\n| Manual try/finally for cleanup | Use a context manager (`with`). |\n| Returning `None`/`-1` for errors | Raise an exception; reserve `None` for expected absence. |\n| Swallowing `CancelledError` in async | Re-raise it. |\n| Leaking tracebacks to API clients | Log server-side; return a sanitized message. |\n| EAFP with broad `except` on a framework hierarchy | Prefer LBYL guard or narrow catch; wrap at the boundary into a domain exception. |\n\n**Diagnose:** 1- `ruff check` (bugbear `B`) — flags overly broad `except` and `raise` without `from` 2- read the full traceback (don't truncate) — the chained `from` cause usually names the real failure.\n\n## References\n\n- [Errors and Exceptions — tutorial](https://docs.python.org/3/tutorial/errors.html)\n- [Built-in Exceptions](https://docs.python.org/3/library/exceptions.html)\n- [Glossary — EAFP / LBYL](https://docs.python.org/3/glossary.html)\n- [Alexis King — Parse, don't validate](https://lexi-lambda.github.io/blog/2019/11/05/parse-don-t-validate/)\n\nBase directory for this skill: /workspace/.opencode/skills/python-error-handling\nRelative paths in this skill (e.g., scripts/, reference/) are relative to this base directory.\nNote: file list is sampled.\n\n<skill_files>\n</skill_files>\n</skill_content>"
+                                  }
+                                ],
+                                "metadata": {
+                                  "name": "python-error-handling",
+                                  "directory": "/workspace/.opencode/skills/python-error-handling",
+                                  "truncated": false
+                                },
+                                "executed": false
+                              }
+                            },
+                            "error": {
+                              "state": "omitted",
+                              "reason": "not_applicable"
+                            },
+                            "start_sequence": 1,
+                            "terminal_sequence": {
+                              "state": "available",
+                              "value": 2
+                            }
+                          }
+                        ],
+                        "coverage": {
+                          "observation_closed": {
+                            "state": "available",
+                            "value": true
+                          },
+                          "process_state": "completed",
+                          "starts": {
+                            "state": "available",
+                            "value": 1
+                          },
+                          "terminals": {
+                            "state": "available",
+                            "value": 1
+                          },
+                          "missing_terminals": {
+                            "state": "available",
+                            "value": 0
+                          },
+                          "observer_failures": {
+                            "state": "available",
+                            "value": 0
+                          },
+                          "callback_failures": {
+                            "state": "available",
+                            "value": 0
+                          },
+                          "losses": [],
+                          "unsupported": [
+                            "stock_codemode_final_boundary_not_exposed"
+                          ],
+                          "boundaries": {
+                            "native": {
+                              "status": "complete",
+                              "evidence_eligible": true,
+                              "starts": {
+                                "state": "available",
+                                "value": 1
+                              },
+                              "terminals": {
+                                "state": "available",
+                                "value": 1
+                              },
+                              "missing_terminals": {
+                                "state": "available",
+                                "value": 0
+                              },
+                              "issues": []
+                            },
+                            "code_mode_execution": {
+                              "status": "complete",
+                              "evidence_eligible": true,
+                              "starts": {
+                                "state": "available",
+                                "value": 0
+                              },
+                              "terminals": {
+                                "state": "available",
+                                "value": 0
+                              },
+                              "missing_terminals": {
+                                "state": "available",
+                                "value": 0
+                              },
+                              "issues": []
+                            },
+                            "code_mode_finality": {
+                              "status": "unsupported",
+                              "evidence_eligible": false,
+                              "starts": {
+                                "state": "unsupported",
+                                "reason": "stock_codemode_final_boundary_not_exposed"
+                              },
+                              "terminals": {
+                                "state": "unsupported",
+                                "reason": "stock_codemode_final_boundary_not_exposed"
+                              },
+                              "missing_terminals": {
+                                "state": "unsupported",
+                                "reason": "stock_codemode_final_boundary_not_exposed"
+                              },
+                              "issues": [
+                                "stock_codemode_final_boundary_not_exposed"
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      "plugin_diagnostic": {
+                        "config_root": "/tmp/runtime/config/opencode",
+                        "config_root_exists": true,
+                        "plugins_root": "/tmp/runtime/config/opencode/plugins",
+                        "plugins_exists": false,
+                        "plugins_is_dir": false,
+                        "plugins_resolved": null,
+                        "plugins_entries": [],
+                        "loom_exists": false,
+                        "loom_is_dir": false,
+                        "loom_index_exists": false,
+                        "loom_flat_exists": false,
+                        "loom_module_index_exists": false,
+                        "runtime_observer_exists": true,
+                        "runtime_observer_inline_configured": true
+                      },
+                      "plugin_preflight": {
+                        "expected": null,
+                        "agent": null,
+                        "entrypoints": []
+                      }
+                    },
+                    "failure": null,
+                    "retry_decision": null
+                  }
+                ]
+              },
+              {
+                "phase": "candidate-judge",
+                "attempts": [
+                  {
+                    "number": 1,
+                    "started_at": "2026-10-29T19:14:09.789Z",
+                    "duration_seconds": 3.3538169839885086,
+                    "invocation": {
+                      "transport": "opencode",
+                      "model": "fixture/mock",
+                      "reasoning": null,
+                      "agent": "eval-judge",
+                      "skill": null,
+                      "workspace_mode": "ro",
+                      "timeout_seconds": 90,
+                      "container_timeout": 150,
+                      "engine": "podman",
+                      "network": "task32-recovery-1793300807",
+                      "image": "sha256:0940e9ac543098bfa51dda81cce643ed3366df1ab8a4e90bf5fcd8601c2e5e39",
+                      "expected_plugin": null
+                    },
+                    "host_exit_code": 0,
+                    "result": {
+                      "schema": "opencode-eval-runner/v1",
+                      "transport": "opencode",
+                      "model": "fixture/mock",
+                      "reasoning": "provider-default",
+                      "reasoning_source": "provider-default",
+                      "agent": "eval-judge",
+                      "skill": null,
+                      "exit_code": 0,
+                      "session_id": "ses_e76ea7905ffe5JQha7SvpnFv4J",
+                      "text": "{\"passed\": true, \"expectations\": [{\"expectation\": \"Catches sqlite3.IntegrityError inside the repository, not in the route\", \"met\": true, \"reason\": \"deterministic fixture grade\"}, {\"expectation\": \"Raises a domain exception with `raise ... from e` to preserve the cause\", \"met\": true, \"reason\": \"deterministic fixture grade\"}, {\"expectation\": \"Maps the domain error to 409 via a FastAPI exception handler (not per-route try/except)\", \"met\": true, \"reason\": \"deterministic fixture grade\"}, {\"expectation\": \"The route/API layer does not import or reference sqlite3\", \"met\": true, \"reason\": \"deterministic fixture grade\"}, {\"expectation\": \"Does NOT wrap the route body in a broad try/except as the fix\", \"met\": true, \"reason\": \"deterministic fixture grade\"}], \"violations\": [], \"trap_observed\": false, \"trap_evidence\": \"not observed\", \"summary\": \"Fixture accepted all authored positive expectations.\"}",
+                      "tools": [],
+                      "actions": [],
+                      "skills_loaded": [],
+                      "timing": {
+                        "run_seconds": 0.853,
+                        "export_seconds": 0.0,
+                        "export_exit_code": null,
+                        "total_seconds": 0.853
+                      },
+                      "stderr": "",
+                      "stderr_truncated": false,
+                      "stderr_total_chars": 0,
+                      "stdout": "{\"type\":\"text\",\"timestamp\":1793301252229,\"sessionID\":\"ses_e76ea7905ffe5JQha7SvpnFv4J\",\"part\":{\"id\":\"prt_189158851001YPWduCx6dbcta2_text-0\",\"sessionID\":\"ses_e76ea7905ffe5JQha7SvpnFv4J\",\"messageID\":\"msg_189158851001YPWduCx6dbcta2\",\"type\":\"text\",\"text\":\"{\\\"passed\\\": true, \\\"expectations\\\": [{\\\"expectation\\\": \\\"Catches sqlite3.IntegrityError inside the repository, not in the route\\\", \\\"met\\\": true, \\\"reason\\\": \\\"deterministic fixture grade\\\"}, {\\\"expectation\\\": \\\"Raises a domain exception with `raise ... from e` to preserve the cause\\\", \\\"met\\\": true, \\\"reason\\\": \\\"deterministic fixture grade\\\"}, {\\\"expectation\\\": \\\"Maps the domain error to 409 via a FastAPI exception handler (not per-route try/except)\\\", \\\"met\\\": true, \\\"reason\\\": \\\"deterministic fixture grade\\\"}, {\\\"expectation\\\": \\\"The route/API layer does not import or reference sqlite3\\\", \\\"met\\\": true, \\\"reason\\\": \\\"deterministic fixture grade\\\"}, {\\\"expectation\\\": \\\"Does NOT wrap the route body in a broad try/except as the fix\\\", \\\"met\\\": true, \\\"reason\\\": \\\"deterministic fixture grade\\\"}], \\\"violations\\\": [], \\\"trap_observed\\\": false, \\\"trap_evidence\\\": \\\"not observed\\\", \\\"summary\\\": \\\"Fixture accepted all authored positive expectations.\\\"}\",\"time\":{\"start\":1793301252191,\"end\":1793301252229}}}\n",
+                      "stdout_truncated": false,
+                      "stdout_total_chars": 1268,
+                      "tool_result_evidence": {
+                        "schema": "opencode-eval-runner/tool-results/v1",
+                        "source": "opencode.event-stream.full",
+                        "observed_events": 0,
+                        "omitted_events": 0,
+                        "events": [],
+                        "safety": {
+                          "schema": "opencode-eval-runner/evidence-safety/v1",
+                          "inventory_complete": true,
+                          "fields": [],
+                          "losses": {}
+                        }
+                      },
+                      "runtime_evidence": {
+                        "schema": "opencode-eval-runner/runtime-evidence/v1",
+                        "status": "complete",
+                        "evidence_eligible": true,
+                        "observations": [],
+                        "coverage": {
+                          "observation_closed": {
+                            "state": "available",
+                            "value": true
+                          },
+                          "process_state": "completed",
+                          "starts": {
+                            "state": "available",
+                            "value": 0
+                          },
+                          "terminals": {
+                            "state": "available",
+                            "value": 0
+                          },
+                          "missing_terminals": {
+                            "state": "available",
+                            "value": 0
+                          },
+                          "observer_failures": {
+                            "state": "available",
+                            "value": 0
+                          },
+                          "callback_failures": {
+                            "state": "available",
+                            "value": 0
+                          },
+                          "losses": [],
+                          "unsupported": [
+                            "stock_codemode_final_boundary_not_exposed"
+                          ],
+                          "boundaries": {
+                            "native": {
+                              "status": "complete",
+                              "evidence_eligible": true,
+                              "starts": {
+                                "state": "available",
+                                "value": 0
+                              },
+                              "terminals": {
+                                "state": "available",
+                                "value": 0
+                              },
+                              "missing_terminals": {
+                                "state": "available",
+                                "value": 0
+                              },
+                              "issues": []
+                            },
+                            "code_mode_execution": {
+                              "status": "complete",
+                              "evidence_eligible": true,
+                              "starts": {
+                                "state": "available",
+                                "value": 0
+                              },
+                              "terminals": {
+                                "state": "available",
+                                "value": 0
+                              },
+                              "missing_terminals": {
+                                "state": "available",
+                                "value": 0
+                              },
+                              "issues": []
+                            },
+                            "code_mode_finality": {
+                              "status": "unsupported",
+                              "evidence_eligible": false,
+                              "starts": {
+                                "state": "unsupported",
+                                "reason": "stock_codemode_final_boundary_not_exposed"
+                              },
+                              "terminals": {
+                                "state": "unsupported",
+                                "reason": "stock_codemode_final_boundary_not_exposed"
+                              },
+                              "missing_terminals": {
+                                "state": "unsupported",
+                                "reason": "stock_codemode_final_boundary_not_exposed"
+                              },
+                              "issues": [
+                                "stock_codemode_final_boundary_not_exposed"
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      "plugin_diagnostic": {
+                        "config_root": "/tmp/runtime/config/opencode",
+                        "config_root_exists": true,
+                        "plugins_root": "/tmp/runtime/config/opencode/plugins",
+                        "plugins_exists": false,
+                        "plugins_is_dir": false,
+                        "plugins_resolved": null,
+                        "plugins_entries": [],
+                        "loom_exists": false,
+                        "loom_is_dir": false,
+                        "loom_index_exists": false,
+                        "loom_flat_exists": false,
+                        "loom_module_index_exists": false,
+                        "runtime_observer_exists": true,
+                        "runtime_observer_inline_configured": true
+                      },
+                      "plugin_preflight": {
+                        "expected": null,
+                        "agent": null,
+                        "entrypoints": []
+                      }
+                    },
+                    "failure": null,
+                    "retry_decision": null
+                  }
+                ]
+              }
+            ],
+            "evidence": {
+              "status": "ready",
+              "reasons": [],
+              "required_boundaries": [
+                "native"
+              ],
+              "runtime_evidence": [
+                {
+                  "schema": "opencode-eval-runner/runtime-evidence/v1",
+                  "status": "complete",
+                  "evidence_eligible": true,
+                  "observations": [
+                    {
+                      "invocation_id": "native:ae06e975-d97e-486d-b072-40c98210df42",
+                      "tool": {
+                        "state": "available",
+                        "value": "skill"
+                      },
+                      "mode": "native",
+                      "actor": {
+                        "state": "available",
+                        "value": "skill-eval"
+                      },
+                      "session_id": {
+                        "state": "available",
+                        "value": "ses_e76ea868cffeMl2OX1v6iMBFty"
+                      },
+                      "message_id": {
+                        "state": "available",
+                        "value": "msg_189157ae9001uYEa7XezZAEvtA"
+                      },
+                      "call_id": {
+                        "state": "available",
+                        "value": "fixture-skill-call"
+                      },
+                      "parent": {
+                        "state": "available",
+                        "value": null
+                      },
+                      "input": {
+                        "state": "available",
+                        "value": {
+                          "id": "python-error-handling"
+                        }
+                      },
+                      "outcome": "success",
+                      "result": {
+                        "state": "available",
+                        "value": {
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "<skill_content name=\"python-error-handling\">\n# Skill: python-error-handling\n\n> Pair with `python-common-practice`, `python-fastapi` (HTTP mapping), `python-async` (CancelledError), and `python-observability` (logging errors) as relevant.\n\n**Persona:** You are a Python engineer who treats exceptions as part of the API. You catch what you can handle and let the rest propagate to someone who can.\n\n# Error Handling\n\nPython prefers **EAFP** (\"easier to ask forgiveness than permission\") — try the operation and handle the exception rather than pre-checking. Pre-checks race with reality; the exception is the truth.\n\n```python\n# ✓ EAFP — one atomic attempt\ntry:\n    return cache[key]\nexcept KeyError:\n    return load(key)\n\n# ✗ LBYL — racy for I/O; fine when a simple guard avoids broad catching\nif key in cache:\n    return cache[key]\n```\n\n**EAFP is a convention, not a universal rule.** Broad catches can hide failures from both humans and agents. Prefer EAFP where the exception type is known and the catch is narrow; inspect the framework's actual error behavior rather than guessing at its hierarchy. Use explicit checks where they express the contract more clearly, while accounting for race conditions between checking and acting.\n\n## Catch narrowly\n\nCatch the **specific** exception you can handle. A bare `except:` or `except Exception:` swallows bugs, `KeyboardInterrupt`, and (in async) cancellation — turning a crash you'd fix into silent wrong behavior.\n\n```python\n# ✗ Bad — hides programming errors and makes debugging impossible\ntry:\n    sync_playlist(p)\nexcept Exception:\n    pass\n\n# ✓ Good — handle the failures you expect; let the rest surface\ntry:\n    sync_playlist(p)\nexcept (httpx.HTTPError, TimeoutError) as e:\n    log.warning(\"sync failed for %s: %s\", p.id, e)\n    metrics.errors_total.inc()\n```\n\nIf you must catch broadly (a top-level worker loop that must not die), log with `log.exception(...)` to capture the traceback, then continue or re-raise — never `pass`.\n\n## Agent navigability — narrow exception surfaces\n\nPrefer narrow exception surfaces: agents catching from broad hierarchies must guess error object shapes — a predictable interface failure, not a model failure.\n\n**Framework guidance — catch the specific exception, not the family:**\n\n| Framework | Broad (avoid) | Narrow (prefer) |\n| --- | --- | --- |\n| `requests` / `httpx` | `requests.exceptions.RequestException` | `httpx.TimeoutException`, `httpx.HTTPStatusError` |\n| `django` ORM | `django.core.exceptions.ObjectDoesNotExist` | `MyModel.DoesNotExist` |\n| SQLAlchemy | `sqlalchemy.exc.SQLAlchemyError` | `sqlalchemy.exc.IntegrityError`, `sqlalchemy.exc.OperationalError` |\n\nWrap framework exceptions at the boundary into domain exceptions. This collapses the broad hierarchy into a predictable, narrow surface for all downstream code.\n\n## Custom exceptions — a hierarchy with a common base\n\nGive your package one base exception; specific errors subclass it. Callers can then catch the whole family or a specific case. This is what lets a FastAPI handler map *all* your domain errors in one place.\n\n```python\nclass SortarrError(Exception):\n    \"\"\"Base for all sortarr domain errors.\"\"\"\n\nclass AuthRequiredError(SortarrError): ...\nclass QuotaExceededError(SortarrError): ...\n```\n\nSubclass the most specific stdlib type when it fits (`ValueError`, `LookupError`); invent a new hierarchy only for domain concepts the stdlib doesn't model.\n\n## Chain exceptions — preserve the cause\n\nWhen you wrap a low-level error in a domain one, use `raise ... from` so the original traceback survives. Bare `raise NewError(...)` inside an `except` hides the root cause.\n\n```python\ntry:\n    resp = await client.get(url)\n    resp.raise_for_status()\nexcept httpx.HTTPStatusError as e:\n    raise QuotaExceededError(\"YouTube quota hit\") from e   # ✓ keeps the cause\n```\n\nTo deliberately suppress the context, use `from None` — and only when the cause is genuinely noise.\n\nThis is also how you keep storage details out of the API: the **repository** catches the driver error and raises a domain error, so the route never imports `sqlite3` or sees a driver exception.\n\n```python\nimport sqlite3\n\ndef save_rule(self, rule: Rule) -> None:\n    try:\n        self._con.execute(\"INSERT INTO rules (id, pattern) VALUES (?, ?)\", (rule.id, rule.pattern))\n    except sqlite3.IntegrityError as e:\n        raise DuplicateRuleError(rule.id) from e   # domain error — a handler maps it to 409\n```\n\n## else and finally\n\n`else` runs only when `try` didn't raise — put success logic there. `finally` always runs; prefer a **context manager** over manual try/finally.\n\n```python\nwith open_connection(db_path) as conn:   # closed on any exit path\n    conn.execute(...)\n```\n\nWrite your own with `contextlib.contextmanager` or `__enter__/__exit__`; use `async with` for async resources.\n\n## Re-raise, don't return error sentinels\n\nReturning `None`/`-1`/`False` to signal failure forces every caller to remember to check, and the type checker can't help. Raise instead — the failure can't be silently ignored. (Return `X | None` only when \"not found\" is a *normal, expected* outcome, not an error.)\n\nIn async code, **never swallow `asyncio.CancelledError`** — re-raise it so shutdown and timeouts work (→ See `python-async`).\n\n## Mapping to HTTP\n\nIn FastAPI, register one exception handler per domain base class rather than try/except in every route (→ See `python-fastapi`):\n\n```python\n@app.exception_handler(AuthRequiredError)\nasync def _auth(_: Request, exc: AuthRequiredError):\n    return JSONResponse(status_code=401, content={\"detail\": str(exc)})\n```\n\nNever leak a stack trace or internal message to a client — log the detail server-side, return a clean message.\n\n## Common mistakes\n\n| Mistake | Fix |\n| --- | --- |\n| `except Exception: pass` | Catch the specific type; if broad, `log.exception` then re-raise. |\n| Bare `raise FooError()` inside `except` | `raise FooError() from err` to preserve the cause. |\n| `except:` (bare) | Catches `KeyboardInterrupt`/`SystemExit`/cancellation too — name the type. |\n| Manual try/finally for cleanup | Use a context manager (`with`). |\n| Returning `None`/`-1` for errors | Raise an exception; reserve `None` for expected absence. |\n| Swallowing `CancelledError` in async | Re-raise it. |\n| Leaking tracebacks to API clients | Log server-side; return a sanitized message. |\n| EAFP with broad `except` on a framework hierarchy | Prefer LBYL guard or narrow catch; wrap at the boundary into a domain exception. |\n\n**Diagnose:** 1- `ruff check` (bugbear `B`) — flags overly broad `except` and `raise` without `from` 2- read the full traceback (don't truncate) — the chained `from` cause usually names the real failure.\n\n## References\n\n- [Errors and Exceptions — tutorial](https://docs.python.org/3/tutorial/errors.html)\n- [Built-in Exceptions](https://docs.python.org/3/library/exceptions.html)\n- [Glossary — EAFP / LBYL](https://docs.python.org/3/glossary.html)\n- [Alexis King — Parse, don't validate](https://lexi-lambda.github.io/blog/2019/11/05/parse-don-t-validate/)\n\nBase directory for this skill: /workspace/.opencode/skills/python-error-handling\nRelative paths in this skill (e.g., scripts/, reference/) are relative to this base directory.\nNote: file list is sampled.\n\n<skill_files>\n</skill_files>\n</skill_content>"
+                            }
+                          ],
+                          "metadata": {
+                            "name": "python-error-handling",
+                            "directory": "/workspace/.opencode/skills/python-error-handling",
+                            "truncated": false
+                          },
+                          "executed": false
+                        }
+                      },
+                      "error": {
+                        "state": "omitted",
+                        "reason": "not_applicable"
+                      },
+                      "start_sequence": 1,
+                      "terminal_sequence": {
+                        "state": "available",
+                        "value": 2
+                      }
+                    }
+                  ],
+                  "coverage": {
+                    "observation_closed": {
+                      "state": "available",
+                      "value": true
+                    },
+                    "process_state": "completed",
+                    "starts": {
+                      "state": "available",
+                      "value": 1
+                    },
+                    "terminals": {
+                      "state": "available",
+                      "value": 1
+                    },
+                    "missing_terminals": {
+                      "state": "available",
+                      "value": 0
+                    },
+                    "observer_failures": {
+                      "state": "available",
+                      "value": 0
+                    },
+                    "callback_failures": {
+                      "state": "available",
+                      "value": 0
+                    },
+                    "losses": [],
+                    "unsupported": [
+                      "stock_codemode_final_boundary_not_exposed"
+                    ],
+                    "boundaries": {
+                      "native": {
+                        "status": "complete",
+                        "evidence_eligible": true,
+                        "starts": {
+                          "state": "available",
+                          "value": 1
+                        },
+                        "terminals": {
+                          "state": "available",
+                          "value": 1
+                        },
+                        "missing_terminals": {
+                          "state": "available",
+                          "value": 0
+                        },
+                        "issues": []
+                      },
+                      "code_mode_execution": {
+                        "status": "complete",
+                        "evidence_eligible": true,
+                        "starts": {
+                          "state": "available",
+                          "value": 0
+                        },
+                        "terminals": {
+                          "state": "available",
+                          "value": 0
+                        },
+                        "missing_terminals": {
+                          "state": "available",
+                          "value": 0
+                        },
+                        "issues": []
+                      },
+                      "code_mode_finality": {
+                        "status": "unsupported",
+                        "evidence_eligible": false,
+                        "starts": {
+                          "state": "unsupported",
+                          "reason": "stock_codemode_final_boundary_not_exposed"
+                        },
+                        "terminals": {
+                          "state": "unsupported",
+                          "reason": "stock_codemode_final_boundary_not_exposed"
+                        },
+                        "missing_terminals": {
+                          "state": "unsupported",
+                          "reason": "stock_codemode_final_boundary_not_exposed"
+                        },
+                        "issues": [
+                          "stock_codemode_final_boundary_not_exposed"
+                        ]
+                      }
+                    }
+                  }
+                }
+              ]
+            },
+            "checks": [
+              {
+                "name": "skill.native-load",
+                "status": "pass",
+                "reason": "native skill evidence evaluated",
+                "metadata": {
+                  "family": "skill"
+                }
+              }
+            ],
+            "skill_outcome": {
+              "expectations": [
+                {
+                  "text": "Catches sqlite3.IntegrityError inside the repository, not in the route",
+                  "met": true,
+                  "reason": "deterministic fixture grade"
+                },
+                {
+                  "text": "Raises a domain exception with `raise ... from e` to preserve the cause",
+                  "met": true,
+                  "reason": "deterministic fixture grade"
+                },
+                {
+                  "text": "Maps the domain error to 409 via a FastAPI exception handler (not per-route try/except)",
+                  "met": true,
+                  "reason": "deterministic fixture grade"
+                },
+                {
+                  "text": "The route/API layer does not import or reference sqlite3",
+                  "met": true,
+                  "reason": "deterministic fixture grade"
+                },
+                {
+                  "text": "Does NOT wrap the route body in a broad try/except as the fix",
+                  "met": true,
+                  "reason": "deterministic fixture grade"
+                }
+              ],
+              "negative_expectations": [],
+              "trap": {
+                "declared": true,
+                "text": "The quick fix is a try/except in the route catching sqlite3.IntegrityError — which leaks the storage driver into the web layer. The repository should translate the driver error into a domain error (with `from`), and a single exception handler should map it to 409.",
+                "observed": false,
+                "evidence": "not observed"
+              },
+              "semantic_judge": {
+                "passed": true,
+                "summary": "Fixture accepted all authored positive expectations.",
+                "behavior_score": 1.0
+              }
+            },
+            "source_artifact": {
+              "schema": "opencode-eval-runner/eval-artifact/v1",
+              "relative_path": "pairs/case-sk1_FQBwAHkAdABoAG8AbgAtAGUAcgByAG8AcgAtAGgAYQBuAGQAbABpAG4AZwEAMQ/iteration-2.json#/sides/candidate",
+              "evidence_id": "0f07bc4bee660b70f7ab5f123b0ec3c1717d0cf3aa36cc2d16a0b43bb9febd6d"
+            }
+          },
+          "comparison": {
+            "schema": "opencode-eval-runner/eval-comparison/v1",
+            "status": "compared",
+            "baseline_classification": "pass",
+            "candidate_classification": "pass",
+            "decision": {
+              "classification": "pass",
+              "summary": "baseline 100.00%; candidate 100.00%; delta +0.00 pp; neutral",
+              "data": {
+                "candidate_absolute_pass": true,
+                "baseline_score": 1.0,
+                "candidate_score": 1.0,
+                "delta_pp": 0.0,
+                "trap_fixed": false,
+                "trap_regression": false,
+                "skill_value": "neutral"
+              }
+            },
+            "failure": null
+          }
+        }
+      },
+      "source_input": 2,
+      "source_path": "skills/python-error-handling/evals/evals.json",
+      "source_sha256": "e834048256f8c142f92930e320ff90e682f5d01b310edfdb13c61526e4cee61b"
+    }
+  },
+  "paired_artifact_evidence_id": "d07dc0309dd071ba979dd275bd98c3bc78d142ee9aa4ac0dae71f90af3767cd3"
+}

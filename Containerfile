@@ -1,5 +1,7 @@
-FROM node:24-bookworm-slim@sha256:0e0ff40c39bc087845bfb27465a0df4ea419520094bc35842ff83dd8cbe6f9b6 AS opencode-builder
 ARG OPENCODE_VERSION=2.0.23
+
+FROM node:24-bookworm-slim@sha256:0e0ff40c39bc087845bfb27465a0df4ea419520094bc35842ff83dd8cbe6f9b6 AS opencode-builder
+ARG OPENCODE_VERSION
 RUN npm install --global "@opencode/cli@${OPENCODE_VERSION}" \
     && resolved="$(readlink -f "$(command -v opencode)")" \
     && test -x "$resolved" \
@@ -53,6 +55,9 @@ ENTRYPOINT ["python3", "/opt/opencode-eval-runner/container/invoke.py"]
 USER 1000:1000
 
 FROM runtime-base AS opencode
+ARG OPENCODE_VERSION
+LABEL org.opencontainers.image.version="${OPENCODE_VERSION}" \
+      io.opencode-eval-runner.invoke-adapter="opencode-eval-runner/opencode-invoke/v1"
 COPY --from=opencode-builder /opencode /usr/local/bin/opencode
 RUN opencode --version
 

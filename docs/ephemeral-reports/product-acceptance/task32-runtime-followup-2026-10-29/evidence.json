@@ -1,0 +1,366 @@
+{
+  "artifacts": [
+    {
+      "bytes": 46,
+      "path": "artifacts/agent-runtime-run/.eval-run-owner.json",
+      "sha256": "d27052b110d0473b28c71b0eeb1d7dfe484e39dbcd48b2e195eb3792c8269311"
+    },
+    {
+      "bytes": 28762,
+      "path": "artifacts/agent-runtime-run/jobs/case-runtime-read-result/iteration-1.json",
+      "sha256": "6d45d9c2df8f4e44054f3def86ccbbed74870e43c3bbb1c19d3c438ef08f3ecb"
+    },
+    {
+      "bytes": 1025,
+      "path": "artifacts/agent-runtime-run/run.json",
+      "sha256": "9e49ace04714224639a70494fc5d20d029d83cf8afb4bb99dd3db5f833e9e349"
+    }
+  ],
+  "case_id": "runtime-read-result",
+  "cleanup": {
+    "network_post_cleanup": "fixtures/network-after-cleanup.txt",
+    "network_removed": true,
+    "preexisting_networks_or_images_modified": false,
+    "provider_container_post_cleanup": "fixtures/provider-after-cleanup.txt",
+    "provider_container_removed": true
+  },
+  "cleanup_artifacts": [
+    {
+      "path": "fixtures/provider-after-cleanup.txt",
+      "sha256": "38d339c672e1e42d8a88875f9bb2d1dac4590a98d4bdbaf3e700f2db3024cb99"
+    },
+    {
+      "path": "fixtures/network-after-cleanup.txt",
+      "sha256": "25b67330c309130128302e07c56ddd5cd83d9edd5cc8684ffd6ec72cf9fa5ab9"
+    }
+  ],
+  "commands": {
+    "effective_environment": {
+      "CONTAINERS_STORAGE_CONF": "/tmp/opencode/task32-recovery/storage.conf",
+      "OPENCODE_EVAL_RUNNER_CONFIG": "/tmp/opencode/task32-runtime-followup/opencode.json",
+      "OPENCODE_EVAL_RUNNER_OPENCODE_IMAGE": "sha256:0940e9ac543098bfa51dda81cce643ed3366df1ab8a4e90bf5fcd8601c2e5e39",
+      "XDG_DATA_HOME": "/tmp/opencode/task32-runtime-followup/isolated-data"
+    },
+    "evaluation_argv": [
+      "python3",
+      "/home/n23790/git/bateau84/opencode-eval-runner-wt/feat/evaluation-format-contracts/bin/opencode-eval-runner",
+      "eval",
+      "--input",
+      "/tmp/opencode/task32-runtime-followup/input.json",
+      "--family",
+      "agent-runtime",
+      "--cases",
+      "runtime-read-result",
+      "--target-model",
+      "fixture/mock",
+      "--network",
+      "task32-runtime-followup-20261029",
+      "--engine",
+      "podman",
+      "--timeout-seconds",
+      "90",
+      "--container-timeout",
+      "150",
+      "--artifact-dir",
+      "/tmp/opencode/task32-runtime-followup/artifacts/final-run",
+      "--format",
+      "json",
+      "--output",
+      "/tmp/opencode/task32-runtime-followup/artifacts/final-run-initial.json"
+    ],
+    "render_argv": [
+      [
+        "python3",
+        "/home/n23790/git/bateau84/opencode-eval-runner-wt/feat/evaluation-format-contracts/bin/opencode-eval-runner",
+        "eval",
+        "--render-run",
+        "/tmp/opencode/task32-runtime-followup/artifacts/final-run",
+        "--format",
+        "json",
+        "--output",
+        "/tmp/opencode/task32-runtime-followup/final-renders/agent-runtime.json"
+      ],
+      [
+        "python3",
+        "/home/n23790/git/bateau84/opencode-eval-runner-wt/feat/evaluation-format-contracts/bin/opencode-eval-runner",
+        "eval",
+        "--render-run",
+        "/tmp/opencode/task32-runtime-followup/artifacts/final-run",
+        "--format",
+        "yaml",
+        "--output",
+        "/tmp/opencode/task32-runtime-followup/final-renders/agent-runtime.yaml"
+      ],
+      [
+        "python3",
+        "/home/n23790/git/bateau84/opencode-eval-runner-wt/feat/evaluation-format-contracts/bin/opencode-eval-runner",
+        "eval",
+        "--render-run",
+        "/tmp/opencode/task32-runtime-followup/artifacts/final-run",
+        "--format",
+        "markdown",
+        "--output",
+        "/tmp/opencode/task32-runtime-followup/final-renders/agent-runtime.markdown"
+      ],
+      [
+        "python3",
+        "/home/n23790/git/bateau84/opencode-eval-runner-wt/feat/evaluation-format-contracts/bin/opencode-eval-runner",
+        "eval",
+        "--render-run",
+        "/tmp/opencode/task32-runtime-followup/artifacts/final-run",
+        "--format",
+        "html",
+        "--output",
+        "/tmp/opencode/task32-runtime-followup/final-renders/agent-runtime.html"
+      ]
+    ],
+    "transport_retries": 0
+  },
+  "configuration": {
+    "actual_config_sha256": "8291052d2b87ac36c40f6ac9e82e53dd2bee2482081e78fb1e97c21b1b3bf6fc",
+    "archived_redacted": "fixtures/provider-config.json",
+    "database_seed": null,
+    "source": "OPENCODE_EVAL_RUNNER_CONFIG",
+    "transport_retries": 0,
+    "xdg_data_home": "isolated per run; pre-existing Podman store preserved by CONTAINERS_STORAGE_CONF"
+  },
+  "evidence": {
+    "evidence_eligible": true,
+    "non_required_code_mode_finality": "unsupported",
+    "observations": 1,
+    "readiness": "ready",
+    "required_boundaries": {
+      "code_mode_execution": "complete",
+      "native": "complete"
+    },
+    "runtime_evidence_status": "complete"
+  },
+  "execution_mode": "runtime",
+  "family": "agent-runtime",
+  "fixture_inventory": [
+    {
+      "bytes": 1257,
+      "path": "fixtures/agent-runtime-input.json",
+      "sha256": "9709d8cf088fadadace760298f5a898a9914b7cf770f8cdb68f42d4599cfc30e"
+    },
+    {
+      "bytes": 4719,
+      "path": "fixtures/deterministic-runtime-provider.py",
+      "sha256": "4ee8ba0192a32b49cc5bdc5a06f88670ccee72bf3b4a320c23ed7b679dcfda5a"
+    },
+    {
+      "bytes": 188,
+      "path": "fixtures/eval.log",
+      "sha256": "79978d2598f78af668f38875634dc532b95df8dcdd218cad88b5440b6e5185fd"
+    },
+    {
+      "bytes": 98,
+      "path": "fixtures/focused-negative-tests.log",
+      "sha256": "61ca266d920fafef052343603b50fecd4732b9b475dffd38709cbf8c33c80949"
+    },
+    {
+      "bytes": 318,
+      "path": "fixtures/general-agent.md",
+      "sha256": "9f6c5ae8409b7d0299b05c34d14811a6851b027cff10c40cdf0c24599723f095"
+    },
+    {
+      "bytes": 137,
+      "path": "fixtures/loom-index.ts",
+      "sha256": "a61f049ab083c12373e3f2ebcd188ee2c51ddd8d15bde5716066ccdab574d536"
+    },
+    {
+      "bytes": 337,
+      "path": "fixtures/loom-plugin-provenance.txt",
+      "sha256": "d8b6868e1d0f5a4b2caccee600178fbaf09ab64001dec9793c6925de2912a067"
+    },
+    {
+      "bytes": 143,
+      "path": "fixtures/network-after-cleanup.txt",
+      "sha256": "25b67330c309130128302e07c56ddd5cd83d9edd5cc8684ffd6ec72cf9fa5ab9"
+    },
+    {
+      "bytes": 1277,
+      "path": "fixtures/network-inspect.json",
+      "sha256": "cf842293573613e9555d5a0a7acb6212b7be4ff55da89cacb8b31796f56d60ef"
+    },
+    {
+      "bytes": 14765,
+      "path": "fixtures/opencode-image-inspect.json",
+      "sha256": "ed4aa373e8e1e4847d61e82b57b8ea5fc7dbcb09725a9d694706277c1b80df6b"
+    },
+    {
+      "bytes": 54,
+      "path": "fixtures/provider-after-cleanup.txt",
+      "sha256": "38d339c672e1e42d8a88875f9bb2d1dac4590a98d4bdbaf3e700f2db3024cb99"
+    },
+    {
+      "bytes": 658,
+      "path": "fixtures/provider-config.json",
+      "sha256": "c4ecd5a4428deb510adf4356cac2770a339bd5e8ebdb2a0ef02e415f700c87ad"
+    },
+    {
+      "bytes": 13612,
+      "path": "fixtures/provider-container-inspect.json",
+      "sha256": "ce2e2dfe7ed0e15bae8077b434b980fbf28ddc4119e4e6fbd3ee47739570a0c7"
+    },
+    {
+      "bytes": 9786,
+      "path": "fixtures/provider-image-inspect.json",
+      "sha256": "dc2bf11ff98c3937c450adbeef2d3e3c8c57b12c90e8de27ff57f2ef5380852f"
+    },
+    {
+      "bytes": 549,
+      "path": "fixtures/provider-requests.log",
+      "sha256": "194d5128ac96db64f56a9044d9c2dd971903b9c3550376f16b8563cc6f34119e"
+    }
+  ],
+  "focused_negative_tests": {
+    "log": "fixtures/focused-negative-tests.log",
+    "result": "3 passed"
+  },
+  "format_projection": {
+    "json_yaml_semantically_equal": true,
+    "outputs": {
+      "html": {
+        "bytes": 41575,
+        "path": "renders/agent-runtime.html",
+        "sha256": "29f3aa8da69abd09b2b5dec74a78d067ee18747a7148ec2117fce810ebd80093"
+      },
+      "json": {
+        "bytes": 37975,
+        "path": "renders/agent-runtime.json",
+        "sha256": "b18e0f88bdf992abe0a5d2a2e24061b5e35737aa9198f74c211755e8e3a9f40c"
+      },
+      "markdown": {
+        "bytes": 36047,
+        "path": "renders/agent-runtime.markdown",
+        "sha256": "db633d050a92b30ef6a8f4bd9eac9180bebfd3ef7340fd878d379cba52795416"
+      },
+      "yaml": {
+        "bytes": 31533,
+        "path": "renders/agent-runtime.yaml",
+        "sha256": "c0dbe2b13613ca98cdbce946069010da31d413c2a4a7e607d9c4aeba1430c859"
+      }
+    },
+    "run_id": "dd23dedc71614b6082fcbb1cc2038c6b",
+    "separately_rendered": [
+      "json",
+      "yaml",
+      "markdown",
+      "html"
+    ]
+  },
+  "images": {
+    "invoke_adapter": "opencode-eval-runner/opencode-invoke/v1",
+    "opencode": "sha256:0940e9ac543098bfa51dda81cce643ed3366df1ab8a4e90bf5fcd8601c2e5e39",
+    "opencode_version": "2.0.23",
+    "provider": "sha256:febd0be41adb897a0ab8f1f1c693d8912669ea60c4940e076e9946b60e210ef0"
+  },
+  "input": {
+    "bytes": 1257,
+    "fixture_marker": "RUNTIME_READ_RESULT_7fbf89c1",
+    "materialized_fixture": "runtime-proof.txt",
+    "path": "fixtures/agent-runtime-input.json",
+    "recorded_input_sha256": "9709d8cf088fadadace760298f5a898a9914b7cf770f8cdb68f42d4599cfc30e",
+    "sha256": "9709d8cf088fadadace760298f5a898a9914b7cf770f8cdb68f42d4599cfc30e"
+  },
+  "input_contract": "agent-runtime/v1",
+  "judge": {
+    "attempts": 1,
+    "claim_limit": "The local deterministic judge emits the contract-shaped strict JSON; it is not independent semantic-model proof.",
+    "fixture_controlled": true,
+    "status": "pass"
+  },
+  "loom_plugin": {
+    "implementation": "actual installed Loom plugin source; no stub",
+    "package_metadata": "fixtures/loom-plugin-provenance.txt",
+    "repo_revision": "2d321780a485dd9c8cf4093c32f3c35f2349e50c"
+  },
+  "network": {
+    "id": "f4200c9d9d8ee4a61a14cbd1f5fc5e64f60585755e7da9e33225d5654a0a67fe",
+    "inspection": "fixtures/network-inspect.json",
+    "internal": true,
+    "name": "task32-runtime-followup-20261029"
+  },
+  "persisted_run_json_sha256": "9e49ace04714224639a70494fc5d20d029d83cf8afb4bb99dd3db5f833e9e349",
+  "previous_combined_skill_run_reused": {
+    "rerun": false,
+    "run_id": "f47f708d31cf42b489900c870838ea43",
+    "source_report": "../task32-2026-10-29/report.md"
+  },
+  "provider": {
+    "base_url": "http://fixture-provider:18762/v1",
+    "container_id": "a83ca7848dc5685490c44003f07c0876b32baa807c53e3614e5ea55bc9968c0f",
+    "external_requests": 0,
+    "paid_inference": false,
+    "request_log": {
+      "actions": [
+        "target-tool-request",
+        "target-final",
+        "judge"
+      ],
+      "count": 3,
+      "only_path": "/v1/chat/completions",
+      "path": "fixtures/provider-requests.log",
+      "request_bodies_logged": false
+    },
+    "runtime_tool_call": "read(path=runtime-proof.txt) returned the input fixture marker"
+  },
+  "run_created_at": "2026-10-29T19:36:12.650Z",
+  "run_id": "dd23dedc71614b6082fcbb1cc2038c6b",
+  "runtime_assertion": {
+    "kind": "tool_results.requires[0]",
+    "observation": {
+      "input": {
+        "path": "runtime-proof.txt"
+      },
+      "invocation_id": "native:c0e4bddd-896f-486c-9b86-4892aed074db",
+      "outcome": "success",
+      "result_contains_marker": true,
+      "result_state": "available",
+      "start_sequence": 1,
+      "terminal_sequence": 2,
+      "tool": "read"
+    },
+    "required_observation_fields": [
+      "tool",
+      "input",
+      "outcome",
+      "start_sequence",
+      "terminal_sequence",
+      "result_or_error"
+    ],
+    "runtime_semantics_fields": [
+      "tool",
+      "input",
+      "outcome",
+      "start_sequence",
+      "terminal_sequence"
+    ],
+    "status": "pass"
+  },
+  "source_head": "39956afa262da97f82d8aad59030a6e66a9eb4d0",
+  "suite": "task32-agent-runtime-native-tool",
+  "summary": {
+    "errors": 0,
+    "fail": 0,
+    "non-evidence": 0,
+    "not_run": 0,
+    "pass": 1,
+    "status": "pass",
+    "total": 1
+  },
+  "target_tools": [
+    "read"
+  ],
+  "renderer_refresh": {
+    "source_revision": "bddccfa (fix(eval): correct readable report summaries)",
+    "reason": "PR89 Task 3.3 F1-F4 renderer corrections",
+    "run_artifact_unchanged": true,
+    "evaluation_rerun": false,
+    "formats_regenerated": [
+      "markdown",
+      "html"
+    ]
+  }
+}
