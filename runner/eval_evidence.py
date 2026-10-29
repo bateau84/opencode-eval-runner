@@ -244,7 +244,21 @@ def check_evidence_readiness(
     reasons: list[str] = []
     for index, observation in enumerate(observations):
         for name in fields:
-            if name == "result_or_error":
+            if name == "outcome":
+                outcome = observation.get("outcome")
+                if outcome == "missing":
+                    field_readiness = _readiness("incomplete", ("field_missing_terminal_outcome",), ())
+                elif outcome in {"success", "error"}:
+                    field_readiness = _readiness("ready", (), ())
+                else:
+                    field_readiness = _readiness("invalid", ("field_invalid_terminal_outcome",), ())
+            elif name == "start_sequence":
+                sequence = observation.get("start_sequence")
+                if type(sequence) is int and sequence > 0:
+                    field_readiness = _readiness("ready", (), ())
+                else:
+                    field_readiness = _readiness("invalid", ("field_invalid_start_sequence",), ())
+            elif name == "result_or_error":
                 outcome = observation.get("outcome")
                 if outcome == "missing":
                     field_readiness = _readiness("incomplete", ("field_missing_terminal_outcome",), ())

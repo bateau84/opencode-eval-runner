@@ -69,6 +69,26 @@ def native_skill_evidence(skill: str, agent: str):
     })
 
 
+def native_runtime_evidence():
+    available = field_available
+    return build_runtime_evidence({
+        "capture_started": True, "capture_ended": True,
+        "observer_failures": 0, "callback_failures": 0, "issues": [],
+        "records": [
+            {"kind": "native_start", "sequence": 1, "invocation_id": "runtime-1",
+             "tool": available("read"), "session_id": available("session-1"),
+             "agent": available("assistant"), "message_id": available("message-1"),
+             "call_id": available("call-1"), "parent_session_id": available(None),
+             "input": available({"filePath": "README.md"}), "boundary": "decoded-tool-execute"},
+            {"kind": "native_terminal", "sequence": 2, "invocation_id": "runtime-1",
+             "tool": available("read"), "session_id": available("session-1"),
+             "agent": available("assistant"), "message_id": available("message-1"),
+             "call_id": available("call-1"), "outcome": "success",
+             "boundary": "session.tool.success", "result": available({"content": "ok"})},
+        ],
+    })
+
+
 def runtime_action_missing_input_evidence():
     available = field_available
     records = [
@@ -498,6 +518,32 @@ def test_unready_runtime_evidence_suppresses_agent_judge(tmp_path, monkeypatch):
     assert artifact["classification"] == "non-evidence"
     assert artifact["target"]["evidence_readiness"]["status"] == "unsupported"
     assert artifact["judge"]["attempts"] == []
+
+
+def test_complete_nonempty_runtime_capture_reaches_agent_judge(tmp_path, monkeypatch):
+    root = tmp_path / "project"
+    write_agent_root(root)
+    (root / "skills").mkdir()
+    (root / "node_modules").mkdir()
+    source = tmp_path / "suite.json"
+    source.write_text(json.dumps({
+        "version": 1, "name": "suite", "cases": [{
+            "id": "runtime", "agent": "assistant", "execution": "runtime",
+            "requirements": ["BR"], "prompt": "p", "trap": "t",
+            "expectations": ["one", "two"], "must_not": ["no"],
+        }],
+    }))
+    invoker = BuiltinInvoker(agent_grade=grade(["one", "two"], ["no"]), runtime_evidence=native_runtime_evidence())
+    monkeypatch.chdir(root)
+    args = parser().parse_args([
+        "eval", "--input", str(source), "--family", "agent-runtime", "--target-model", "provider/model",
+        "--all", "--artifact-dir", str(tmp_path / "artifacts"),
+    ])
+
+    code, _, _ = run_command(args, invoker)
+
+    assert code == EVAL_EXIT_PASS
+    assert [spec.agent for spec in invoker.specs] == ["assistant", "eval-judge"]
 
 
 def test_tool_only_action_still_requires_input_readiness(tmp_path, monkeypatch):

@@ -105,6 +105,26 @@ class EvidenceReadinessTests(unittest.TestCase):
         self.assertEqual(readiness.status, "incomplete")
         self.assertTrue(any("required_field_field_omitted" in reason for reason in readiness.reasons))
 
+    def test_scalar_runtime_fields_are_checked_without_object_field_adapter(self):
+        readiness = check_evidence_readiness(
+            complete_evidence(),
+            EvidenceRequirement(
+                (BOUNDARY_NATIVE, BOUNDARY_CODE_MODE_EXECUTION),
+                ("outcome", "start_sequence"),
+            ),
+        )
+
+        self.assertEqual(readiness.status, "ready")
+
+    def test_missing_terminal_outcome_is_not_ready_for_scalar_outcome_assertion(self):
+        readiness = check_evidence_readiness(
+            incomplete_evidence(),
+            EvidenceRequirement((BOUNDARY_NATIVE,), ("outcome", "start_sequence")),
+        )
+
+        self.assertEqual(readiness.status, "incomplete")
+        self.assertIn(f"boundary_incomplete:{BOUNDARY_NATIVE}", readiness.reasons)
+
     def test_code_mode_execution_boundary_can_be_ready(self):
         readiness = check_evidence_readiness(
             complete_evidence(),
