@@ -21,11 +21,11 @@ The OpenCode configuration inspected during this attempt had no provider names, 
 
 ### E2E-001 — agent/runtime through verified result
 
-**UNPROVEN at initial attempt.** No suite was submitted during this first feasibility check. See follow-up report for the later public-path result and its deterministic-provider limitations.
+**UNPROVEN at initial attempt.** No suite was submitted during this first feasibility check. The later agent-family `conversation-response` result does not close this runtime scenario; see the [native runtime follow-up](task32-runtime-followup-2026-10-29/report.md) for actual execution evidence and deterministic-provider limitations.
 
 ### E2E-002 — combined skills, five iterations, four formats
 
-**UNPROVEN at initial attempt.** No combined run was submitted during this first feasibility check. See follow-up report for later run IDs, source provenance, output artifacts, and validation limits.
+**UNPROVEN at initial attempt.** No combined run was submitted during this first feasibility check. See the [deterministic-provider report](task32-2026-10-29/report.md) for the later run ID, source provenance, output artifacts, and validation limits; its combined-skill run was reused for the runtime follow-up without rerunning.
 
 ## Evidence inventory and limits
 
@@ -40,6 +40,6 @@ The OpenCode configuration inspected during this attempt had no provider names, 
 
 The user's accepted historical GHCR image transfer remains a known non-blocking exception. This report makes no no-egress claim and does not reopen that boundary. It also makes no live-provider compatibility claim, no WCAG conformance claim, and no claim that tests substitute for the missing composed journey.
 
-## Required next step
+## Superseding evidence
 
-Provide or authorize an existing provider-free local fixture/provider route that preserves the semantics needed by real runner-side OpenCode/OCI invocation, or explicitly authorize the intended live provider and spend. Then execute both scenarios through the public CLI, verifier, persistence, and renderers; save run IDs and same-run output artifacts; and hand the actual HTML/Markdown paths to the designer for Task 3.3. Until then both scenarios remain UNPROVEN.
+The initial report's next step was to establish an authorized provider-free route and execute both scenarios. A local deterministic provider route was subsequently reconstructed. E2E-001 now has an actual native runtime observation and same-run format evidence in the [runtime follow-up](task32-runtime-followup-2026-10-29/report.md); E2E-002 remains the completed combined-skill run in the [initial acceptance report](task32-2026-10-29/report.md). Neither report claims live-provider semantic quality, browser review, or whole-workflow no-egress.

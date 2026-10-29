@@ -1,0 +1,5 @@
+repo=2d321780a485dd9c8cf4093c32f3c35f2349e50c
+package=2.0.0-alpha.1
+@opencode/plugin=2.0.29
+e7fa7ff467e45166fd177c157f9d14714024e2dc7db8a346138759435c8646f4  /home/n23790/.config/opencode/plugins/loom/src/plugin.ts
+fee2ebaca22a9af7cd2b5d74a4c74530657edca0e27f784af06126e2b2657ed6  /home/n23790/.config/opencode/plugins/loom/package.json

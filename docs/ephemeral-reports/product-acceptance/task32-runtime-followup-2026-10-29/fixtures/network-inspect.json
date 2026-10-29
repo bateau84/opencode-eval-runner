@@ -1,0 +1,37 @@
+[
+     {
+          "name": "task32-runtime-followup-20261029",
+          "id": "f4200c9d9d8ee4a61a14cbd1f5fc5e64f60585755e7da9e33225d5654a0a67fe",
+          "driver": "bridge",
+          "network_interface": "podman1",
+          "created": "2026-10-29T20:22:49.597844432+01:00",
+          "subnets": [
+               {
+                    "subnet": "10.89.0.0/24",
+                    "gateway": "10.89.0.1"
+               }
+          ],
+          "ipv6_enabled": false,
+          "internal": true,
+          "dns_enabled": true,
+          "ipam_options": {
+               "driver": "host-local"
+          },
+          "containers": {
+               "a83ca7848dc5685490c44003f07c0876b32baa807c53e3614e5ea55bc9968c0f": {
+                    "name": "task32-runtime-provider",
+                    "interfaces": {
+                         "eth0": {
+                              "subnets": [
+                                   {
+                                        "ipnet": "10.89.0.25/24",
+                                        "gateway": "10.89.0.1"
+                                   }
+                              ],
+                              "mac_address": "f6:12:89:98:38:10"
+                         }
+                    }
+               }
+          }
+     }
+]
