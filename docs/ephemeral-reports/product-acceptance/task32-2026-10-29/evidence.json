@@ -4,7 +4,7 @@
     "agent: separately requested JSON and YAML parse to identical values from verified run",
     "skill: persisted run completed and all 10 jobs passed",
     "skill: separately requested JSON and YAML parse to identical values from verified run",
-    "skill: two distinct skills each expose iterations 1\u20135 in the actual Markdown report",
+    "skill: two distinct skills each expose iterations 1–5 in the actual Markdown report",
     "skill: each family renderer embeds the completed run ID",
     "provider: requests were logged only for /v1/chat/completions and no request bodies/prompts are logged"
   ],
@@ -67,9 +67,9 @@
     },
     "skill": {
       "html": {
-        "bytes": 2333116,
+        "bytes": 1790681,
         "path": "renders/skill.html",
-        "sha256": "5312cc365facfde5f8c63b07a25fd1ebfb766873a9bd0ba4fcee5f3ee5cb1e88"
+        "sha256": "317cbf532d3dbaf067f2a40fa4c2d0c6ffeb305851859ee22dbdedae00701abb"
       },
       "json": {
         "bytes": 1748044,
@@ -77,9 +77,9 @@
         "sha256": "f779900972eb0f098d15b6da2f54ccfdf41820312bd9e12dbac6b5c8dbb3627d"
       },
       "markdown": {
-        "bytes": 2126647,
+        "bytes": 1683692,
         "path": "renders/skill.markdown",
-        "sha256": "259641e6c2ad300c61f72964926b7b2caef944753782ad0db6793b02f755cfb1"
+        "sha256": "755eba381518dca5de4819bc22e6692ed682a08007088b8b7d3e6fe1a691fc5d"
       },
       "yaml": {
         "bytes": 1577822,
@@ -221,5 +221,15 @@
       "bytes": 8286,
       "sha256": "d8ed62c2905caa4d2e3b021f8069328ea4d1dab014131d5c26a15db471e8f469"
     }
+  },
+  "renderer_refresh": {
+    "source_revision": "renderer correction working tree; see plan and implementation commit",
+    "reason": "PR89 Task 3.3 F1-F4 renderer corrections",
+    "run_artifact_unchanged": true,
+    "evaluation_rerun": false,
+    "formats_regenerated": [
+      "markdown",
+      "html"
+    ]
   }
 }

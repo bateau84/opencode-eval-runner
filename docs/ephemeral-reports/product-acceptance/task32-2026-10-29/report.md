@@ -33,6 +33,11 @@ Each representation was independently requested with the public `eval --render-r
 
 For each family, parsed JSON and YAML values were identical. The skill Markdown and HTML expose both skill groups and all five individual iterations for each. SHA-256 digests, sizes, run manifests, persisted job artifacts, command logs, source hashes, image/network metadata, and provider request metadata are recorded in `evidence.json` and the adjacent evidence directories. The Markdown/HTML files are the actual generated outputs and are available for Task 3.3 design/browser validation; this report does not claim a browser check.
 
+**Renderer refresh (2026-10-29):** The skill Markdown and HTML were regenerated via `eval --render-run` from the unchanged persisted combined-skill run after PR #89 Task 3.3 corrections. No eval/provider execution occurred; JSON/YAML, run manifests, and job artifacts were not modified. Updated output sizes and SHA-256 digests are in `evidence.json`; the original execution source provenance remains unchanged. Reassessment is pending.
+
+- `renders/skill.markdown`: 1,683,692 bytes; SHA-256 `755eba381518dca5de4819bc22e6692ed682a08007088b8b7d3e6fe1a691fc5d`
+- `renders/skill.html`: 1,790,681 bytes; SHA-256 `317cbf532d3dbaf067f2a40fa4c2d0c6ffeb305851859ee22dbdedae00701abb`
+
 ## Deterministic external substitution and limits
 
 The only external substitution was a local OpenAI-compatible deterministic provider container on a Podman network inspected as `internal=true`. It used no external provider endpoint, no paid inference, and no ambient provider credentials. Its image ID was `sha256:febd0be41adb897a0ab8f1f1c693d8912669ea60c4940e076e9946b60e210ef0`; its own implementation is archived as `fixtures/deterministic-provider.py`. Configuration authority was the mounted `OPENCODE_EVAL_RUNNER_CONFIG` seed, not inferred from `OPENCODE_CLI_CONFIG_CONTENT`. The isolated XDG data directory had no OpenCode database seed (`database_seed=None`); `CONTAINERS_STORAGE_CONF` retained the original local Podman image store while that data directory was isolated.

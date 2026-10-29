@@ -337,11 +337,15 @@ def test_render_run_projects_one_verified_result_without_invocation(tmp_path, mo
             assert "## Run " in rendered and "### Case decision" in rendered
             assert '"pass"' in rendered and "semantic_judge" in rendered
             assert "Assertions:" in rendered and "Evidence readiness:" in rendered
+            assert "attempt 1 — result recorded" in rendered
+            assert "attempt 1 result {" not in rendered
         else:
             assert "<main>" in rendered and "<h1>" in rendered
             assert "<section><h2>Run " in rendered and "<section><h3>Case decision" in rendered
             assert "Assertions:" in rendered and "Evidence readiness:" in rendered
             assert "Choose &lt;safely&gt;" in rendered
+            assert "attempt 1 — result recorded" in rendered
+            assert "overflow-wrap:anywhere" in rendered
         assert len(invoker.specs) == invocations
         assert (artifact_dir / "run.json").read_bytes() == manifest_before
 
@@ -670,9 +674,11 @@ def test_skill_eval_runs_four_phases_and_preserves_comparison_and_pair_integrity
             assert "### Case smoke" in text and "Canonical case ID: skill:helper:smoke" in text
             assert "Baseline:" in text and "percentage points" in text
             assert "baseline-target" in text and "candidate-target" in text and "delta_pp" in text
+            assert "100.00%" in text and "1.00%" not in text
         else:
             assert "<main>" in text and "<h3>Case skill:helper:smoke" in text
             assert "baseline-target" in text and "candidate-target" in text
+            assert "100.00%" in text and "1.00%" not in text
             assert text.index("<section><h2>Run ") < text.index("<section><h3>Case skill:helper:smoke") < text.index("</section>")
     validate_output_model(paired_canonical)
     misplaced_v1 = json.loads(json.dumps(paired_canonical))
@@ -886,6 +892,7 @@ def test_combined_markdown_and_html_render_five_iterations_under_repeated_skill_
         assert text.count("Iteration 4 — pass") == 4
         assert text.count("Iteration 5 — pass") == 4
         assert "baseline_score" in text and "candidate_score" in text and "Captured answers and evidence" in text
+        assert "attempt 1 result {" not in text
         assert "source_id" in text
         assert "one-" + "x" * 40 in text
         assert "two" in text
@@ -906,6 +913,7 @@ def test_combined_markdown_and_html_render_five_iterations_under_repeated_skill_
             assert "<dt>observations</dt><dd><ul>" in text
             assert "<dt>tool</dt>" in text and "native-1" in text and "skill body" in text
             assert "Raw captured stdout/stderr" in text
+            assert "Expectation met: useful" in text
         else:
             assert text.count("### Skill helper") == 1
             assert text.count("#### Case ") == 2

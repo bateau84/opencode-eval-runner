@@ -222,9 +222,9 @@
     "json_yaml_semantically_equal": true,
     "outputs": {
       "html": {
-        "bytes": 57607,
+        "bytes": 41575,
         "path": "renders/agent-runtime.html",
-        "sha256": "292b73717790d8850dc52c3d04ade2b1a54646e6dd7cb14c23ed272aeb72261d"
+        "sha256": "29f3aa8da69abd09b2b5dec74a78d067ee18747a7148ec2117fce810ebd80093"
       },
       "json": {
         "bytes": 37975,
@@ -232,9 +232,9 @@
         "sha256": "b18e0f88bdf992abe0a5d2a2e24061b5e35737aa9198f74c211755e8e3a9f40c"
       },
       "markdown": {
-        "bytes": 46289,
+        "bytes": 36047,
         "path": "renders/agent-runtime.markdown",
-        "sha256": "d888cd0b36e82171cb55581c5e85f7255e719926dde566e7a9eb769a2b768f5e"
+        "sha256": "db633d050a92b30ef6a8f4bd9eac9180bebfd3ef7340fd878d379cba52795416"
       },
       "yaml": {
         "bytes": 31533,
@@ -352,5 +352,15 @@
   },
   "target_tools": [
     "read"
-  ]
+  ],
+  "renderer_refresh": {
+    "source_revision": "renderer correction working tree; see plan and implementation commit",
+    "reason": "PR89 Task 3.3 F1-F4 renderer corrections",
+    "run_artifact_unchanged": true,
+    "evaluation_rerun": false,
+    "formats_regenerated": [
+      "markdown",
+      "html"
+    ]
+  }
 }

@@ -48,8 +48,10 @@ After the one evaluation completed, all four outputs were separately requested t
 | --- | --- | --- |
 | JSON | `renders/agent-runtime.json` | `b18e0f88bdf992abe0a5d2a2e24061b5e35737aa9198f74c211755e8e3a9f40c` |
 | YAML | `renders/agent-runtime.yaml` | `c0dbe2b13613ca98cdbce946069010da31d413c2a4a7e607d9c4aeba1430c859` |
-| Markdown | `renders/agent-runtime.markdown` | `d888cd0b36e82171cb55581c5e85f7255e719926dde566e7a9eb769a2b768f5e` |
-| HTML | `renders/agent-runtime.html` | `292b73717790d8850dc52c3d04ade2b1a54646e6dd7cb14c23ed272aeb72261d` |
+| Markdown | `renders/agent-runtime.markdown` | `db633d050a92b30ef6a8f4bd9eac9180bebfd3ef7340fd878d379cba52795416` |
+| HTML | `renders/agent-runtime.html` | `29f3aa8da69abd09b2b5dec74a78d067ee18747a7148ec2117fce810ebd80093` |
+
+**Renderer refresh (2026-10-29):** Markdown and HTML were regenerated through `eval --render-run` from this same persisted run after PR #89 Task 3.3 corrections. The verified run, JSON/YAML projections, and execution evidence are unchanged; no evaluation or provider call was made. Current Markdown/HTML sizes and SHA-256 digests are in `evidence.json` (`renderer_refresh` records this derivation; `format_projection.outputs` is authoritative). Human design reassessment remains pending.
 
 Parsed JSON and YAML are identical. Both readable reports identify run `dd23dedc71614b6082fcbb1cc2038c6b`, pass status, the runtime case, and its observed marker. The saved `run.json`, job artifact, all four outputs, exact input, logs, image/network inspection, and hashes are retained in this report directory and indexed by `evidence.json`.
 
