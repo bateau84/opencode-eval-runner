@@ -5,6 +5,10 @@ description: Changes to the evaluation format ownership requirements bundle.
 tags: [evaluation, requirements, log]
 ---
 
+## 2026-10-29
+
+- **Update**: [Requirements bundle index](/docs/requirements/eval-format-ownership/index.md) — Reconciled the superseded single-input architecture conflict with the repeated explicit skill-input realization in ARD-001/ARS-001, and recorded user acceptance of the historical GHCR transfer as a non-blocking exception without making a no-egress claim.
+
 ## 2026-10-16
 
 - **Update**: [BR-005 — Evaluate multiple skill inputs together](/docs/requirements/eval-format-ownership/br-005-evaluate-multiple-skill-inputs-together.md) and [OC-001 — Evaluation case input conformance](/docs/requirements/eval-format-ownership/oc-001-evaluation-case-input-conformance.md) — Defined full-run uniqueness by composite skill/case identity: repeated skill identity across distinct inputs remains allowed for disjoint cases; duplicate composite identities reject before invocation rather than being merged, omitted, or misattributed.

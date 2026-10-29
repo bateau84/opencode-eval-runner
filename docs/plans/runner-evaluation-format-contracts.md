@@ -11,11 +11,15 @@ Complete and verify the unfinished evaluation-format branch and PR #89 against t
 
 The target is both input families through the existing public `eval` interface; verified JSON/YAML/Markdown/HTML projections; preserved agent/runtime and skill-ablation semantics; readable attributed reports; and trustworthy CI and assembled-product evidence. Existing `--profile` behavior and the one-invocation image boundary remain unchanged.
 
-**Status basis:** branch `feat/evaluation-format-contracts`, HEAD `1b729fac44c98646718886224e0b50766383a71b`, base `1262ac8c2eebbd10af572e3e3560318f6113233b`, PR #89. These identifiers were supplied in the review handoff and confirmed from this checkout; the worktree was clean when inspected. The accepted plan's old delivery snapshot predates the current review and is superseded below. Historical green tests, review opinions, and prior `/tmp` artifacts are not proof that the current HEAD satisfies these tasks.
+**Status basis (2026-10-29):** branch `feat/evaluation-format-contracts`, HEAD `15e5cff` at the start of Task 3.1, base `1262ac8c2eebbd10af572e3e3560318f6113233b`, PR #89. The preceding implementation commits include `0c29f85` (combined skill inputs/reports), `c62295b` (combined-result projection), and `15e5cff` (readable attributed reports). Historical test runs and prior `/tmp` artifacts do not prove current product-level OCI/browser behavior.
 
 **Execution update (2026-10-29):** Tasks 1.2 and 2.1 have implementation and local verification commits on this branch (`660da87`, `0e04355`). The existing unittest suite and the three targeted pytest modules pass locally. Task 1.2 remains open until a hosted GitHub run visibly records the pytest modules; `gh pr checks 89` reported no checks on the branch at this observation. Task 2.1's local evidence-readiness and judge-gate criteria are verified; real OCI composition remains Task 3.2.
 
 **Task 2.2 update (2026-10-29):** Result projection changes and focused local verification are complete in this branch. V2 case provenance remains in the v2 input/case projection and artifact metadata, the closed `SkillResult.case_identity` shape is unchanged, combined Markdown/HTML display the verified run timestamp, and undeclared trap outcome fields are null. Strict conformance tests cover combined v2 provenance and the existing v1 projection path. Real invocation/persistence/report composition and human report assessment remain open under Tasks 3.2–3.3.
+
+**Task 2.3 update (2026-10-29):** Readable attributed Markdown/HTML rendering is implemented at `15e5cff`; focused local renderer tests and projection tests cover the changed semantics. This is not evidence of the approved multi-skill/five-iteration product report in a browser. Real OCI composition and human/browser report assessment remain open under Tasks 3.2–3.3.
+
+**Task 3.1 update (2026-10-29):** The obsolete requirements-index conflict is reconciled: ARD-001/ARS-001 specify repeated explicit skill inputs, and implementation commit `0c29f85` supports them. The user's acceptance of the historical GHCR transfer remains a bounded non-blocking exception, not a no-egress claim. Requirements are unchanged. Tasks 3.2–3.3, independent review, hosted/current merge-state checks remain open.
 
 ## Plain-language task map
 
@@ -239,10 +243,10 @@ Implements: [ARS-001](../architecture/eval-format-ownership/specifications/ars-0
 Depends on: 2.1, 2.2, 2.3.
 Acceptance criteria:
 
-- [ ] Plan status distinguishes historical evidence, current unproven gaps, planned work, and executed verification; it makes no stale assertion that a resolved architecture question is still open or that review/critic gates passed for current HEAD.
-- [ ] Requirements index reconciliation removes the obsolete claim that the multi-input realization remains an unresolved architecture conflict, while preserving BR-005 and the architect's settled realization.
-- [ ] Any links, bundle index, change log, and OKF metadata touched by this reconciliation validate and resolve; no requirement or accepted contract is rewritten to fit implementation.
-- [ ] User-facing usage docs are only updated if code changes alter their truth; documentation describes current behavior after implementation, not planned behavior as shipped.
+- [x] Plan status distinguishes historical evidence, current unproven gaps, planned work, and executed verification; it makes no stale assertion that a resolved architecture question is still open or that review/critic gates passed for current HEAD.
+- [x] Requirements index reconciliation removes the obsolete claim that the multi-input realization remains an unresolved architecture conflict, while preserving BR-005 and the architect's settled realization.
+- [x] Links, bundle index, change log, and OKF metadata touched by this reconciliation validate and resolve; no requirement or accepted contract is rewritten to fit implementation.
+- [x] User-facing usage docs remain unchanged: `docs/eval-usage.md` already documents repeated skill inputs, all four formats, verified persisted outputs, readable report hierarchy and v2 combined output as implemented in current code.
 
 #### Task 3.2: Prove both real evaluation journeys and report design [L] → owner: product acceptance integrator
 
@@ -359,7 +363,7 @@ Acceptance criteria:
 8. **Execution fit:** Runtime semantics, output projection, presentation, CI coverage, docs, E2E, review and GitHub state are split at independent ownership/context/verification boundaries. The two E2E scenarios share setup and are grouped for one integration/provenance loop.
 9. **Vertical proof:** Task 2.1 tests evidence-to-gate semantics; Task 2.2 tests verified result projection; Task 3.2 composes actual invocation → verified state → output.
 10. **E2E:** Exactly two scenarios distinguish agent/runtime evidence/judge semantics from combined skill ablation, attribution and five-iteration readability. Both require real product-owned components and upstream-produced state; actual human-facing output validation is separately owned by 3.3.
-11. **Pass honesty:** All findings and current product proof remain open for execution. No pass, merge-ready state, no-egress claim, or WCAG conformance claim is inferred from historical evidence.
+11. **Pass honesty:** Local implementation tasks are recorded as complete only where focused evidence exists. Real OCI composition, current browser/design validation, independent final review, hosted CI confirmation, and current GitHub merge disposition remain open; no no-egress or WCAG conformance claim is inferred from historical evidence.
 
 ## Open questions
 

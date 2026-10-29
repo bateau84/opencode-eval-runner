@@ -11,8 +11,9 @@ it excludes GitHub Copilot CLI transport from that built-in contract. The
 existing `--profile` API path and its current transport flexibility remain
 preserved. This is a requirements baseline, not an architecture or
 implementation specification. Concrete schemas/markup, historical
-compatibility, migration, and the multi-input selection surface remain
-architectural decisions as listed below.
+compatibility, and migration remain bounded decisions as listed below. The
+multi-input selection surface has been realized in ARD-001/ARS-001; this does
+not add historical compatibility promises.
 
 ## Requirements
 
@@ -81,7 +82,7 @@ reconciliation evidence, not sources that narrow these requirements.
 
 ## Reconciliation findings
 
-- **Conflict / owner: architect:** The currently accepted [ARS-001](../../architecture/eval-format-ownership/specifications/ars-001-runner-eval-contract.md) execute contract specifies one `--input PATH` and one top-level skill identity per invocation (§§57–65); it does not realize the newly user-approved multi-skill run. BR-005 is the protected product requirement. The architect must revise the accepted realization (including the input-selection surface) or identify a distinct accepted architectural replacement before implementation. This requirement deliberately does not prescribe multiple paths, directory discovery, flags, or input merging rules.
+- **Resolved architecture / aligned:** [ARD-001](../../architecture/eval-format-ownership/design/ard-001-runner-owned-input-and-output-contracts.md) and [ARS-001](../../architecture/eval-format-ownership/specifications/ars-001-runner-eval-contract.md) realize BR-005 with repeated explicit skill input occurrences, whole-set validation, and composite identity rules. The requirement remains implementation-independent and does not prescribe directory discovery or input-merging behavior.
 - **Resolved specification detail / source: specifier choice within user-approved combined-run scope:** Different inputs may declare the same skill identity if all child cases have distinct composite identities. Duplicate `(skill identity, stable case identity)` children are rejected before target/judge invocation; this avoids silent coalescing or misattribution while not requiring one input document per skill. Repeating a case-bearing input is rejected by the same identity-collision rule. No syntax or document-alias recognition is specified.
 - **Aligned / user-approved:** BR-005 limits combined evaluation to skill-family inputs, retains each skill's own comparison and case/iteration attribution, prohibits cross-skill aggregate claims, and keeps all four output representations tied to the same verified combined result under OC-002. Existing report readability/evidence details remain covered by BR-004, QS-001, and OC-002.
 
@@ -133,7 +134,7 @@ reconciliation evidence, not sources that narrow these requirements.
 | Decision | Owner | Blocks |
 | --- | --- | --- |
 | Must historical variants beyond the existing source formats remain accepted unchanged, including legacy inference/wrapper/ID spelling/generated-ID/selector-alias behavior? | User | Blocks historical-compatibility promises only; source feature coverage and stable identity preservation do not depend on it. |
-| Does the user accept or authorize the historical image-transfer/egress behavior identified during remediation? | User | Blocks closure or acceptance of that historical egress question only; it does not change the input/output requirements in this bundle. |
+| Historical image-transfer/egress behavior identified during remediation | Resolved by user acceptance: the recorded GHCR transfer is a known historical exception and non-blocking for this remediation. | Does not establish no-egress, local layer retention, or byte volume; do not claim those. |
 | Backward compatibility, migration path, and timing for current profile inputs and runner outputs | User | Blocks migration/compatibility promises and any removal/change to those current surfaces; does not block new ownership paths while preserving current v1 integrity/meaning. |
 | Exact serialization/schema/version/markup and any additional output content beyond the common facts in OC-002 and the approved readable-report baseline | Architect for structural realization; user for material user-facing content beyond the stated baseline | Blocks detailed format specification beyond the semantic boundaries in OC-002/BR-004, not production of all four formats. |
 | Whether formats are selectable or emitted together | Resolved as selectable alternatives by BR-002/OC-002; simultaneous output is not required | Not blocking. |
@@ -141,7 +142,7 @@ reconciliation evidence, not sources that narrow these requirements.
 | What HTML represents beyond an accessible view of the same facts or enables interactively | User for report/product meaning; architect realizes accepted meaning | Blocks specific HTML/report content or interaction claims only; any introduced interaction must be keyboard operable. |
 | Is a polished report required, distinct from the bounded human-readable Markdown/HTML summaries now required? | User | Blocks polished-report scope only; the approved readability baseline does not require branding or unrelated report features. |
 | Whether there is a canonical representation and the technical relationship between inputs and outputs | Architect, unless the user has a product preference | Blocks architecture, not these requirements. |
-| Input-selection surface for multiple skill-owned evaluation inputs (for example, explicit paths versus directory selection) | Architect | Blocks interface/schema realization only; user intent for one combined skill-family run is settled. |
+| Input-selection surface for multiple skill-owned evaluation inputs | Resolved in ARD-001/ARS-001 as repeated explicit paths; no directory discovery. | No further architecture reconciliation is pending. |
 
 Duplicate-child semantics are settled in BR-005 and OC-001: uniqueness is evaluated over composite skill/case identity for the full submitted run, not by imposing a single-document-per-skill rule. No additional product decision is open on this point.
 
