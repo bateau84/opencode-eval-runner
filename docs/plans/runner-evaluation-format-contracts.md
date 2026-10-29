@@ -19,7 +19,11 @@ The target is both input families through the existing public `eval` interface; 
 
 **Task 2.3 update (2026-10-29):** Readable attributed Markdown/HTML rendering is implemented at `15e5cff`; focused local renderer tests and projection tests cover the changed semantics. This is not evidence of the approved multi-skill/five-iteration product report in a browser. Real OCI composition and human/browser report assessment remain open under Tasks 3.2–3.3.
 
-**Task 3.1 update (2026-10-29):** The obsolete requirements-index conflict is reconciled: ARD-001/ARS-001 specify repeated explicit skill inputs, and implementation commit `0c29f85` supports them. The user's acceptance of the historical GHCR transfer remains a bounded non-blocking exception, not a no-egress claim. Requirements are unchanged. Tasks 3.2–3.3, independent review, hosted/current merge-state checks remain open.
+**Task 3.1 update (2026-10-29):** The obsolete requirements-index conflict is reconciled: ARD-001/ARS-001 specify repeated explicit skill inputs, and implementation commit `0c29f85` supports them. The user's acceptance of the historical GHCR transfer remains a bounded non-blocking exception, not a no-egress claim. Requirements are unchanged. Hosted CI evidence for Task 1.2 is now recorded below; product proof Task 3.2 remains unproven, Task 3.3 and independent review remain open, and the current GitHub `BLOCKED` state still lacks an authoritative explanation.
+
+**Task 3.2 execution update (2026-10-29, HEAD `23a8a4fedb79f7b0633af911a5b9006dde64b4bd`): UNPROVEN.** Feasibility inspection found the compatible OpenCode 2.0.23 invoke image locally (`localhost/eval-contract-opencode:guarded`, immutable image ID `sha256:0940e9ac543098bfa51dda81cce643ed3366df1ab8a4e90bf5fcd8601c2e5e39`; expected version and adapter labels match). However, no approved provider-free local fixture/provider route is configured: the OpenCode configuration available to this process declares no providers/models/base URLs. Running the eval would therefore require selecting and potentially spending against an unapproved live provider. Per scope, no invocation was attempted. No run IDs, verified persisted results, JSON/YAML/Markdown/HTML same-run outputs, or actual HTML/Markdown report paths exist from this attempt. Neither scenario can be claimed PASS; actual combined reports and browser/design validation remain unproven. See [Task 3.2 feasibility and evidence record](../ephemeral-reports/product-acceptance/pr89-task32.md). This limitation does not reopen the accepted historical GHCR transfer boundary.
+
+**Read-only delivery observations (2026-10-29):** GitHub run `40935434652` completed successfully for current HEAD `23a8a4fedb79f7b0633af911a5b9006dde64b4bd`; test job `Python checks` visibly collected 46 pytest cases and completed `46 passed in 2.77s`, including `tests/test_eval_input.py`, `tests/test_eval_assertions.py`, and `tests/test_eval_builtin_cli.py`. This satisfies hosted execution evidence for Task 1.2. `gh pr view 89` reports base `main` (`1262ac8c2eebbd10af572e3e3560318f6113233b`), merge state `BLOCKED`, `mergeable: MERGEABLE`, no review decision/reviews/requests, and both check runs successful. Branch-protection API returned HTTP 404 “Branch not protected.” The precise reason for GitHub's `BLOCKED` state remains unavailable from these observations; do not infer a blocker or claim ready. Task 1.1/final readiness remains unresolved pending GitHub's authoritative reason.
 
 ## Plain-language task map
 
@@ -114,7 +118,7 @@ Identify the actual merge blocker → repair CI and contract gaps → reconcile 
 - **Closed result schema boundary:** Misplacing source provenance inside a closed family payload can break strict conformance and round trips. Validate projection ownership, persistence verification, and rendering against ARS-001, not merely permissive serialization.
 - **Human-readable output boundary:** A renderer can be machine-conforming yet fail BR-004/QS-001. Validate against actual produced multi-skill, five-iteration results; placeholders or injected result objects are not sufficient.
 - **CI coverage boundary:** Local pytest green is not CI coverage while the workflow runs only unittest discovery. Confirm executed modules in the hosted run after changing workflow behavior.
-- **Run availability:** Actual OCI/OpenCode runs may depend on the approved local image and configured OpenCode provider. If unavailable, record the proof as UNPROVEN, retain narrower evidence, and do not substitute mocks for product-owned stages or claim completion.
+- **Run availability:** The compatible local OCI image is present, but this environment has no configured provider-free OpenCode route. Actual OCI/OpenCode runs were not attempted absent authority for live provider use. Record both scenarios UNPROVEN; do not substitute mocks for product-owned stages or claim completion.
 - **Review independence:** The prior assessment was evidence-backed but not blind. Task 4.1 must independently review the final diff and artifacts and disclose that lineage; its status must not imply an independent clean-room first assessment.
 
 ## End-to-end proof
@@ -173,9 +177,9 @@ Applicable skill: github-workflow, python-testing
 Implements: [ARS-001](../architecture/eval-format-ownership/specifications/ars-001-runner-eval-contract.md)
 Acceptance criteria:
 
-- [ ] CI executes the evaluation pytest modules `test_eval_input`, `test_eval_assertions`, and `test_eval_builtin_cli` that unittest discovery currently omits.
-- [ ] The hosted run visibly records pytest discovery and results for those modules; a green unittest-only run does not satisfy this task.
-- [ ] Existing tests remain covered, dependencies remain pinned/declared according to repository policy, and the full relevant CI run is green.
+- [x] CI executes the evaluation pytest modules `test_eval_input`, `test_eval_assertions`, and `test_eval_builtin_cli` that unittest discovery currently omits.
+- [x] Hosted run `40935434652` visibly records pytest discovery and results for those modules; the Python checks collected 46 cases and finished `46 passed in 2.77s`.
+- [x] Existing test job and full relevant CI run completed successfully; dependencies remain pinned/declared according to repository policy.
 
 ### Phase 2: Restore implementation conformance
 
