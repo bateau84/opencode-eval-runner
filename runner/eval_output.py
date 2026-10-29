@@ -252,7 +252,7 @@ def _agent_result(artifact: dict[str, Any], ref: dict[str, str]) -> dict[str, An
 
 
 def _skill_result(
-    pair: dict[str, Any], ref: dict[str, str], *, combined: bool = False
+    pair: dict[str, Any], ref: dict[str, str], *, source_input: int | None = None
 ) -> dict[str, Any]:
     meta = pair["project_metadata"].get("runner_eval")
     _require(isinstance(meta, dict), "paired artifact lacks runner family result")
@@ -283,8 +283,6 @@ def _skill_result(
         "source_index",
         "display_name",
     }
-    if combined:
-        identity_keys.update({"source_input", "source_path", "source_sha256"})
     _exact_keys(family_result["case_identity"], identity_keys, "skill case identity")
     _exact_keys(family_result["trap"], {"declared", "text"}, "skill trap")
     _exact_keys(
@@ -419,9 +417,9 @@ def _skill_result(
         "family_result": family_result,
         "source_artifacts": refs,
     }
-    if combined:
+    if source_input is not None:
         result["identity"] = {"skill": family_result["skill"], "case": pair["case"]}
-        result["source_input"] = family_result["case_identity"]["source_input"]
+        result["source_input"] = source_input
     return result
 
 
@@ -535,15 +533,9 @@ def load_verified_output(run_directory: str | os.PathLike[str]) -> dict[str, Any
                     item["artifact"],
                     pair["paired_artifact_evidence_id"],
                 )
-                job = _skill_result(pair, ref, combined=combined)
+                job = _skill_result(pair, ref, source_input=ordinal if combined else None)
                 if combined:
-                    identity = meta["family_result"]["case_identity"]
-                    _require(
-                        identity.get("source_input") == ordinal
-                        and identity.get("source_path") == source["path"]
-                        and identity.get("source_sha256") == source["sha256"],
-                        "case identity provenance mismatch",
-                    )
+                    _require(job["identity"]["skill"] == source["skill"], "case skill provenance mismatch")
             else:
                 artifact = store.read_job_artifact(identity)
                 _require(
@@ -843,6 +835,28 @@ def validate_output_model(model: dict[str, Any]) -> None:
             ),
             f"cases[{index}] family payload is missing or mismatched",
         )
+        if case["family"] == "skill":
+            family_result = case["family_result"]
+            _exact_keys(
+                family_result["case_identity"],
+                {"case_id", "source_id", "authored_id", "source_index", "display_name"},
+                f"cases[{index}].family_result.case_identity",
+            )
+            trap = family_result["trap"]
+            _exact_keys(trap, {"declared", "text"}, f"cases[{index}].family_result.trap")
+            for side_name in ("baseline", "candidate"):
+                outcome_trap = family_result["ablation"][side_name]["skill_outcome"]["trap"]
+                _exact_keys(
+                    outcome_trap,
+                    {"declared", "text", "observed", "evidence"},
+                    f"cases[{index}].family_result.ablation.{side_name}.skill_outcome.trap",
+                )
+                if not trap["declared"]:
+                    _require(
+                        trap["text"] is None
+                        and outcome_trap == {"declared": False, "text": None, "observed": None, "evidence": None},
+                        f"cases[{index}] undeclared trap outcome is not null",
+                    )
         if combined:
             _exact_keys(case["identity"], {"skill", "case"}, f"cases[{index}].identity")
             skill, case_id = case["identity"]["skill"], case["identity"]["case"]
@@ -864,16 +878,9 @@ def validate_output_model(model: dict[str, Any]) -> None:
                 source["skill"] == skill,
                 f"cases[{index}] source skill does not match identity",
             )
-            family_identity = case["family_result"].get("case_identity", {})
             _require(
                 case["family_result"].get("skill") == skill,
                 f"cases[{index}] family skill does not match identity",
-            )
-            _require(
-                family_identity.get("source_input") == ordinal
-                and family_identity.get("source_path") == source["source_path"]
-                and family_identity.get("source_sha256") == source["sha256"],
-                f"cases[{index}] family source provenance does not match input collection",
             )
             composite = (skill, case_id, case["iteration"])
             _require(
@@ -1109,6 +1116,7 @@ def _combined_markdown(model: dict[str, Any]) -> str:
         "",
         f"## Run {run['id']}",
         "",
+        f"- **Created:** {run['created_at']}",
         f"- **Status:** {summary['status']}",
         (
             f"- **Jobs:** {summary['total']} total; {summary['pass']} pass, {summary['fail']} fail, "
@@ -1165,6 +1173,7 @@ def _combined_html(model: dict[str, Any]) -> str:
     summary = run["summary"]
     sections = [
         f"<section><h2>Run {html.escape(run['id'])}</h2>",
+        f"<p>Created: {html.escape(run['created_at'])}</p>",
         f"<p>Status: {html.escape(summary['status'])}</p>",
         "<p>Jobs: {} total; {} pass, {} fail, {} non-evidence, {} errors, {} not run</p>".format(
             summary["total"],

@@ -24,6 +24,7 @@ from runner.eval_artifacts import (
 from runner.eval_cli import EVAL_EXIT_ERROR, EVAL_EXIT_PASS, EVAL_EXIT_VERDICT, run_eval
 from runner.eval_execute import RESULT_SCHEMA
 from runner.eval_input import combined_skill_case_id
+from runner.eval_output import EvalOutputError, validate_output_model
 from runner.eval_plan import build_run_plan
 from runner.eval_types import ArtifactIdentity, NormalizedCase
 
@@ -233,6 +234,12 @@ def test_builtin_agent_eval_uses_public_command_and_seals_family_metadata(tmp_pa
 
     assert code == EVAL_EXIT_PASS
     assert '"schema": "opencode-eval-runner/eval-output/v1"' in stdout
+    output = json.loads(stdout)
+    validate_output_model(output)
+    invalid_output = json.loads(stdout)
+    invalid_output["cases"][0]["unexpected"] = True
+    with pytest.raises(EvalOutputError, match=r"cases\[0\]"):
+        validate_output_model(invalid_output)
     assert "Artifacts:" in stderr
     assert [spec.agent for spec in invoker.specs] == ["assistant", "eval-judge"]
     assert all(spec.model == "provider/model" for spec in invoker.specs)
@@ -625,6 +632,9 @@ def test_skill_eval_runs_four_phases_and_preserves_comparison_and_pair_integrity
     skill_result = family["family_result"]
     assert family["case_id"] == "skill:helper:smoke"
     assert skill_result["case_identity"]["source_id"] == "smoke"
+    assert skill_result["ablation"]["candidate"]["skill_outcome"]["trap"] == {
+        "declared": True, "text": "unsafe", "observed": False, "evidence": "not observed"
+    }
     assert skill_result["ablation"]["baseline"]["classification"] == "fail"
     assert skill_result["ablation"]["candidate"]["classification"] == "pass"
     comparison = skill_result["ablation"]["comparison"]
@@ -663,6 +673,11 @@ def test_skill_eval_runs_four_phases_and_preserves_comparison_and_pair_integrity
             assert "<main>" in text and "<h3>Case skill:helper:smoke" in text
             assert "baseline-target" in text and "candidate-target" in text
             assert text.index("<section><h2>Run ") < text.index("<section><h3>Case skill:helper:smoke") < text.index("</section>")
+    validate_output_model(paired_canonical)
+    misplaced_v1 = json.loads(json.dumps(paired_canonical))
+    misplaced_v1["cases"][0]["family_result"]["case_identity"]["source_path"] = str(source)
+    with pytest.raises(EvalOutputError, match="case_identity"):
+        validate_output_model(misplaced_v1)
     artifact_path = store.paired_job_path(identity)
     raw = json.loads(artifact_path.read_text())
     raw["project_metadata"]["runner_eval"]["family_result"]["prompt"] = "changed"
@@ -706,6 +721,7 @@ def test_combined_skill_run_preserves_source_occurrence_in_v2_and_rejects_duplic
 
     assert code == EVAL_EXIT_PASS, stderr
     output = json.loads(stdout)
+    validate_output_model(output)
     assert output["schema"] == "opencode-eval-runner/eval-output/v2"
     assert [entry["source_path"] for entry in output["run"]["input"]["inputs"]] == [str(first), str(second)]
     assert [(case["identity"]["skill"], case["source_input"], case["iteration"]) for case in output["cases"]] == [
@@ -720,6 +736,13 @@ def test_combined_skill_run_preserves_source_occurrence_in_v2_and_rejects_duplic
     assert metadata["source_input"] == 1
     assert metadata["source_path"] == str(first)
     assert metadata["source_sha256"] == __import__("hashlib").sha256(first.read_bytes()).hexdigest()
+    family = metadata["family_result"]
+    assert set(family["case_identity"]) == {
+        "case_id", "source_id", "authored_id", "source_index", "display_name"
+    }
+    assert family["ablation"]["candidate"]["skill_outcome"]["trap"] == {
+        "declared": False, "text": None, "observed": None, "evidence": None
+    }
 
     duplicate = tmp_path / "duplicate.json"
     duplicate.write_text(first.read_text())
@@ -803,9 +826,23 @@ def test_combined_markdown_and_html_render_five_iterations_under_repeated_skill_
     )
     assert run_command(canonical_args, invoker)[0] == EVAL_EXIT_PASS
     canonical = json.loads(canonical_path.read_text(encoding="utf-8"))
+    validate_output_model(canonical)
+    invalid = json.loads(canonical_path.read_text(encoding="utf-8"))
+    invalid["cases"][0]["family_result"]["case_identity"]["source_input"] = 1
+    with pytest.raises(EvalOutputError, match="case_identity"):
+        validate_output_model(invalid)
+    invalid = json.loads(canonical_path.read_text(encoding="utf-8"))
+    invalid["cases"][0]["unexpected"] = True
+    with pytest.raises(EvalOutputError, match=r"cases\[0\]"):
+        validate_output_model(invalid)
+    invalid = json.loads(canonical_path.read_text(encoding="utf-8"))
+    invalid["cases"][0]["family_result"]["ablation"]["candidate"]["skill_outcome"]["trap"]["observed"] = False
+    with pytest.raises(EvalOutputError, match="undeclared trap"):
+        validate_output_model(invalid)
     assert canonical["schema"] == "opencode-eval-runner/eval-output/v2"
     assert len(canonical["cases"]) == 10
     assert len(canonical["cases"][0]["id"]) > 60
+    created_at = canonical["run"]["created_at"]
     assert {
         (case["identity"]["skill"], case["source_input"]) for case in canonical["cases"]
     } == {("helper", 1), ("helper", 2)}
@@ -841,6 +878,7 @@ def test_combined_markdown_and_html_render_five_iterations_under_repeated_skill_
         )
         assert run_command(render, invoker)[0] == EVAL_EXIT_PASS
         text = destination.read_text(encoding="utf-8")
+        assert created_at in text
         assert text.count("Iteration 1 — pass") == 4
         assert text.count("Iteration 2 — pass") == 4
         assert text.count("Iteration 3 — pass") == 4

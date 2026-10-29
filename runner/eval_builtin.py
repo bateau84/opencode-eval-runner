@@ -937,7 +937,12 @@ class SkillAblationAdapter:
                         {"text": item["rule"], "violated": item["violated"], "reason": item["reason"]}
                         for item in grades.get("violations", [])
                     ],
-                    "trap": {"declared": bool(data.get("trap")), "text": data.get("trap") or None, "observed": grades.get("trap_observed"), "evidence": grades.get("trap_evidence")},
+                    "trap": {
+                        "declared": bool(data.get("trap")),
+                        "text": data.get("trap") or None,
+                        "observed": grades.get("trap_observed") if data.get("trap") else None,
+                        "evidence": grades.get("trap_evidence") if data.get("trap") else None,
+                    },
                     "semantic_judge": {"passed": grades.get("passed"), "summary": grades.get("summary"), "behavior_score": grades.get("behavior_score") } if grades else None,
                 },
                 "source_artifact": {"schema": "opencode-eval-runner/eval-artifact/v1", "relative_path": relative + f"#/sides/{side_name}", "evidence_id": side_artifact["artifact_evidence_id"]},
@@ -953,9 +958,6 @@ class SkillAblationAdapter:
                 "authored_id": data["_skill_authored_id"],
                 "source_index": data["_skill_source_index"],
                 "display_name": data["_skill_display_name"],
-                **({"source_input": case.metadata["source_input"], "source_path": case.metadata["source_path"],
-                    "source_sha256": case.metadata["source_sha256"]}
-                   if case.metadata.get("input_count") > 1 else {}),
             },
             "prompt": data["prompt"],
             "fixture_files": data.get("fixture_files", []),

@@ -15,6 +15,8 @@ The target is both input families through the existing public `eval` interface; 
 
 **Execution update (2026-10-29):** Tasks 1.2 and 2.1 have implementation and local verification commits on this branch (`660da87`, `0e04355`). The existing unittest suite and the three targeted pytest modules pass locally. Task 1.2 remains open until a hosted GitHub run visibly records the pytest modules; `gh pr checks 89` reported no checks on the branch at this observation. Task 2.1's local evidence-readiness and judge-gate criteria are verified; real OCI composition remains Task 3.2.
 
+**Task 2.2 update (2026-10-29):** Result projection changes and focused local verification are complete in this branch. V2 case provenance remains in the v2 input/case projection and artifact metadata, the closed `SkillResult.case_identity` shape is unchanged, combined Markdown/HTML display the verified run timestamp, and undeclared trap outcome fields are null. Strict conformance tests cover combined v2 provenance and the existing v1 projection path. Real invocation/persistence/report composition and human report assessment remain open under Tasks 3.2–3.3.
+
 ## Plain-language task map
 
 > Reader aid only. Task details, acceptance criteria, and dependencies govern if this ever differs.
@@ -198,11 +200,11 @@ Applicable skill: software-engineering, python-how-to, python-testing, python-ty
 Implements: [ARS-001](../architecture/eval-format-ownership/specifications/ars-001-runner-eval-contract.md) §§247–267, 356–412, 414–441 and [ARD-001](../architecture/eval-format-ownership/design/ard-001-runner-owned-input-and-output-contracts.md)
 Acceptance criteria:
 
-- [ ] `SkillResult.case_identity` emits only the closed family fields; input occurrence/path/digest remain in their specified v2 input/projection fields and cases retain the correct source-occurrence attribution.
-- [ ] Combined human-readable reports include the `created_at` value from the same run result.
-- [ ] An undeclared trap is represented as not applicable/null as specified; declared-but-not-observed remains distinguishable and retains its evidence semantics.
-- [ ] Local strict-schema and verified-result tests cover valid v1 and v2 outputs, reject unknown keys, and prove source provenance is not lost or moved into a closed payload.
-- [ ] No durable v1 envelope, hash/integrity behavior, or existing profile behavior changes.
+- [x] `SkillResult.case_identity` emits only the closed family fields; input occurrence/path/digest remain in their specified v2 input/projection fields and cases retain the correct source-occurrence attribution.
+- [x] Combined human-readable reports include the `created_at` value from the same run result.
+- [x] An undeclared trap is represented as not applicable/null as specified; declared-but-not-observed remains distinguishable and retains its evidence semantics.
+- [x] Local strict-schema and verified-result tests cover valid v1 and v2 outputs, reject unknown keys, and prove source provenance is not lost or moved into a closed payload.
+- [x] No durable v1 envelope, hash/integrity behavior, or existing profile behavior changes.
 
 #### Task 2.3: Render readable attributed Markdown and HTML outcomes [M] → owner: runner report maintainer
 
