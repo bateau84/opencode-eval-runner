@@ -1140,8 +1140,12 @@ def _agent_narrative(case: dict[str, Any]) -> list[str]:
     assertions = family["assertions"]
     for assertion in assertions:
         lines.append(f"Assertion ({assertion['kind']}): {assertion['status']} — {assertion['reason'] or 'no reason recorded'}; authored: {json.dumps(assertion['authored'], ensure_ascii=False)}")
-        for observation in assertion.get("observed", []):
-            lines.append(f"Observed evidence: tool {observation['tool'].get('value', 'unavailable')}; input {json.dumps(observation['input'].get('value'), ensure_ascii=False)}; outcome {observation['outcome']}; result {json.dumps(observation['result'].get('value'), ensure_ascii=False)}")
+        observed = assertion.get("observed")
+        if isinstance(observed, list):
+            for observation in observed:
+                lines.append(f"Observed evidence: tool {observation['tool'].get('value', 'unavailable')}; input {json.dumps(observation['input'].get('value'), ensure_ascii=False)}; outcome {observation['outcome']}; result {json.dumps(observation['result'].get('value'), ensure_ascii=False)}")
+        elif observed is not None:
+            lines.append(f"Observed evidence: {json.dumps(observed, ensure_ascii=False)}")
     if not assertions:
         lines.append("Assertions: none authored/applicable.")
     judge = family["semantic_judge"]
@@ -1409,7 +1413,7 @@ def serialize_output(model: dict[str, Any], format: str) -> bytes:
             for case in model["cases"]:
                 heading = f"Case {case['id']} — {case['family']} iteration {case['iteration']}"
                 identity = case["family_result"].get("case_identity", {})
-                label = identity.get("display_name") or identity.get("source_id") or case["id"]
+                label = str(identity.get("display_name") or identity.get("source_id") or case["id"])
                 narrative = "".join("<p>" + html.escape(line) + "</p>" for line in _agent_narrative(case)) if case["family"] == "agent-runtime" else f"<p>{html.escape(_skill_iteration_summary(case)[0])}</p>"
                 details = _html_tree(case)
                 sections.append(f"<section><h3>{html.escape(heading)} — {html.escape(label)}</h3>{narrative}<details><summary>Captured answers and evidence — iteration {case['iteration']}</summary>{details}</details></section>")

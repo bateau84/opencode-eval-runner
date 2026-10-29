@@ -1,14 +1,56 @@
 ---
 type: Report
 title: PR89 task 3.3 assembled report assessment
-description: Browser and CommonMark assessment of the actual two-skill five-iteration and native-read runtime reports; four renderer corrections remain.
+description: Targeted reassessment at 93ac09e passes the exercised report journeys after four renderer corrections; retains the historical failure evidence and explicit coverage limits.
 tags: [evaluation, reports, design-validation, pr-89, task-3.3]
-timestamp: 2026-10-29T19:52:00Z
+timestamp: 2026-10-29T20:04:00Z
 ---
 
 # PR89 task 3.3 — actual assembled reports
 
-## Verdict
+## Current verdict — targeted follow-up at 93ac09e
+
+**Product assessment: PASS for the exercised accepted report journeys. QA: PASS within the evidence boundary below. Task 3.3 is accepted.** All four original major findings are corrected in the regenerated actual reports. The initial FAIL below is historical, not the current disposition. Remaining items are minor presentation advisories and untested states, not reproduced blockers. This does not approve semantic judge quality, blanket accessibility conformance, or PR merge readiness.
+
+Reassessed HEAD `93ac09efc0b5d2c7c074c111a5a11e9c06e321e2`, initially clean; renderer correction `bddccfa07478273e10c49c35447faa86701938a0`. Reviewed the current diff, correction notes and both Task 3.2 evidence manifests. Independently checked refreshed output sizes/SHA-256 against those manifests, and confirmed no persisted `artifacts/` file changed from `d2a7c58` to this HEAD. Run IDs and JSON projections remain the same. The renderer refresh did not rerun evaluation; the deterministic-provider limitation is unchanged.
+
+Re-exercised both actual HTML reports in installed Chromium 156.0.8078.4, and actual Markdown through markdown-it-py 4.2.0 CommonMark/HTML-enabled host rendering. Repeated desktop, 320 CSS px with all disclosures open, keyboard/anchor/disclosure, accessible-name/expanded-state and capture-completeness probes. The earlier scripts now accept `REPORT_PROBE_OUT`; follow-up outputs are separate under `/tmp/opencode/pr89-task33-followup-93ac09e/`, so initial observations were not overwritten. No production changes, model calls, commits or pushes were made by this reassessment; the coder-reported 300 tests plus 123 subtests were not independently rerun here.
+
+### Original finding dispositions
+
+| Finding | Reobserved evidence | Current disposition |
+| --- | --- | --- |
+| F1 — score scaling | All ten combined iteration summaries now show baseline/candidate **100.00%**, matching normalized JSON scores `1.0` and recorded decision summaries. Delta remains **+0.00 percentage points**, not multiplied again. | **Fixed for the actual run.** Nonzero-delta states are not newly exercised by these reports. |
+| F2 — raw attempt/capture wall | Both families now show concise phase/attempt/result-recorded/reported-exit-code/retry entries, not invocation dictionaries/raw streams. Primary runtime outcomes, checks and readiness are readable before its disclosure. Captured content remains in supporting records. CommonMark now renders **zero links** instead of interpreting the captured skill documents as 120 links in the narrative. | **Major defect fixed.** Minor Markdown block-separation issue remains, described below. |
+| F3 — incomplete family explanations | Combined HTML now shows separate baseline/candidate expectation outcomes and reasons. Runtime HTML and Markdown now identify suite `task32-agent-runtime-native-tool`, agent `general`, runtime execution, the authored `read`/path/success/marker assertion and associated successful observation, two semantic expectation-met results, forbidden-rule-not-violated result, declared trap observation/evidence, checks and readiness. Its judge summary explicitly disclaims independent semantic assessment. | **Fixed for the actual run.** Compact JSON fragments in the authored predicate/observed result are supporting inline values, no longer a full-record decoding task. |
+| F4 — runtime open-evidence reflow | With all disclosures open, **both** reports measure `scrollWidth=320` at `innerWidth=320` and `scrollWidth=1280` at desktop width 1280; no right-edge overflowing elements found. Runtime's deep evidence is now visible inside the viewport, not pushed beyond 1520 px. Actual browser 200% zoom additionally passes, as below. | **Fixed and rechecked.** No overflow-hiding workaround was observed. |
+
+The summary-first skill → case → five iterations structure, all 14 combined anchors, explicit non-color statuses, candidate/comparison distinction, native focus/disclosure behavior and attribution remain intact. Every case's captured facts remain present: **10/10 combined and 1/1 runtime** Markdown JSON fences decode exactly to their JSON case projections, including when read back from the rendered host's `pre > code` text. HTML disclosure primitive values match the same projections with multiplicity, with no missing scalar found. This also rechecks literal captured code fences, backticks, loaded skill documents and escaped newlines actually present in these records. It does not certify adversarial input not present in them.
+
+### Actual browser zoom, not CSS or pinch zoom
+
+Reasonable recovery closed the previous real-zoom evidence gap. `/tmp/opencode/pr89-task33-browserzoom.mjs` launches disposable Chromium profiles and sets **Chrome's actual default browser zoom** via `chrome.settingsPrivate.setDefaultZoom(2)` on `chrome://settings/appearance`, then opens the reports. The corresponding getter returns `2`. Browser measurements distinguish this from the earlier CSS-zoom approximation:
+
+| Condition | Outer width | CSS inner width | Device pixel ratio | Root CSS zoom | Visual viewport scale | Document width, both reports |
+| --- | --- | --- | --- | --- | --- | --- |
+| Browser zoom 100% | 1280 | 1280 | 1 | 1 | 1 | 1280 |
+| Browser zoom 200% | 1280 | 640 | 2 | 1 | 1 | 640 |
+
+At actual 200% browser zoom, all evidence remains open, no right-edge overflow is detected, and the enlarged runtime disclosure is visibly readable. CDP screenshots after native scrolling and repaint were used: Playwright's ordinary screenshot clip was undersized under real browser zoom, so those intermediate cropped screenshots are **not** the visual proof. Evidence files: `browserzoom100.json`, `browserzoom200.json`, and `*-open-browserzoom200-cdp.png` in the follow-up directory.
+
+Selected follow-up screenshots retained beside this report: `followup-runtime-desktop.png`, `followup-runtime-open320.png`, `followup-runtime-browserzoom200.png`, `followup-commonmark.png`. The original screenshot files retain their historical meaning; they are not evidence of the corrected implementation.
+
+### Remaining advisories and limits
+
+- **Minor, implementation advisory:** combined Markdown still lacks blank block separators. In the named CommonMark host, “Candidate result” is appended to the final baseline expectation bullet, and short attempt entries run together after the final candidate bullet. Explicit side/phase labels preserve attribution, values remain intact, and the raw wall is gone; this is not the original major F2 failure. Separate paragraphs/list sections would improve scanning. `retry None` is truthful to the stored absence but less clear than “no retry decision recorded.” No new recovery promise is implied.
+- **Advisory:** supporting HTML remains a verbose full-record tree. More directly titled capture subsections would improve long investigations; this is not a missing-capture or outcome-reading blocker in these observed runs. Preserve the exact backing records and current native controls.
+- **Still unverified:** screen-reader announcements/AT compatibility, forced-colors/comprehensive contrast, other Markdown hosts, FAIL/NON-EVIDENCE/error/retry or redacted/truncated capture states, nonzero/negative deltas and adversarial labels absent from these actual runs. All observed jobs pass with single attempts and neutral comparisons. No blanket WCAG, general renderer-state coverage or independent semantic grading claim is made. **Actual 200% browser zoom is no longer unverified for these two reports.**
+
+No remaining reproduced major report defect or missing product capability was found in this targeted reassessment. No user-owned design choice was introduced. Task 4.1 independent final review and Task 4.2 current GitHub readiness remain separate; this reviewer did not inspect current GitHub state or decide the external merge blocker. Plan Task 3.3 records this bounded acceptance, not approval of those later tasks.
+
+Follow-up documentation checks: both this report and the updated plan pass single-file OKF validation with their existing `Report` / `plan` vocabulary (zero errors/warnings/notifications). Dangling-reference inspection remains at the same 11 pre-existing findings outside the new follow-up content; no graph profile is loaded. No shared index/log was added or changed.
+
+## Historical initial verdict — d2a7c58 (superseded by follow-up above)
 
 **Product assessment: FAIL. QA: FAIL for readable-report completion.** Actual report observation is now available, but Task 3.3 cannot pass: incorrect percentages, raw invocation dumps in the primary reading layer, incomplete readable family outcomes, and runtime HTML reflow failure remain. These are implementation corrections, not requests for a new design. The execution/persistence evidence in Task 3.2 is not invalidated; affected human-readable outputs need regeneration from those same verified runs and reassessment after correction.
 
@@ -57,7 +99,7 @@ The initial probe's skill disclosure had already been opened during keyboard nav
 
 All actual jobs here pass, all comparisons are neutral, all attempt counts are one, and no capture truncation was exercised. This dataset cannot prove readable FAIL/NON-EVIDENCE/error/retry handling, nonzero/negative delta, differing iteration verdicts, unavailable comparison, or redacted/truncated capture behavior. Those states remain unverified here, not implicitly approved by successful neighboring checks.
 
-## Required corrections
+## Historical required corrections at d2a7c58
 
 ### F1 — Scores are displayed 100 times too small
 
@@ -103,11 +145,11 @@ All actual jobs here pass, all comparisons are neutral, all attempt counts are o
 - The raw-stream disclaimer and exact same-report backing records are useful. Correcting the primary layer should not discard “duplicate” capture facts or change capture/redaction policy.
 - Actual 200% browser zoom, assistive-technology announcements, diverse failure/retry states, and adversarial literal labels/captures beyond those present in these runs remain unproven. CSS zoom is not substituted for browser zoom. No blanket WCAG or independent semantic-judge-quality claim is made.
 
-## Handoff
+## Historical handoff at d2a7c58
 
 Renderer owner: correct F1–F4 in `runner/eval_output.py`, with focused tests that assert readable facts outside raw trees/disclosures and named-host literal rendering. Product integrator: regenerate affected Markdown/HTML through public persisted-run rendering of the **same** two verified runs; keep previous output provenance honest. Designer/follow-up reviewer: reassess regenerated outputs, particularly numeric truth, family explanations, attempt scan, capture attribution and runtime open-evidence reflow. No new model run is implied by these presentation corrections.
 
-There is no user-owned taste/scope decision or identified missing backing capability: the needed facts already exist in these actual projections. No new stories/scenarios were authored; this validates accepted journeys, not new behavior. Task 3.3 stays not accepted until findings are corrected and rechecked. Task 3.2's machine-path proof is separate from this report-experience failure, and neither establishes PR merge readiness.
+There was no user-owned taste/scope decision or identified missing backing capability: the needed facts already existed in these actual projections. No new stories/scenarios were authored; this validates accepted journeys, not new behavior. At that initial observation Task 3.3 was not accepted; the targeted reassessment above supersedes this disposition after correction. Task 3.2's machine-path proof and PR merge readiness remain separate.
 
 Skills loaded: `design-validation`, `accessibility-design`, `accessibility-implementation`, `okf-authoring`. Installed `design-validation/ASSESSMENT.md` and `QA.md` lenses were read directly after Loom companion calls were denied because the configured designer lacks assessment/qa roles. No role configuration was altered and no privileged QA registration is claimed; these are the designer's own evidence-backed product assessment/QA judgments. The QA pass through alternate family, narrow viewport, raw-data parity and actual CommonMark rendering found failures despite improved status headings and preserved data.
 

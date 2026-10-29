@@ -299,6 +299,7 @@ def test_render_run_projects_one_verified_result_without_invocation(tmp_path, mo
             "id": "decision", "agent": "assistant", "execution": "role-decision",
             "requirements": ["BR-1"], "prompt": "Choose <safely>", "trap": "fabricate",
             "expectations": ["good", "safe"], "must_not": ["fake"],
+            "output": {"contains": ["target response"]},
         }],
     }))
     artifact_dir = tmp_path / "artifacts"
@@ -318,6 +319,8 @@ def test_render_run_projects_one_verified_result_without_invocation(tmp_path, mo
     ])
     assert run_command(json_args, invoker)[0] == EVAL_EXIT_PASS
     canonical = json.loads(json_target.read_text(encoding="utf-8"))
+    assertion = canonical["cases"][0]["family_result"]["assertions"][0]
+    assert assertion["observed"] == {"source_urls": [], "final_text": "target response"}
     for format in ("json", "yaml", "markdown", "html"):
         target = tmp_path / f"result.{format}"
         render = parser().parse_args([
@@ -336,16 +339,18 @@ def test_render_run_projects_one_verified_result_without_invocation(tmp_path, mo
         elif format == "markdown":
             assert "## Run " in rendered and "### Case decision" in rendered
             assert '"pass"' in rendered and "semantic_judge" in rendered
-            assert "Assertions:" in rendered and "Evidence readiness:" in rendered
+            assert "Assertion (output): pass" in rendered and "Evidence readiness:" in rendered
             assert "attempt 1 — result recorded" in rendered
             assert "attempt 1 result {" not in rendered
+            assert '"final_text": "target response"' in rendered
         else:
             assert "<main>" in rendered and "<h1>" in rendered
             assert "<section><h2>Run " in rendered and "<section><h3>Case decision" in rendered
-            assert "Assertions:" in rendered and "Evidence readiness:" in rendered
+            assert "Assertion (output): pass" in rendered and "Evidence readiness:" in rendered
             assert "Choose &lt;safely&gt;" in rendered
             assert "attempt 1 — result recorded" in rendered
             assert "overflow-wrap:anywhere" in rendered
+            assert '&quot;final_text&quot;: &quot;target response&quot;' in rendered
         assert len(invoker.specs) == invocations
         assert (artifact_dir / "run.json").read_bytes() == manifest_before
 
@@ -604,7 +609,7 @@ def test_skill_eval_runs_four_phases_and_preserves_comparison_and_pair_integrity
     (root / "skills" / "helper" / "SKILL.md").write_text("Method", encoding="utf-8")
     source = tmp_path / "skill.json"
     source.write_text(json.dumps({"skill": "helper", "cases": [{
-        "id": "smoke", "prompt": "Help", "expectations": ["useful"],
+        "id": 1, "prompt": "Help", "expectations": ["useful"],
         "negative_expectations": ["leaks"], "trap": "unsafe",
     }]}))
     artifact_dir = tmp_path / "artifacts"
@@ -627,15 +632,15 @@ def test_skill_eval_runs_four_phases_and_preserves_comparison_and_pair_integrity
     store = RunArtifactStore(artifact_dir, manifest["run_id"])
     job = build_run_plan(
         manifest["run_id"],
-        (NormalizedCase("skill:helper:smoke", ("skill:helper:smoke",), "standard", None, {}),),
-        selectors=("skill:helper:smoke",), select_all=False,
+        (NormalizedCase("skill:helper:1", ("skill:helper:1",), "standard", None, {}),),
+        selectors=("skill:helper:1",), select_all=False,
     ).jobs[0]
     identity = artifact_identity_for_job(manifest["run_id"], job)
     artifact = store.read_paired_job_artifact(identity)
     family = artifact["project_metadata"]["runner_eval"]
     skill_result = family["family_result"]
-    assert family["case_id"] == "skill:helper:smoke"
-    assert skill_result["case_identity"]["source_id"] == "smoke"
+    assert family["case_id"] == "skill:helper:1"
+    assert skill_result["case_identity"]["source_id"] == 1
     assert skill_result["ablation"]["candidate"]["skill_outcome"]["trap"] == {
         "declared": True, "text": "unsafe", "observed": False, "evidence": "not observed"
     }
@@ -669,17 +674,17 @@ def test_skill_eval_runs_four_phases_and_preserves_comparison_and_pair_integrity
             result = yaml.safe_load(text)
             assert result == paired_canonical
             result = result["cases"][0]
-            assert result["family_result"]["case_identity"]["source_id"] == "smoke"
+            assert result["family_result"]["case_identity"]["source_id"] == 1
         elif output_format == "markdown":
-            assert "### Case smoke" in text and "Canonical case ID: skill:helper:smoke" in text
+            assert "### Case 1" in text and "Canonical case ID: skill:helper:1" in text
             assert "Baseline:" in text and "percentage points" in text
             assert "baseline-target" in text and "candidate-target" in text and "delta_pp" in text
             assert "100.00%" in text and "1.00%" not in text
         else:
-            assert "<main>" in text and "<h3>Case skill:helper:smoke" in text
+            assert "<main>" in text and "<h3>Case skill:helper:1" in text
             assert "baseline-target" in text and "candidate-target" in text
             assert "100.00%" in text and "1.00%" not in text
-            assert text.index("<section><h2>Run ") < text.index("<section><h3>Case skill:helper:smoke") < text.index("</section>")
+            assert text.index("<section><h2>Run ") < text.index("<section><h3>Case skill:helper:1") < text.index("</section>")
     validate_output_model(paired_canonical)
     misplaced_v1 = json.loads(json.dumps(paired_canonical))
     misplaced_v1["cases"][0]["family_result"]["case_identity"]["source_path"] = str(source)
