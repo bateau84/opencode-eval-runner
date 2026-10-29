@@ -1,297 +1,363 @@
 ---
 type: plan
-title: Runner-owned evaluation input and output contracts
-description: Specify, implement, and prove both evaluation input families and four output formats behind the existing runner evaluation interface.
-tags: [active, plan:runner-evaluation-format-contracts, evaluation, contracts]
+title: Runner-owned evaluation contracts — PR #89 completion
+description: Close source-backed contract, CI, report, documentation, and product-proof gaps before deciding whether PR #89 is mergeable.
+tags: [active, plan:runner-evaluation-format-contracts, evaluation, contracts, pr-89]
 ---
 
 ## Goal
 
-Deliver runner-owned contracts for agent/runtime suites and skill-owned cases, and JSON, YAML, Markdown, and HTML results, through one public `eval` interface. Preserve family semantics and existing integrity-checked JSON artifact guarantees. Built-in target and judge invocations are OpenCode-only; existing `--profile` mode remains unchanged and transport-flexible. Keep evaluation orchestration and parsing/rendering host-owned; `invoke` and its image continue to perform exactly one isolated invocation per call. Built-in retry default is zero. A conforming format is rendered from verified persisted results and requires a family-owned result for every planned job; pre-result errors/not-run jobs are not fabricated into results.
+Complete and verify the unfinished evaluation-format branch and PR #89 against the accepted runner-owned input/output contracts. Do not implement work while planning, claim mergeability before the current GitHub blocker is known, or reinterpret accepted requirements to fit the current code.
 
-**Execution-plan alignment:** This document's original task numbering and phase prose predate the current Loom Plan revision 13. The Loom Plan is the executable task graph; use its stable task IDs rather than this document's legacy numeric labels. The current graph includes the completed base contract work and combined-skill follow-up (`multiskill-architecture`, `multiskill-inputs`, `multiskill-renderers`, `multiskill-e2e`, `multiskill-renderer-responsive-fix`, `multiskill-design-validation`, and `multiskill-user-docs`), followed by final review and `commit-multiskill-followup`. The historical `docs-repair` task is closed; current README, eval-usage, and local-plan edits belong to `multiskill-user-docs`. This local plan records scope and evidence, not a competing schedule or task assignment.
+The target is both input families through the existing public `eval` interface; verified JSON/YAML/Markdown/HTML projections; preserved agent/runtime and skill-ablation semantics; readable attributed reports; and trustworthy CI and assembled-product evidence. Existing `--profile` behavior and the one-invocation image boundary remain unchanged.
 
-## Current evidence and remaining gates
-
-This status snapshot reconciles the plan with evidence available on 2026-10-16; it is not a ship-readiness verdict.
-
-| Work/evidence | Current disposition |
-| --- | --- |
-| Provider-free assembled E2E | Evidence at `/tmp/opencode/assembled-e2e-no-db-20261016T093439` records successful, same-run four-format results for agent/runtime run `4a7930d9847049cea88d364f003722a9` and skill run `ff52fc71eb2c498d8c4edd16f7fa0015`. The local deterministic provider was substituted; this proves those provider-free runs, not whole-workflow absence of network egress. |
-| Combined-skill E2E | Public built-in skill eval run `bd56d8fa2e6b420fb44c764462097bfd` used explicit inputs `skills/python-testing/evals/evals.json` and `skills/python-error-handling/evals/evals.json`; each had five iterations (10 case-iteration jobs), all passed, and comparisons were reported as compared/pass. The real runner path and renderers were used; a deterministic local provider was the external substitution. JSON/YAML/Markdown/HTML were derived from the same verified run. Evidence is recorded under `/tmp/opencode/combined-skill-e2e-rerun-20261016T213217/`. This is provider-free, not proof of whole-workflow no-egress. |
-| Safety preflight | Preflight evidence records the approved immutable local image and an inspected internal Podman network before E2E. This is bounded to the tested setup and does not resolve historical registry-transfer activity. |
-| Renderer correction | Case headings were nested beneath run headings, and both saved runs were rerendered from their existing verified results at `/tmp/opencode/renderer-heading-fix-20261016T`; no evaluation rerun was needed. |
-| Combined report/browser validation | The combined renderer was corrected and the same saved run rerendered. Offline browser checks of the final HTML at 1440, 390, and 320 CSS-pixel widths found no horizontal overflow; skill/case/iteration hierarchy, all 10 iteration entries, comparisons and expanded evidence remained present. The final inspected report is `/tmp/opencode/multiskill-responsive-fix-bd56d8fa-rerender/report.html`; supporting evidence is under `/tmp/opencode/multiskill-rerender-browser-check/` and `/tmp/opencode/multiskill-responsive-fix-bd56d8fa-rerender/`. This is bounded browser evidence, not a WCAG or assistive-technology conformance claim. |
-| Combined-skill automated tests | Implementer-reported `PYTHONPATH=. pytest -q` completed with 297 passed and 123 subtests passed; targeted ruff, format, compileall, and diff checks were also reported passing. These are recorded implementation reports, not rerun as part of this documentation-only update. |
-| Historical GHCR activity | Audit evidence confirms that two earlier GHCR pull attempts transferred nine blobs plus config and manifest. Whether transferred layers remain in local cache/storage and the amount of data transferred are unknown. The user explicitly accepts this confirmed historical egress as a non-blocking exception. This does not mean no transfer occurred and neither local internal-network E2E nor the audit supports a whole-workflow no-egress claim. |
-| Remediation/review | BR/OC frontmatter and bundle/index/log validation are complete. The temporary internal Podman network was removed and its cleanup verified. Final critic: **APPROVED** for the combined multi-skill/readability follow-up, with caveats: the two earlier GHCR pull attempts transferred nine blobs plus config and manifest; local retention and transfer volume remain unknown; the user's acceptance makes this a non-blocking exception only. No whole-workflow no-egress claim is supported, and live-provider behavior remains untested. The separate `commit-multiskill-followup` task remains pending. |
+**Status basis:** branch `feat/evaluation-format-contracts`, HEAD `1b729fac44c98646718886224e0b50766383a71b`, base `1262ac8c2eebbd10af572e3e3560318f6113233b`, PR #89. These identifiers were supplied in the review handoff and confirmed from this checkout; the worktree was clean when inspected. The accepted plan's old delivery snapshot predates the current review and is superseded below. Historical green tests, review opinions, and prior `/tmp` artifacts are not proof that the current HEAD satisfies these tasks.
 
 ## Plain-language task map
 
 > Reader aid only. Task details, acceptance criteria, and dependencies govern if this ever differs.
 
-### Phase 1: Ground and specify
-| Task | What this actually does |
-| --- | --- |
-| 1.1 | Establishes current source semantics and compatibility surfaces relevant to the contracts. |
-| 1.2 | Defines precise input, output, compatibility, interface, and accessible-view contracts. |
+### Phase 1: Establish actual blockers and make CI exercise the tests
 
-### Phase 2: Implement runner-owned paths
 | Task | What this actually does |
-| --- | --- |
-| 2.1 | Accepts both distinct case families through `eval` and carries their meanings into evaluation results. |
-| 2.2 | Produces four conforming views of verified results without changing durable JSON guarantees. |
+| ---- | ------------------------ |
+| 1.1 | Finds and records the exact current reason GitHub blocks merging PR #89, without guessing from stale check summaries. |
+| 1.2 | Ensures the CI test job discovers and runs the pytest modules that currently hold evaluation-contract coverage. |
 
-### Phase 3: Integrate and prove
+### Phase 2: Restore implementation conformance
+
 | Task | What this actually does |
-| --- | --- |
-| 3.1 | Proves both assembled family paths and same-run format views end-to-end. |
-| 3.2 | Independently validates real Markdown and HTML views against the approved design baseline. |
-| 3.3 | Independently checks implementation and evidence against approved contracts before shipping. |
-| 3.4 | Performs the final critic gate after reviewer findings have a verified disposition. |
-| 3.5 | Reconciles architecture, runner, responsibility, and usage documentation with ARD-001/ARS-001. |
+| ---- | ------------------------ |
+| 2.1 | Makes runtime evidence readiness reflect the fields actually required by each assertion, preserving valid runtime evaluations. |
+| 2.2 | Aligns combined-result identity, provenance, timestamp, and undeclared-trap values with the closed output contract. |
+| 2.3 | Makes Markdown and HTML explain outcomes and per-iteration ablation results instead of presenting only field trees. |
+
+### Phase 3: Reconcile documents and prove the assembled product
+
+| Task | What this actually does |
+| ---- | ------------------------ |
+| 3.1 | Removes stale planning and requirements-index statements without weakening accepted requirements or mislabeling planned work as done. |
+| 3.2 | Runs real agent/runtime and combined-skill evaluations and compares every format against the verified runs. |
+| 3.3 | Checks the actual generated Markdown and HTML against the approved readable-report experience. |
+
+### Phase 4: Close review and merge readiness
+
+| Task | What this actually does |
+| ---- | ------------------------ |
+| 4.1 | Independently checks fixes and evidence against all accepted guarantees and the review findings. |
+| 4.2 | Rechecks GitHub's current merge conditions and records a supported ready/not-ready disposition for PR #89. |
 
 ### Important task relationships
-- Task 1.1 informs specification; it does not decide compatibility/report scope for the user.
-- Tasks 2.1/2.2 can parallelize only after a stable shared result contract and disjoint write surfaces; Task 3.1 integrates after both.
-- Skill ablation retains baseline/candidate comparison meaning, not merely ordinary pass/fail.
-- The current Loom Plan's `independent-review` and `final-critic` tasks are separate gates. The closed `docs-repair` task owns only its historical changes; the combined follow-up documentation belongs to `multiskill-user-docs`. This local plan's original numeric labels are not live Loom task identities.
+
+- Task 2.2 precedes 2.3 because report summaries must consume the corrected, contract-conforming result projection; the shared `runner/eval_output.py` surface also makes this a deliberate serialization boundary.
+- Task 3.2 depends on implementation and documentation work. It must use real product-owned runner, invocation, persistence/verifier, and renderer paths; unit tests or injected state do not prove the user outcome.
+- Task 3.3 depends on the actual reports produced by 3.2; it is separate from E2E execution because design validation has an independent owner and human-centered evidence boundary.
+- Task 4.2 is a merge-readiness check, not an assumption that the blocker found in 1.1 is caused by these code findings.
 
 ### Whole plan in one sentence
 
-Inventory sources → specify contracts and gate user-owned choices → implement both families and four formats behind host `eval` → reconcile docs → prove and independently review → final critic gate.
+Identify the actual merge blocker → repair CI and contract gaps → reconcile stale documentation → prove both real evaluation journeys and readable outputs → independently review → report current merge readiness.
 
 ## Assumptions
 
-- **[ASSUMPTION]** Approved requirements and ARD-001 bind scope and architecture; detailed schema and serialization are for the specification task.
-- **[ASSUMPTION]** Baseline Markdown/HTML are functional views of the same result, not a polished report; ARS-001 disclaims a WCAG conformance-level claim and richer report scope.
-- Historical input migration and external v1 consumer compatibility remain unpromised. The existing `--profile` mode remains additive and transport-flexible; built-in target/judge transport is OpenCode-only by user decision.
+- **[ASSUMPTION]** The approved requirement bundle, ARD-001, ARS-001, and combined-report design below remain authority; the findings are to be corrected against them, not used to revise them.
+- **[ASSUMPTION]** Existing CI policy permits adding the pinned pytest execution to the current test job; if CI ownership or policy says otherwise, task 1.2 returns that decision to the workflow owner rather than silently omitting tests.
+- **[CONCERN]** The PR's actual merge-block reason is unknown. A green set of visible checks does not explain a `BLOCKED` merge state; task 1.1 is required before making a merge-readiness claim.
 
 ## Out of scope
 
-Polished report beyond functional baseline views; image-side orchestration; universal assertion language or semantic conversion; unauthorized historical input migration/external artifact compatibility promises; provider/spend compatibility claims; simultaneous output of multiple formats.
+- Implementing code or changing the PR during this planning assignment.
+- New product capabilities, assertion semantics, output fields, aggregation, or compatibility promises.
+- Reopening the user-accepted historical GHCR transfer as a blocker. It remains a known historical exception, not evidence of no egress and not part of this remediation.
+- Claiming a live-provider compatibility, no-network-egress, WCAG conformance-level, or merge-readiness result without corresponding evidence.
 
 ## Sources
 
 | Source | Status and use |
 | --- | --- |
-| [Requirements bundle](../requirements/eval-format-ownership/index.md): BR-001–003, OC-001–002 | Approved: two distinct inputs, four output formats, one interface, invalid/ambiguous rejection and same-result representations. Exact schemas and historical compatibility remain open. |
-| [ARD-001](../architecture/eval-format-ownership/design/ard-001-runner-owned-input-and-output-contracts.md) | Critic-approved for planning; governs host family adapters/shared orchestration, verified result/rendering, v1 artifact integrity, one-invocation boundary and accessibility. Detailed compatibility/content remain open. |
-| [Handoff](../eval-format-ownership-handoff.md) | Intent and pinned Loom source provenance: `f0e1a78ce2e2171d9b9a755e5d1f323e02994bab`. |
-| [Old engine architecture](../eval-engine-architecture.md), [runner contracts](../eval-engine-runner-contracts.md), [responsibility inventory](../loom-eval-runner-responsibility-inventory.md), [eval usage](../eval-usage.md), [invocation usage](../invocation-usage.md) | Existing docs to reconcile, not authority narrowing new requirements. Paths verified; detailed content inventory belongs to Task 1.1. |
-| [runner/eval_api.py](../../runner/eval_api.py), [runner/eval_artifacts.py](../../runner/eval_artifacts.py) | Inspected current profile API and artifact persistence/validation; current run/artifact/paired v1 envelopes and integrity are preserved unless authorized otherwise. |
-| Designer report guidance (conversation) | Markdown/HTML are accessible views of the same result; polished report optional/user-owned. |
-| Architecture bundle log | Critic reported a nonblocking malformed-entry caveat in `get_log`; no impact on approved ARD and no assumption of a defect. |
+| [Requirements index](../requirements/eval-format-ownership/index.md), [BR-001](../requirements/eval-format-ownership/br-001-accept-both-input-contract-families.md), [BR-002](../requirements/eval-format-ownership/br-002-own-output-contracts-across-named-formats.md), [BR-003](../requirements/eval-format-ownership/br-003-provide-one-user-facing-evaluation-interface.md), [BR-004](../requirements/eval-format-ownership/br-004-present-readable-markdown-and-html-results.md), [BR-005](../requirements/eval-format-ownership/br-005-evaluate-multiple-skill-inputs-together.md), [OC-001](../requirements/eval-format-ownership/oc-001-evaluation-case-input-conformance.md), [OC-002](../requirements/eval-format-ownership/oc-002-evaluation-output-conformance.md), [QS-001](../requirements/eval-format-ownership/qs-001-readable-multi-skill-five-iteration-reports.md) | Approved product authority. Preserve both distinct families, one interface, all four representations, readable outcome narratives, combined skill attribution, and separate per-skill comparisons. The requirements index contains a stale statement that the multi-input architecture is still unresolved; reconcile its factual status without changing requirement meaning. |
+| [ARD-001](../architecture/eval-format-ownership/design/ard-001-runner-owned-input-and-output-contracts.md) | Proposed architecture governing host-owned family adapters, verified persisted results, existing artifact integrity, invocation boundary, and combined-input provenance. |
+| [ARS-001](../architecture/eval-format-ownership/specifications/ars-001-runner-eval-contract.md) | Proposed implementation contract. Relevant exact rules include assertion-scoped runtime readiness (§117); closed result fields and undeclared trap nulls (§§356–412); v2 provenance fields at the `RunResultV2.input.inputs[]` / `CaseResultV2` projection, not inside closed `SkillResult.case_identity` (§§414–441); `run.created_at` (§§247–267); and output eligibility (§321). |
+| [Combined skill report baseline](../design/eval-format-ownership/multiskill-readable-report-baseline.md) | User-approved design authority for status-first narrative, skill → case → iteration structure, per-iteration baseline/candidate comparisons, complete same-report evidence, and narrow-viewport/keyboard checks. |
+| Prior version of this plan | It recorded implementer-reported 297 pytest passes plus 123 subtests and prior provider-free runs/browser checks. Those are historical claims, not rerun here, and do not establish hosted pytest coverage or the real-OCI evidence missing for current HEAD. The prior plan also recorded two GHCR pull attempts transferring nine blobs plus config/manifest; the user accepted that known historical egress as non-blocking, while local layer retention and byte volume remained unknown. |
+| [PR #89](https://github.com/bateau84/opencode-eval-runner/pull/89), reviewed diff at the stated HEAD, and reviewer finding record | PR status is unresolved; code-backed findings and evidence limits are carried forward. The review was not genuinely blind because earlier verdict excerpts were present in automatic context. |
+| Current repository evidence | `runner/eval_evidence.py`, `runner/eval_builtin.py`, `runner/eval_output.py`, `.github/workflows/ci.yml`, and the test suite were reviewed for the bounded findings. Exact reviewer line references and reproductions are in the review handoff; no implementation was changed during this planning task. |
 
 ## Obligation map
 
-| Obligation | Satisfier / owner | Verification | Disposition |
-| --- | --- | --- | --- |
-| BR-001 / OC-001: distinct agent/runtime and skill contracts, reject invalid/ambiguous input before evaluation, preserve each meaning | ARD-001; Task 1.2 specifies, 2.1 implements | Contract tests; E2E-001/002 with real files and execution | Implement |
-| BR-002 / OC-002: all four conforming formats represent same result; failed production not successful | ARD-001; Task 1.2 specifies, 2.2 implements | Local parity and E2E-001/002 each compare all four separately obtained representations against one completed, verified source result; corruption/output-failure checks | Implement |
-| BR-003: both families, evaluation and format selection via one public interface | ARD-001 existing `eval`; Tasks 1.2/2.1/2.2; Task 3.1 proves | Same public entry in both E2E scenarios | Implement |
-| Family provenance/semantics survive shared orchestration | ARD-001 family-tagged result; Task 2.1 | Local adapter and vertical input-to-durable-record proof; E2E | Implement |
-| One-call invocation boundary; host owns orchestration/retries/artifacts/rendering | ARD-001 and invocation architecture; Task 2.1/3.1 | Invocation regression and E2E with real host/image | Implement |
-| Preserve current integrity-checked JSON artifacts; no silent v1 reinterpretation | ARD-001; Tasks 1.2/2.2 | v1 schema/integrity regressions and corrupt-record E2E | Implement |
-| Accessible Markdown/HTML (structure/order, non-color status, keyboard access to any interaction) | ARD-001; Task 1.2 specifies criteria | Renderer tests and real generated-document check in 3.1 | Implement |
-| Exact contract fields, interface grammar, semantic mapping | Task 1.2 realizes ARD-001 | Spec review becomes implementation/test baseline | Implement |
-| Historical input aliases/migration and external v1 consumers | User/product owner | No compatibility claim until decided | No alias/migration/external-reader compatibility promise; preserve existing profile mode and its transport flexibility |
-| Polished report beyond accessible baseline | User/product owner | No richer-report claim absent authorization | Out of scope by agreement in BR-002 baseline; deferred |
+| Obligation | Architectural satisfier | Owner / task | Verification path | Disposition |
+| --- | --- | --- | --- | --- |
+| Runtime readiness is scoped to fields needed by the selected assertion; a complete canonical runtime capture is not rejected for unrelated missing fields. | ARS-001 §117; ARD-001 host family adapter boundary | Runner implementation, 2.1 | Focused regressions for complete canonical runtime evidence and each assertion's required fields; real agent/runtime E2E in 3.2 demonstrates a valid run reaches the intended judge gate. | Implement |
+| CI executes all evaluation tests, including the three pytest modules currently missed by unittest discovery. | CI/test contract is repository-owned; no product architecture change | CI owner, 1.2 | CI job evidence lists these modules as executed and fails when a regression is introduced; preserve deterministic unit tests. | Implement |
+| Closed `SkillResult.case_identity` stays closed; combined input provenance is represented only in the agreed v2 projection locations. | ARS-001 §§356–441; ARD-001 provenance invariant | Runner output owner, 2.2 | Schema/conformance regressions assert exact field ownership, strict rejection of unknown fields, and source occurrence attribution after verified result round trip. | Implement |
+| Run creation timestamp is present in combined human-facing outputs as required by the result contract. | ARS-001 `RunResult.created_at` §§247–267 | Runner output owner, 2.2 | Projection and renderer tests check timestamp against the same verified run; E2E report check in 3.2. | Implement |
+| Undeclared trap has the contract's unavailable/not-applicable null outcome, not a fabricated observed-false/evidence value. | ARS-001 §§412; family semantics remain as specified | Runner output owner, 2.2 | Local input-to-result and strict output conformance tests distinguish undeclared trap from declared-but-not-observed trap. | Implement |
+| Markdown/HTML provide readable run and per-case outcomes, attribution, iteration status and comparison, while retaining full captured detail. | ARD-001; ARS-001 §28; BR-004/BR-005; QS-001; approved report baseline | Renderer owner, 2.3 | Renderer contract tests plus generated report review against actual multi-skill/five-iteration verified run and design checks in 3.2. | Implement |
+| Both input families, one interface, output parity, and skill-only paired ablation retain their accepted semantics. | ARD-001 and ARS-001 | Runner + integrator, 2.1–3.2 | Local contract/vertical tests and the two E2E scenarios below; every output derived from the same verified run. | Implement |
+| Stale plan and requirements-index status is corrected; requirements and existing `--profile` promise are not rewritten. | Documentation policy; approved requirements and architecture | Documentation owner, 3.1 | Link/metadata validation; read-back confirms no accepted contract changed and planned vs executed evidence is distinguished. | Implement |
+| PR #89's exact current merge blocker is identified and final merge state is truthfully reported. | External GitHub repository state | Integrator, 1.1 and 4.2 | Capture current required-check/review/branch-protection/mergeability evidence and the GitHub reason; recheck after fixes. | Implement |
+| Prior review's real OCI, combined five-iteration, and current-browser/report evidence gaps are closed. | ARD-001; ARS-001; report baseline | Integrator and design reviewer, 3.2–4.1 | Real product-owned paths and produced-state provenance; record provider/image/config, artifacts, outcomes, and evidence locations. | Implement |
+| Historical GHCR transfer / local retention uncertainty | No new architectural satisfier required; user accepted the known transfer as a non-blocking exception | User disposition already recorded in source plan history | Do not claim no transfer or whole-workflow no-egress; carry the known caveat only. | Out of scope by agreement |
 
 ## Risk boundaries
 
-- **Source drift:** Task 1.1 checks pinned Loom formats/features against handoff before contract scope is finalized; no undocumented aliases or silent narrowing.
-- **Compatibility:** Until user decisions, preserve v1 structure/integrity and make no historical/migration claim. If spec cannot satisfy preservation plus new contracts, pause only affected scope and return to user/architect authority.
-- **Semantic loss:** Opaque metadata alone is not proof. Task 2.1 proves real source input to family-tagged verified result, including both ablation sides/comparison.
-- **Representation/accessibility drift:** Task 2.2 compares views with verified durable facts; Task 3.1 checks actual Markdown/HTML against specified criteria.
-- **Image boundary:** Suite orchestration stays host-side; actual `invoke` remains one isolated invocation per call.
+- **Merge-state uncertainty (blocks readiness claim only):** GitHub's precise blocked reason could be branch protection, a required check/review, or another condition. Task 1.1 records current evidence and narrows the relevant follow-up; it does not delay source-backed fixes.
+- **Input-to-judge semantic boundary:** Current readiness logic can reject a valid canonical capture before the judge. Fix and test this boundary before treating unit-test status as evidence of the expected agent/runtime outcome.
+- **Closed result schema boundary:** Misplacing source provenance inside a closed family payload can break strict conformance and round trips. Validate projection ownership, persistence verification, and rendering against ARS-001, not merely permissive serialization.
+- **Human-readable output boundary:** A renderer can be machine-conforming yet fail BR-004/QS-001. Validate against actual produced multi-skill, five-iteration results; placeholders or injected result objects are not sufficient.
+- **CI coverage boundary:** Local pytest green is not CI coverage while the workflow runs only unittest discovery. Confirm executed modules in the hosted run after changing workflow behavior.
+- **Run availability:** Actual OCI/OpenCode runs may depend on the approved local image and configured OpenCode provider. If unavailable, record the proof as UNPROVEN, retain narrower evidence, and do not substitute mocks for product-owned stages or claim completion.
+- **Review independence:** The prior assessment was evidence-backed but not blind. Task 4.1 must independently review the final diff and artifacts and disclose that lineage; its status must not imply an independent clean-room first assessment.
 
 ## End-to-end proof
 
-### E2E-001: Agent/runtime suite to four faithful views
-- Outcome: Valid agent/runtime suite runs under its own execution/assertion meaning through public `eval`; every selectable format conforms and represents that result. Invalid/ambiguous input is rejected pre-invocation.
-- Entry point: Public host `eval` command.
-- Product-owned path: Real suite file → host family validation → agent/runtime adapter → shared evaluator → host `invoke` and real one-invocation image → runtime evidence → integrity-checked durable record → JSON/YAML/Markdown/HTML projection.
-- External substitutions: Model/provider may use authorized deterministic endpoint/sandbox; retain real host invocation adapter/image. No evaluator, verifier or renderer mock.
-- State provenance: Input semantics come from submitted suite; attempts/evidence/artifact from this run; views from verified durable record.
-- Externally meaningful assertion: Same interface; family semantics retained; all four outputs conform and preserve identity/classification/attempts/assertions. Invalid input causes no invocation.
-- Failure/recovery: Test invalid/ambiguous rejection, integrity rejection and no false success on render failure; no new retry promise.
-- Human design check: Required for actual Markdown/HTML structure/order, non-color status and keyboard access for controls, per Task 1.2 criteria.
-- Executes in: Task 3.1.
+The smallest discriminating set is two scenarios: one validates agent/runtime assertion/readiness/judging semantics; the other covers combined skill provenance, paired comparisons, five-iteration report readability and all format projections. They share infrastructure but exercise materially different family semantics.
 
-### E2E-002: Skill cases and paired ablation to four faithful views
-- Outcome: Valid skill cases run via same public `eval`, retaining expectations and (for ablation) both baseline/candidate sides and skill-owned comparison; all formats represent same result. Invalid input is not treated as valid.
-- Entry point: Public host `eval` command.
-- Product-owned path: Real skill-case file → host validation → skill adapter → real target/judge or paired lifecycle → host `invoke` per attempt → verified durable side/pair result and comparison → selected format.
-- External substitutions: Model/provider may use authorized deterministic endpoint/sandbox; all product-owned evaluation, invoke, storage/verifier and renderer stages remain real.
-- State provenance: Prompts/expectations/trap conditions and sides originate in submitted input; both outcomes/comparison are produced in this run; output derives from verified records, not injected state.
-- Externally meaningful assertion: Same interface and skill meaning; sides/comparison retained; formats conform and preserve identity/classification/attempts/comparison. Invalid input is rejected pre-invocation.
-- Failure/recovery: Test malformed/ambiguous input, corrupt records and no false success on render failure; no new retry promise.
-- Human design check: Required for Markdown/HTML under same criteria as E2E-001.
-- Executes in: Task 3.1.
+### E2E-001: Agent/runtime canonical capture through verified result
+
+- Outcome: A valid agent/runtime suite completes through `eval`; assertion-scoped runtime evidence readiness permits the prescribed judge decision, and its output represents the verified result without semantic loss.
+- Entry point: Public `eval` command.
+- Product-owned path: Real suite input → host validation/agent-runtime adapter → real OpenCode invocation adapter and OCI image → runtime evidence and assertion checks → judge when the specified readiness/gate conditions hold → durable artifact and verifier → selected output renderer.
+- External substitutions: No substitution for runner, adapter, OCI image, evidence, verifier, or renderer. A genuine OpenCode-configured model/provider sandbox may replace paid/live provider service only if it preserves the needed request/response semantics; identify that limit. Do not substitute synthetic runtime evidence for evidence produced by the invocation.
+- State provenance: Submitted real suite creates the case; actual OCI/OpenCode invocation produces target output and canonical runtime evidence; runner produces checks, judge result, verified artifact; formats are derived from that artifact in this run.
+- Externally meaningful assertion: A canonical complete capture accepted under assertion-scoped readiness reaches the expected judge path; emitted classification and source assertions agree with the verified run; invalid inputs remain pre-invocation failures.
+- Failure/recovery: Assert no false pass for incomplete required evidence or target failure, and no judge where the contract says to skip; no new retry/recovery promise.
+- Human design check: Required for generated Markdown/HTML; executes in Task 3.3.
+- Executes in: Task 3.2.
+
+### E2E-002: Combined skill run through attributed five-iteration reports
+
+- Outcome: Multiple explicitly supplied skill inputs produce a single verified run with per-skill/per-case/per-iteration ablation results and readable Markdown/HTML; JSON/YAML/Markdown/HTML all represent that same run.
+- Entry point: Public built-in `eval` command, followed by its public persisted-run render mode for each selected format.
+- Product-owned path: Real explicit skill input files and installed skills → whole-set validation and source provenance → actual baseline/candidate target and judge OCI/OpenCode phases → paired comparisons and durable verified records → same-run JSON, YAML, Markdown, and HTML projections.
+- External substitutions: No mock for any product-owned component. A genuine external OpenCode provider may use an approved sandbox with documented limits; OCI invocation/image and runner product path stay real.
+- State provenance: The real submitted input bytes and occurrence order establish every source identity/digest; actual run creates both sides, comparisons, attempts and evidence; all four separately requested representations are rendered from the same verified persisted run. No hand-injected case, comparison, evidence, or results.
+- Externally meaningful assertion: Summary identifies the run outcome; each skill/case and all five iterations are separately findable with that iteration's status, baseline/candidate comparison, attempts and captured evidence. Each format matches the verified result, source attribution is retained, no cross-skill aggregate is invented, and output schema values obey ARS-001.
+- Failure/recovery: Include duplicate composite identity or invalid unselected child rejection before invocation, and ensure corrupt result/output failure cannot claim successful output. No new retry promise.
+- Human design check: Required; inspect actual Markdown and HTML against the approved structure, order, complete same-report detail, status text, keyboard navigation/disclosures, and 320 CSS-pixel / 200% zoom reflow requirements in Task 3.3. This is not a blanket WCAG conformance claim.
+- Executes in: Task 3.2.
 
 ## Phases
 
-### Phase 1: Ground and specify
+### Phase 1: Establish actual blockers and CI coverage
 
-#### Task 1.1: Inventory current source formats and compatibility surfaces [M] → owner: researcher
-Target/change surface: Read-only pinned Loom sources, `runner/eval_api.py`, `runner/eval_artifacts.py`, CLI/usage/invocation docs, old architecture/responsibility docs. No source edits.
+#### Task 1.1: Identify PR #89's current merge blocker [S] → owner: integrator
+
+Target/change surface: PR #89 current GitHub status, required checks/reviews/branch protection and mergeability; no source edits.
 Type: Research
 Nature: Research
-Applicable skill: work-decomposition, risk-driven-planning
+Execution fit: One bounded read-only observation. It resolves a material readiness uncertainty without delaying independent source fixes; retry cost is low and proof is the recorded current reason, not an inference from stale CI text.
+Applicable skill: risk-driven-planning
 Implements: [ARD-001](../architecture/eval-format-ownership/design/ard-001-runner-owned-input-and-output-contracts.md)
 Acceptance criteria:
-- [ ] Record actual shapes, optional features and semantics of both pinned Loom families; identify discrepancies with handoff/ARD.
-- [ ] Inventory current `eval`/profile surfaces, in-repo v1 artifact readers/writers/consumers and affected docs; distinguish observed from unknown external consumers.
-- [ ] Make no compatibility, migration or report decision; provide evidence and concrete questions to user/Task 1.2.
 
-#### Task 1.2: Specify input/output contracts and compatibility boundary [L] → owner: architect / design-specification owner
-Target/change surface: New implementation-facing contract spec, interface contract, accessibility criteria and Task 1.1 compatibility mapping; place in architecture bundle.
+- [ ] Record timestamp, PR/base/head, current merge state, exact blocking reason(s), required check/review conditions, and links or retrievable evidence.
+- [ ] Distinguish GitHub's actual merge blocker from the source-backed code findings in this plan; if the blocker is unavailable/ambiguous, leave merge readiness unresolved and state what evidence is missing.
+- [ ] Do not treat stale PR text or currently green checks as proof of the blocker or its resolution.
+
+#### Task 1.2: Restore evaluation pytest coverage in CI [S] → owner: CI/workflow maintainer
+
+Target/change surface: `.github/workflows/ci.yml`, pinned test dependencies, and CI test invocation; exact existing files verified in current diff.
+Type: Infrastructure
+Nature: Bug
+Execution fit: One focused workflow/test-discovery change with a discrete hosted verification boundary. It does not require changes to evaluation semantics; any workflow-policy uncertainty returns to its owner.
+Applicable skill: github-workflow, python-testing
+Implements: [ARS-001](../architecture/eval-format-ownership/specifications/ars-001-runner-eval-contract.md)
+Acceptance criteria:
+
+- [ ] CI executes the evaluation pytest modules `test_eval_input`, `test_eval_assertions`, and `test_eval_builtin_cli` that unittest discovery currently omits.
+- [ ] The hosted run visibly records pytest discovery and results for those modules; a green unittest-only run does not satisfy this task.
+- [ ] Existing tests remain covered, dependencies remain pinned/declared according to repository policy, and the full relevant CI run is green.
+
+### Phase 2: Restore implementation conformance
+
+#### Task 2.1: Fix assertion-scoped runtime evidence readiness [M] → owner: runner evaluation maintainer
+
+Target/change surface: `runner/eval_evidence.py`, `runner/eval_builtin.py`, focused evaluation tests; reviewer findings cite `eval_evidence.py:245–258, 280–281` and builtin judge gating.
+Type: Backend
+Nature: Bug
+Execution fit: One semantic boundary—from canonical evidence through requested readiness to judge eligibility—with focused local regressions. Keeping classifier and gate together avoids separately “fixing” a check that still prevents the required judge path; live OCI composition remains a later independent proof.
+Applicable skill: software-engineering, python-how-to, python-testing, test-driven-development
+Implements: [ARS-001](../architecture/eval-format-ownership/specifications/ars-001-runner-eval-contract.md) §117 and [ARD-001](../architecture/eval-format-ownership/design/ard-001-runner-owned-input-and-output-contracts.md)
+Acceptance criteria:
+
+- [ ] Evidence readiness for scalar outcome and start-sequence assertions checks the fields those assertions require, not unrelated envelope fields.
+- [ ] A complete canonical nonempty runtime capture supporting the requested assertions is accepted and reaches the ARS-001-prescribed judge gate; required-but-missing evidence remains non-evidence.
+- [ ] Tests distinguish evidence readiness from assertion outcome and cover the relevant evidence boundary/field failure cases without replacing real E2E evidence.
+- [ ] Existing classification precedence and “judge skipped on non-pass deterministic checks” behavior remain contract-conforming.
+
+#### Task 2.2: Align result projection and trap semantics to the closed contract [M] → owner: runner output maintainer
+
+Target/change surface: `runner/eval_builtin.py`, `runner/eval_output.py`, result/output tests; reviewer findings cite `eval_builtin.py:940, 956–958` and `eval_output.py:286–288, 1104–1234`.
+Type: Backend
+Nature: Bug
+Execution fit: These are coupled contract-model defects at one verified-result projection boundary: location of v2 provenance, preservation of `run.created_at`, and null semantics for undeclared trap. Local conformance tests can prove them before the separate readable-renderer work. The subsequent renderer task shares `eval_output.py` and must follow this task to avoid write collisions.
+Applicable skill: software-engineering, python-how-to, python-testing, python-type-checking
+Implements: [ARS-001](../architecture/eval-format-ownership/specifications/ars-001-runner-eval-contract.md) §§247–267, 356–412, 414–441 and [ARD-001](../architecture/eval-format-ownership/design/ard-001-runner-owned-input-and-output-contracts.md)
+Acceptance criteria:
+
+- [ ] `SkillResult.case_identity` emits only the closed family fields; input occurrence/path/digest remain in their specified v2 input/projection fields and cases retain the correct source-occurrence attribution.
+- [ ] Combined human-readable reports include the `created_at` value from the same run result.
+- [ ] An undeclared trap is represented as not applicable/null as specified; declared-but-not-observed remains distinguishable and retains its evidence semantics.
+- [ ] Local strict-schema and verified-result tests cover valid v1 and v2 outputs, reject unknown keys, and prove source provenance is not lost or moved into a closed payload.
+- [ ] No durable v1 envelope, hash/integrity behavior, or existing profile behavior changes.
+
+#### Task 2.3: Render readable attributed Markdown and HTML outcomes [M] → owner: runner report maintainer
+
+Target/change surface: `runner/eval_output.py` Markdown/HTML renderer and renderer tests; actual report must follow [combined report baseline](../design/eval-format-ownership/multiskill-readable-report-baseline.md).
+Type: Backend
+Nature: Enhancement
+Execution fit: One presentation outcome and verification boundary: turn verified result facts into narrative summaries and nested attributed details. It follows 2.2 because projection facts must first be correct; it remains separate from 2.2 because readable presentation can be independently useful and must be assessed against human-facing design, not just schema tests.
+Applicable skill: software-engineering, python-how-to, python-testing, accessibility-implementation
+Implements: [BR-004](../requirements/eval-format-ownership/br-004-present-readable-markdown-and-html-results.md), [BR-005](../requirements/eval-format-ownership/br-005-evaluate-multiple-skill-inputs-together.md), [QS-001](../requirements/eval-format-ownership/qs-001-readable-multi-skill-five-iteration-reports.md), [ARS-001](../architecture/eval-format-ownership/specifications/ars-001-runner-eval-contract.md), and [report baseline](../design/eval-format-ownership/multiskill-readable-report-baseline.md)
+Depends on: 2.2.
+Acceptance criteria:
+
+- [ ] Markdown and HTML lead with readable run outcome and then attribute skill → case → iteration; each applicable iteration includes status and its own baseline/candidate comparison, attempts, checks and evidence summary.
+- [ ] Human readers do not need to decode a raw field/value tree to identify outcomes; full captured answers/evidence and their redaction/truncation meaning remain in the same report.
+- [ ] Candidate absolute classification remains distinct from comparison decision and skill-value label; no per-skill or cross-skill aggregates are added.
+- [ ] Existing output escaping, semantic order, non-color status and keyboard-operable native interactions remain conformant to the approved baseline.
+- [ ] Renderer tests use verified-shaped source results and assert narrative facts as well as representation parity; final browser/design proof remains Task 3.2.
+
+### Phase 3: Reconcile documentation and prove assembled product
+
+#### Task 3.1: Reconcile stale plan and requirements status [S] → owner: documentation maintainer
+
+Target/change surface: `docs/plans/runner-evaluation-format-contracts.md`, `docs/requirements/eval-format-ownership/index.md`, and only affected documentation indexes/logs required by repository policy.
 Type: Documentation
 Nature: Documentation
-Applicable skill: design-specification, architectural-spec, accessibility-design, risk-driven-planning
-Implements: [ARD-001](../architecture/eval-format-ownership/design/ard-001-runner-owned-input-and-output-contracts.md)
-Depends on: 1.1; user decisions only for affected promises.
+Execution fit: One bounded consistency pass over statements made stale by actual implementation/review history. It explicitly excludes rewriting accepted BR/OC content; scope expansion discovered during reconciliation returns to the authority owner.
+Applicable skill: documentation, okf-authoring
+Implements: [ARS-001](../architecture/eval-format-ownership/specifications/ars-001-runner-eval-contract.md) and accepted [requirements bundle](../requirements/eval-format-ownership/index.md)
+Depends on: 2.1, 2.2, 2.3.
 Acceptance criteria:
-- [ ] Specify distinct boundaries and semantics for both families, including baseline/candidate meaning when ablation applies.
-- [ ] Specify one public `eval`, four selectable format contracts, shared semantic facts and rejection/output-failure behavior. For each family, define one evaluation that completes and passes verification; then obtain each representation separately through the public interface from that same completed result (for example, selecting/rendering a persisted result). Require comparisons of every representation against that source result; simultaneous emissions are not required.
-- [ ] Define relation of public JSON to existing v1 envelopes without reinterpreting/weakening schema or integrity; incompatible proposals return for user/architecture decision.
-- [ ] Define falsifiable Markdown/HTML accessibility checks (structure, order, non-color status, keyboard access for interactions); no richer report without authorization.
-- [ ] State accepted features, excluded variants, compatibility limits and unresolved user decisions; no material choice hidden as an assumption.
 
-### Phase 2: Implement
+- [ ] Plan status distinguishes historical evidence, current unproven gaps, planned work, and executed verification; it makes no stale assertion that a resolved architecture question is still open or that review/critic gates passed for current HEAD.
+- [ ] Requirements index reconciliation removes the obsolete claim that the multi-input realization remains an unresolved architecture conflict, while preserving BR-005 and the architect's settled realization.
+- [ ] Any links, bundle index, change log, and OKF metadata touched by this reconciliation validate and resolve; no requirement or accepted contract is rewritten to fit implementation.
+- [ ] User-facing usage docs are only updated if code changes alter their truth; documentation describes current behavior after implementation, not planned behavior as shipped.
 
-#### Task 2.1: Implement both family contracts through host `eval` [L] → owner: coder (runner/evaluation)
-Target/change surface: Eval command, family loading/validation, semantic adapters and shared result integration around `runner/eval_api.py` and engine surfaces found in 1.1; current host invoke. Exact files follow spec.
-Type: Backend
-Nature: Feature
-Applicable skill: software-engineering, python-how-to, python-testing, product-acceptance
-Implements: [ARD-001](../architecture/eval-format-ownership/design/ard-001-runner-owned-input-and-output-contracts.md) and Task 1.2 spec
-Depends on: 1.2.
-Acceptance criteria:
-- [ ] One public `eval` validates both families; invalid/ambiguous input is rejected before any invocation.
-- [ ] Agent/runtime execution mode and applicable assertions survive without reinterpretation as skill expectations.
-- [ ] Skill expectations and specified negative/trap semantics survive; ablation preserves both sides and skill-owned comparison through real paired lifecycle.
-- [ ] Each actual execution uses existing host `invoke`; image gains no suite orchestration, retries, planning, artifact writing or rendering.
-- [ ] Local valid/invalid contract tests and vertical proof use upstream-created input and real evaluation-produced verified persistence to show identity/meaning.
+#### Task 3.2: Prove both real evaluation journeys and report design [L] → owner: product acceptance integrator
 
-#### Task 2.2: Implement four output contracts from verified results [L] → owner: coder (runner/output)
-Target/change surface: Output dispatch/renderers, result access and artifact-verification integration; exact files follow spec. Avoid family-adapter/CLI edits except agreed interface.
-Type: Backend
-Nature: Feature
-Applicable skill: software-engineering, python-how-to, python-testing, accessibility-implementation
-Implements: [ARD-001](../architecture/eval-format-ownership/design/ard-001-runner-owned-input-and-output-contracts.md) and Task 1.2 spec
-Depends on: 1.2; shared result contract from 2.1 (renderer module work may start after 1.2; public wiring waits for 2.1).
-Acceptance criteria:
-- [ ] JSON/YAML/Markdown/HTML are selectable through public `eval` and conform to specified contracts.
-- [ ] Each reflects same verified durable result including family/case/run identity, classification, attempts and family/paired outcomes; rendering cannot rerun evaluation or alter verdicts.
-- [ ] Local parity evidence starts with one completed evaluation whose durable result has passed verification, obtains JSON, YAML, Markdown, and HTML separately through the public interface from that same result, and compares each representation against the source result. It does not rely on four separate evaluation runs or require simultaneous emissions.
-- [ ] Existing v1 validation/persistence/integrity meaning is preserved; corrupt state cannot be reported as successful output.
-- [ ] Output failure is not success; Markdown/HTML meet accessibility criteria and any interactive HTML is keyboard-operable.
-- [ ] Local parity/conformance tests compare against verified records and cover corrupt/invalid source and output failure.
-
-### Phase 3: Integrate and prove
-
-#### Task 3.1: Prove assembled paths [L] → owner: integrator (runner/product acceptance)
-Target/change surface: Public built-in eval paths, verified run records, renderers, ARS and evidence. This was the base E2E scope; the current combined-skill documentation task is `multiskill-user-docs` in Loom Plan rev13.
+Target/change surface: public eval CLI, real host adapters, local OCI image/invoke path, artifacts/verifier, all renderers, current documentation, and recorded run evidence.
 Type: Testing
 Nature: Enhancement
-Applicable skill: product-acceptance
-Implements: [ARD-001](../architecture/eval-format-ownership/design/ard-001-runner-owned-input-and-output-contracts.md) and Task 1.2 spec
-Depends on: 2.1 and 2.2.
+Execution fit: This is intentionally one composition task because both scenarios share the real build/configuration, invocation and artifact provenance setup, and each independently verifies one family outcome through every representation. It is downstream of all fixes; splitting scenario setup from proof would duplicate infrastructure and risk inconsistent evidence. If prerequisites make this materially broader than one execution loop, preserve completed proof and re-slice the remaining scenario only.
+Applicable skill: product-acceptance, design-validation
+Implements: [ARD-001](../architecture/eval-format-ownership/design/ard-001-runner-owned-input-and-output-contracts.md), [ARS-001](../architecture/eval-format-ownership/specifications/ars-001-runner-eval-contract.md), and [report baseline](../design/eval-format-ownership/multiskill-readable-report-baseline.md)
+Depends on: 2.1, 2.2, 2.3, 3.1.
 Acceptance criteria:
-- [ ] Reconcile old profile-owned discovery/normalization and input-JSON exclusion with new ownership; retain accurate invocation/evidence boundaries; do not rewrite requirements.
-- [ ] Usage docs describe one interface, both families/four formats, `eval` vs one-call `invoke`, and only authorized compatibility/report claims.
-- [ ] Execute E2E-001/002 through actual interface using real product-owned loaders, evaluators, invoke adapter/image, verifier and renderers; record external substitutions/limits.
-- [ ] For each scenario, run evaluation once to completion and verify its durable result; then obtain each of JSON, YAML, Markdown, and HTML separately through the public interface from that same result (for example, by selecting/rendering the persisted result). Compare every representation against that source result. Do not substitute separate evaluation runs as parity evidence; simultaneous emissions are not required.
-- [ ] Each proves provenance and invalid-input no-invocation; corruption/render failure cannot claim success.
-- [ ] Check generated Markdown/HTML against accessibility criteria and evidence one-invocation boundary. Record entry/path, build/config, action, outcome, gaps and evidence; no unexecuted PASS.
 
-#### Task 3.2: Validate actual human-readable output [M] → owner: designer
-Target/change surface: Generated Markdown and HTML outputs against ARS-001's structure, order, textual status and interaction baseline. Read-only validation; no report redesign or WCAG-level claim.
+- [ ] Execute E2E-001 and E2E-002 through the real public interface and actual product-owned adapter, OCI invocation/image, verifier, persistence, and rendering path; record exact build/HEAD, configuration, external substitution, actions, observed outcome and evidence location.
+- [ ] Each scenario runs an evaluation once to a verified eligible durable result, then separately obtains all four formats from that same persisted result; compare every representation against the same result and preserve real state provenance.
+- [ ] Verify pre-invocation rejection for invalid/duplicate combined inputs and verify corrupt source/output failure cannot claim success; use upstream-generated state for every behavior claimed.
+- [ ] Real combined run has multiple skills and five iterations per case; reports expose the design-required run outcome and attributed per-iteration details without invented aggregates.
+- [ ] If required OCI/provider/configuration is unavailable, mark the affected scenario UNPROVEN with the missing prerequisite and evidence retained; do not use a mock or injected state to close it.
+
+#### Task 3.3: Validate generated reports against the approved design [M] → owner: designer / design-validation reviewer
+
+Target/change surface: Actual Markdown and HTML generated by Task 3.2 and the approved [combined report baseline](../design/eval-format-ownership/multiskill-readable-report-baseline.md); read-only assessment.
 Type: Testing
 Nature: Assessment
-Applicable skill: design-validation
-Depends on: 3.1.
+Execution fit: This is a focused human-facing review of the real report outputs, separate from the integrator's product-path setup and state-provenance reasoning. It cannot be completed using renderer unit fixtures alone; failed findings route to the renderer owner and invalidate affected report evidence.
+Applicable skill: design-validation, accessibility-design
+Implements: [BR-004](../requirements/eval-format-ownership/br-004-present-readable-markdown-and-html-results.md), [QS-001](../requirements/eval-format-ownership/qs-001-readable-multi-skill-five-iteration-reports.md), and [report baseline](../design/eval-format-ownership/multiskill-readable-report-baseline.md)
+Depends on: 3.2.
+Acceptance criteria:
 
-#### Task 3.3: Independent contract/release-readiness review [M] → owner: reviewer
-Target/change surface: Final diff, requirements/ARD/spec, inventory, local/vertical/E2E evidence, reconciled docs. Read-only review; findings routed to implementation owner.
+- [ ] Assess the actual generated reports from the verified multi-skill/five-iteration run, not a placeholder or injected fixture.
+- [ ] Record evidence for summary-first hierarchy, skill/case/iteration attribution, independently findable statuses and comparisons, same-report captured details, semantic reading order, text status independent of color, keyboard links/disclosures, and 320 CSS-pixel / 200% zoom reflow.
+- [ ] Report design gaps without silently redesigning accepted scope; return implementation changes to the renderer owner and mark affected acceptance evidence unproven until rechecked.
+- [ ] Make no blanket WCAG conformance claim.
+
+### Phase 4: Close review and merge readiness
+
+#### Task 4.1: Independently review fixes and proof [M] → owner: reviewer
+
+Target/change surface: final PR diff, accepted requirements/architecture/spec/design, CI evidence, local/vertical tests, E2E artifacts and design validation.
 Type: Testing
 Nature: Maintenance
-Applicable skill: product-acceptance, design-validation
+Execution fit: One read-only final review across the exact contract seams and proof record. It follows implementation to avoid reviewing moving targets. Prior review lineage is disclosed; this is independent of implementation, not a claim of blind first assessment.
+Applicable skill: product-acceptance, design-validation, risk-driven-planning
 Implements: [ARD-001](../architecture/eval-format-ownership/design/ard-001-runner-owned-input-and-output-contracts.md)
-Depends on: Base review dependencies are recorded in Loom Plan rev13. The combined-skill review additionally depends on `multiskill-user-docs`, `multiskill-e2e`, and `multiskill-design-validation` through `readable-report-review`.
+Depends on: 1.2, 2.1, 2.2, 2.3, 3.1, 3.2, 3.3.
 Acceptance criteria:
-- [ ] Independently trace each BR/OC and ARD invariant to implementation/evidence, probing semantic loss, output drift, false success, v1 regressions and image-boundary violations.
-- [ ] Review every output path for conformance and accessibility; unit tests are not accepted as E2E proof.
-- [ ] Record each finding with owner and disposition; implementation owners resolve findings and rerun affected checks, while any proposed acceptance of a blocking finding is explicitly decided by the relevant authority. No ship-ready claim while mandatory guarantees remain unproven.
 
-#### Task 3.4: Final critic gate [M] → owner: critic
-Target/change surface: Final implementation diff, approved requirements/ARD/specification, Task 3.1 E2E evidence, Task 3.2 review and finding dispositions. Read-only adversarial plan/implementation/evidence review.
+- [ ] Trace every obligation in this plan to actual code and evidence; inspect the exact runtime readiness, output schema/provenance, trap/timestamp, readable report, CI discovery, and `--profile` preservation boundaries.
+- [ ] Reconcile each inherited reviewer finding and record whether fixed, still failing, or unproven; do not represent a prior verdict excerpt as fresh independent evidence.
+- [ ] Any blocking finding returns to the responsible task with affected tests/E2E invalidated and rerun; no requirement is waived by green neighboring tests.
+
+#### Task 4.2: Recheck and disposition PR merge readiness [S] → owner: integrator
+
+Target/change surface: PR #89 required checks, reviews, branch protection and mergeability at final HEAD; no source edits.
 Type: Testing
 Nature: Maintenance
-Applicable skill: product-acceptance, risk-driven-planning
+Execution fit: Small final external-state check, dependent on all proof and review gates. It may end in “not ready”; its purpose is a truthful disposition, not forcing merge.
+Applicable skill: product-acceptance
 Implements: [ARD-001](../architecture/eval-format-ownership/design/ard-001-runner-owned-input-and-output-contracts.md)
-Depends on: Task 3.3 and an external prerequisite that all blocking reviewer findings have verified resolution or explicit authority acceptance; the critic gate does not own implementation fixes or acceptance decisions.
+Depends on: 1.1, 1.2, 2.1, 2.2, 2.3, 3.1, 3.2, 3.3, 4.1.
 Acceptance criteria:
-- [ ] Confirm reviewer findings are resolved with affected evidence rerun, or explicitly accepted by the relevant authority; unresolved blocking findings return to implementation/authority and stop the gate.
-- [ ] Adversarially check that each family’s four representations come from one completed, verified evaluation result via the public interface, with each compared against that same source result; separate evaluation runs do not count as parity proof.
-- [ ] Confirm all mandatory BR/OC and ARD guarantees have actual implementation and evidence, and no unresolved blocker or unsupported ship-ready claim remains.
+
+- [ ] Record final PR head SHA, merge state, required checks/reviews and exact remaining blocker(s), with current evidence references.
+- [ ] Declare ready only when all mandatory findings/guarantees have passing evidence and GitHub reports no unresolved merge blocker; otherwise list the precise outstanding owner/action.
+- [ ] Do not merge, modify PR metadata, or claim the PR is unblocked as part of this task unless separately authorized.
 
 ## Dependency and ownership graph
 
-The table and detailed legacy task text below retain some of the original local plan's numbering. For live scheduling, use Loom Plan revision 13 and its stable task IDs; this local plan is historical context, not a live schedule. Documentation work for the combined-skill follow-up is `multiskill-user-docs`; the pending follow-up commit is `commit-multiskill-followup`.
-
 ```text
-1.1 inventory [researcher] -> 1.2 specification [architect/design-spec owner]
-                                  |-> 2.1 input families/host eval [runner coder] --\
-                                   |-> 2.2 output formats [output coder] -----------+-> 3.1 E2E proof [integrator] -> 3.2 human-view validation [designer]
-                                        (public wiring depends on 2.1)                  |-> 3.5 docs reconciliation [integrator]
-                                                                                        +-> independent-review [reviewer]
-                                                                                             -> final-critic [critic]
+1.1 current blocker investigation ───────────────────────────────┐
+1.2 CI coverage ──────────────────────────────────────────────┐  │
+2.1 runtime readiness ───────────────────────────────────────┐ │  │
+2.2 result projection/trap semantics ──> 2.3 readable render ─┤ │  │
+                                                              v v  v
+                                     3.1 docs reconcile ──> 3.2 real E2E ──> 3.3 design check
+                                                                         │             │
+                                                                         └──────┬──────┘
+                                                                                v
+                                                                            4.1 review
+                                                           │
+                                                           v
+                                                4.2 final merge disposition
 ```
 
-| Task | Owner | Read surfaces | Write surfaces | Dependencies |
+| Task | Owner | Read surfaces | Write surfaces | Dependencies / coordination |
 | --- | --- | --- | --- | --- |
-| 1.1 | Researcher | Loom sources, runner API/artifacts/CLI, old docs | Inventory only | None |
-| 1.2 | Architect/design-spec owner | Requirements, ARD, inventory, user decisions | Contract spec | 1.1; applicable user decisions |
-| 2.1 | Runner coder | Spec, eval/engine/invoke | Family loaders/adapters and integration | 1.2 |
-| 2.2 | Output coder | Spec, result contract, verifier | Dispatch/renderers/tests | 1.2; 2.1 for public wiring |
-| 3.1 | Integrator | Implementation, spec/evidence | Assembled E2E evidence | 2.1, 2.2 |
-| 3.2 | Designer | Generated Markdown/HTML, ARS-001 | Human-view validation report | 3.1 |
-| Historical `independent-review` | Reviewer | Diff, docs and evidence | Base independent review findings | Base E2E, design check, renderer fix, egress audit, docs repair, browser check, network cleanup; current combined-follow-up dependencies are in Loom Plan rev13 |
-| `final-critic` | Critic | Final diff, requirements/ARD/spec, E2E evidence, review dispositions | Final gate findings only | `independent-review` plus prerequisite: all blocking findings resolved or explicitly accepted |
-| Historical `docs-repair` | Documentation owner | Implementation, docs, ARD/spec | Base reconciled plan and required metadata | Historical base remediation; follow-up documentation is `multiskill-user-docs` |
-
-No shared mutable test state is specified in inspected sources [unverified]. Disclose shared artifact dirs, provider accounts, ports or generated surfaces before parallelizing. Tasks 2.1/2.2 overlap only with stable interfaces and disjoint writes; otherwise serialize CLI/schema integration. Live task identities and dependencies are those in Loom Plan revision 13.
+| 1.1 | Integrator | PR status, repository policy | Evidence note only | None; can run in parallel with source fixes. |
+| 1.2 | CI/workflow maintainer | CI workflow, pinned test dependencies, test modules | `.github/workflows/ci.yml` and only test config needed | None; keep separate from runner files. |
+| 2.1 | Runner evaluation maintainer | ARS-001, `eval_evidence.py`, `eval_builtin.py`, tests | Runtime readiness/gating and focused tests | None; separate semantic boundary. |
+| 2.2 | Runner output maintainer | ARS-001, `eval_builtin.py`, `eval_output.py`, tests | Projection/trap/timestamp result mapping and tests | None; owns result model correctness before renderer work. |
+| 2.3 | Runner report maintainer | Approved design, `eval_output.py`, tests | Markdown/HTML rendering and tests | Depends 2.2; shared output file means serialize after 2.2. |
+| 3.1 | Documentation maintainer | Plan, requirements index, authoritative docs, implementation state | Plan and factual index/log/usage doc corrections | After code fixes so current behavior can be described accurately. |
+| 3.2 | Product acceptance integrator | Final implementation, real runtime image/config, tests and design baseline | E2E evidence records only | Depends on all fixes/docs; shared OCI/provider/artifact state must be isolated per run and provenance recorded. |
+| 3.3 | Designer / design-validation reviewer | Real generated Markdown/HTML, report baseline | Design-validation evidence only | Depends on actual reports from 3.2; no renderer edits. |
+| 4.1 | Reviewer | Final diff, all authority and evidence | Findings/dispositions only | After all implementation and proof; any blocker invalidates dependent evidence. |
+| 4.2 | Integrator | Current GitHub PR state and 4.1 disposition | Final readiness record | Last; rechecks external state after review. |
 
 ## Execution waves
 
-1. Loom Plan rev13's base `assembled-e2e` has provider-free same-run evidence for both families; `renderer-heading-fix` and `design-check` are reported complete. The combined-skill follow-up is separately evidenced in the status table above.
-2. Base remediation checks are complete: BR/OC frontmatter validation passed, and the temporary internal Podman network was removed. The combined HTML overflow found by an earlier browser review was fixed and rechecked at 1440/390/320px as recorded above. `egress-history-audit` established that two earlier GHCR attempts transferred nine blobs plus config and manifest. Whether transferred layers remain in local cache/storage and the amount of data transferred are unknown. The user explicitly accepts this confirmed historical egress as a non-blocking exception.
-3. Independent review and final critic are complete; the final critic approved the combined follow-up with caveats, including unknown local layer retention/bytes. The user accepts the confirmed historical GHCR transfer as a non-blocking exception.
-4. The accepted historical transfer is not a shipping blocker. No whole-workflow no-egress claim is supported.
+1. **Wave 1 (parallel):** 1.1 exact blocker investigation; 1.2 CI coverage; 2.1 runtime readiness; 2.2 result projection/trap semantics. Their write surfaces are disjoint except 2.2's contained output projection responsibility; do not concurrently edit the shared output module from 2.3.
+2. **Wave 2:** 2.3 readable Markdown/HTML after 2.2. Documentation task 3.1 starts after 2.1–2.3; no documentation statements should claim fixes before they land.
+3. **Wave 3:** 3.2 real composed E2E after code and docs. Re-run local/CI checks for changes made after Wave 1 as relevant.
+4. **Wave 4:** 3.3 design validation of reports from 3.2, then 4.1 independent review. Resolve/rerun any findings before 4.2 current PR merge-state disposition.
+
+## Plan checks
+
+1. **Authorities:** Listed requirements, ARD, ARS, approved report baseline, PR/reviewer evidence and repository state; current plan supersedes stale status while retaining historical caveats.
+2. **Obligations:** Every known reviewer issue and accepted cross-component guarantee has an owner, satisfier, and falsifiable verification; accepted GHCR transfer is explicitly out of scope by agreement.
+3. **Decisions:** No new product or architecture decision is hidden in implementation. If implementation finds ARS/ARD contradict the approved requirement, stop only dependent work and return the conflict to the relevant authority.
+4. **Foundations:** CI and local semantic/projection fixes precede renderer, docs, assembled proof, independent review and merge-state disposition.
+5. **Graph:** Each task appears once; dependencies are acyclic and complete; shared `eval_output.py` changes are ordered; exact GitHub blocker investigation does not falsely gate independent code fixes.
+6. **Mechanisms:** Readiness, strict projection, timestamps, null trap semantics, same-run rendering and report hierarchy each cite ARS/ARD/BR/OC/QS/design authority.
+7. **Repo claims:** HEAD/base/worktree facts were verified this session. Reviewer findings and exact code ranges are source-backed via the handoff; GitHub blocker reason, OCI run availability, and current product proof remain unresolved until their tasks execute.
+8. **Execution fit:** Runtime semantics, output projection, presentation, CI coverage, docs, E2E, review and GitHub state are split at independent ownership/context/verification boundaries. The two E2E scenarios share setup and are grouped for one integration/provenance loop.
+9. **Vertical proof:** Task 2.1 tests evidence-to-gate semantics; Task 2.2 tests verified result projection; Task 3.2 composes actual invocation → verified state → output.
+10. **E2E:** Exactly two scenarios distinguish agent/runtime evidence/judge semantics from combined skill ablation, attribution and five-iteration readability. Both require real product-owned components and upstream-produced state; actual human-facing output validation is separately owned by 3.3.
+11. **Pass honesty:** All findings and current product proof remain open for execution. No pass, merge-ready state, no-egress claim, or WCAG conformance claim is inferred from historical evidence.
 
 ## Open questions
 
 | Question | Owner | Blocks |
 | --- | --- | --- |
-| Are historical built-in input aliases/migration or external v1 artifact consumers supported? | User/product owner | Blocks only those compatibility claims; existing `--profile` behavior, including transport flexibility, remains preserved and is not a migration decision. |
-| Are v1 run/artifact/paired JSON envelopes externally consumed, and what compatibility/migration applies to new public JSON? | User/product owner, informed by 1.1 | Blocks changing/versioning envelopes or making compatibility claims. Until resolved preserve v1 integrity/schema and do not reinterpret fields. |
-| Is a polished report beyond accessible Markdown/HTML baseline required; for whom and what must it communicate? | User/product owner | Blocks richer report only; baseline formats proceed without report promise. |
-
-Specialist-owned source-feature boundaries, fields, semantic mapping, interface grammar and accessibility verification belong to Task 1.2. If a detail drops a material source capability, changes user meaning, or conflicts with compatibility, return to user/architect authority instead of assuming.
-
-## Plan checks
-
-1. **Authorities:** Requirements, approved ARD, handoff, current code/docs and designer guidance are reconciled; architecture log caveat recorded as nonblocking, not presumed defective.
-2. **Obligations:** BRs/OCs, semantics, accessibility, JSON integrity and invocation boundary all have owners, satisfiers, proof and disposition; compatibility/report are explicitly user-owned.
-3. **Decisions:** Only user compatibility/migration/report matters remain; specialist details assigned to Task 1.2 with escalation for material scope changes.
-4. **Foundations:** Inventory → spec → implementation → composition proof → independent review/findings disposition → final critic gate.
-5. **Graph:** Loom Plan rev13 task identities and dependencies are authoritative; this legacy local task list is not a count or schedule for that graph.
-6. **Mechanisms:** Adapters, verified record, selectable renderers, accessibility, one-call image boundary trace to BR/OC and ARD-001.
-7. **Repo claims:** Current implementation/evidence claims remain limited to inspected files and recorded artifacts; external consumers remain unknown unless separately evidenced.
-8. **Session fit:** Inventory, specification, family integration, output integration, composition/docs and review are bounded natural scopes; implementation splits at semantic seam, not by file.
-9. **Vertical proofs:** Task 2.1 proves input-to-runner durable state; 2.2 proves verified-state-to-format and integrity rejection.
-10. **E2E:** Two discriminating scenarios cover both distinct families, same interface, ablation, four formats, failure paths and actual accessible output using real product-owned stages. Within each scenario, one completed and verified evaluation supplies all four separately selected representations, each compared against that same source result.
-11. **No unsupported pass/n/a:** Provider-free E2E, renderer correction, static design inspection, offline browser inspection, BR/OC frontmatter validation, and temporary-network cleanup have evidence; independent review and final critic approval with caveats are complete. Two earlier GHCR attempts transferred nine blobs plus config and manifest; whether transferred layers remain in local cache/storage and the amount of data transferred are unknown. The user explicitly accepts this confirmed historical egress as a non-blocking exception. No whole-workflow no-egress claim is supported.
+| What exact GitHub condition currently makes PR #89 merge state BLOCKED? | Integrator via Task 1.1; GitHub evidence is authoritative | Final merge-readiness claim only; code-backed fixes proceed independently. |
+| Is the approved real OCI image and OpenCode-configured provider available for the two required product proofs? | Integrator / environment owner | E2E completion; unavailable proof remains UNPROVEN and cannot be replaced by mocks. |
+| Does the actual final source or design inspection expose any requirement/architecture contradiction beyond the review findings? | Architect or product authority, only if evidence identifies one | Only the affected implementation or acceptance claim; no such contradiction is assumed now. |
