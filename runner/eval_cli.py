@@ -39,6 +39,7 @@ from runner.eval_input import InputContractError, load_evaluation_inputs
 from runner.eval_output import EvalOutputError, load_verified_output, write_output
 from runner.eval_plan import EvalPlanningError, build_run_plan, list_cases
 from runner.eval_types import EvalJob, InvocationSpec, JsonValue, RunPlan
+from runner.model_catalog import pinned_model_catalog
 from runner.oci_image import ImageSelectionError, validate_immutable_image_identity
 
 EVAL_EXIT_PASS = 0
@@ -185,6 +186,7 @@ def add_eval_parser(subparsers: Any) -> argparse.ArgumentParser:
     )
     run.add_argument("--format", choices=("json", "yaml", "markdown", "html"), help="Built-in result format (default: json).")
     run.add_argument("--output", metavar="PATH", help="Write the selected built-in representation atomically to PATH.")
+    run.add_argument("--models-catalog", metavar="PATH", help="Explicit OpenCode model catalog snapshot.")
     return run
 
 
@@ -629,6 +631,7 @@ def run_eval(
     stderr = sys.stderr if stderr is None else stderr
     progress_stdout = stderr if getattr(args, "input", None) else stdout
 
+    catalog_context = None
     try:
         _validate_cli_values(args)
         if getattr(args, "render_run", None) is not None:
@@ -738,6 +741,13 @@ def run_eval(
         )
         if not plan.jobs:
             raise EvalCommandError("selection matched no eval cases")
+
+        if args.input is not None:
+            try:
+                catalog_context = pinned_model_catalog(getattr(args, "models_catalog", None))
+                args.models_catalog = str(catalog_context.__enter__())
+            except (OSError, TypeError, ValueError) as exc:
+                raise EvalCommandError(f"model catalog preparation failed: {exc}") from exc
 
         artifact_dir = (
             Path(args.artifact_dir)
@@ -889,3 +899,6 @@ def run_eval(
     ) as exc:
         print(f"opencode-eval-runner eval: {exc}", file=stderr)
         return EVAL_EXIT_ERROR
+    finally:
+        if catalog_context is not None:
+            catalog_context.__exit__(None, None, None)

@@ -17,6 +17,8 @@ This inventory was validated against:
   - `action.yml`
 - `bateau84/loom` branch `functionality-anchor-requirements-coherance`, `scripts/run-evals.py` blob `30f2ae87764be180173a9e5b4b609ee79b2f063d`.
 
+**OpenCode upgrade revalidation (2026-10-30):** The pinned runtime was upgraded from 2.0.23 to 2.2.2. Exact 2.2.2 OCI packaging and provider-free acceptance revalidation confirmed native start/terminal evidence, Code Mode inner identity/input/order, plugin activation, and all 11 runtime-evidence acceptance scenarios. Exact Code Mode caller-final value/error remains explicitly unsupported; the upgrade does not change that boundary. Historical evidence below remains attributed to its actual 2.0.23 runtime.
+
 PR #45 is merged. The integration branch `eval-engine/01-architecture` matches `main` at merge commit `fd9da10cbe2a8182fc8910ec199a221250deb3ca`, so the final Task 1 synthesis can consume this inventory against the landed runner contract.
 
 ## Boundary in one sentence
@@ -45,7 +47,7 @@ The built-in `eval` command is a host-side orchestration surface for two explici
 | Unknown coverage | Unknown is never converted to zero. | Keep unknown/unsupported distinct from observed absence. | Passing an absence assertion because a count is missing. |
 | Native authority | Direct/native calls include authoritative identity, tool, actor, Session/message/CallID, executable input, ordering, terminal outcome, ancestry. | Consume only fields needed by project assertions. | Reconstructing invocation identity from order, tool name, input equality, or model output. |
 | Code Mode execution | Inner call identity/tool/input/parent/outcome/ordering are supportable at `code_mode_execution`. | Assertions over these facts require that boundary to be `complete`. | Assuming exact final caller-visible value/error is known. |
-| Code Mode finality | Exact script-visible final value/error is `unsupported` on stock OpenCode 2.0.23. | Mark an assertion requiring this boundary as unsupported/non-evidence. | Converting transformed-handler result/error into final caller evidence. |
+| Code Mode finality | Exact script-visible final value/error is `unsupported` on stock OpenCode 2.2.2. | Mark an assertion requiring this boundary as unsupported/non-evidence. | Converting transformed-handler result/error into final caller evidence. |
 | Product vs evidence outcome | `result.exit_code`, timeout, and behavioral/product success are separate from evidence eligibility. | Evaluate transport/product health and evidence readiness independently. | `exit_code == 0` => evidence complete, or evidence complete => behavioral PASS. |
 | Inner timeout | `--timeout-seconds`, default 240s, limits the transport invocation inside the container. OpenCode timeout can still emit a structured result with `exit_code: 124`, `timed_out: true`, and timeout-aware runtime evidence. | Treat timeout as target/judge transport failure/non-evidence unless project policy explicitly says otherwise; retain the result artifact when available. | Retrying inside `invoke` or calling timeout a behavioral FAIL. |
 | Outer timeout | `--container-timeout`, default 300s, limits the OCI process from the host wrapper. A host-side timeout makes the CLI return infrastructure failure and may leave no result file. | Orchestration owns whether an explicit retry policy applies; record the failed attempt. | Assuming every failed `invoke` has a result JSON. |
@@ -53,7 +55,7 @@ The built-in `eval` command is a host-side orchestration surface for two explici
 | Output parsing | Host requires container stdout to parse as a JSON object. | Treat missing/invalid JSON as infrastructure/non-evidence. | Parsing arbitrary stdout fragments as a successful result. |
 | Output validation | Container validates `runtime_evidence` before stdout serialization; host validates it again before writing `--output`. | Reject missing/malformed authoritative evidence rather than degrading to diagnostics. | Assuming the host currently schema-validates every top-level `result/v1` field; its hard validator is specifically the object shape plus `runtime_evidence/v1`. |
 | Host/image compatibility | Current host requires official/custom image output to include valid `runtime_evidence/v1`; legacy images without it are rejected. | Treat host+image as a compatibility pair and record selected image/transport configuration. | Silent fallback to an older result shape. |
-| OpenCode reviewed runtime | Runtime-observer capability is reviewed against stock OpenCode 2.0.23. | An OpenCode upgrade requires capability/acceptance revalidation. | Assuming later OpenCode versions preserve the same observation boundaries. |
+| OpenCode reviewed runtime | Runtime-observer capability and all 11 provider-free runtime-evidence acceptance scenarios are revalidated against stock OpenCode 2.2.2. | Any further OpenCode upgrade requires capability/acceptance revalidation. | Assuming later OpenCode versions preserve the same observation boundaries. |
 | Copilot runtime evidence | Copilot emits valid result shape but `runtime_evidence.status = unsupported` because no OpenCode runtime observer exists. | Copilot can be used for pure model/judge work where OpenCode runtime assertions are not required. | Runtime tool assertions from Copilot convenience output. |
 | Expected plugin | OpenCode-only zero-inference preflight can fail before inference when required plugin activation is unavailable. | Treat preflight failure as infrastructure/non-evidence. | Behavioral FAIL for missing runner/runtime prerequisites. |
 | Skills | `--skill` records skill-under-test intent; it does not force-load a skill. `skills_loaded` is observed convenience data. | Project-owned assertions decide whether the intended skill was used and which evidence they require. | Runner-owned skill PASS/FAIL semantics. |
@@ -99,7 +101,7 @@ Examples:
 - overall runtime evidence is `incomplete` or `invalid`;
 - a required boundary is not `complete`;
 - a required exact field is redacted, omitted, or unsupported;
-- Code Mode finality is required on stock 2.0.23.
+- Code Mode finality is required on stock 2.2.2.
 
 This is non-evidence for the affected assertion, even if the product invocation exited successfully.
 
@@ -164,7 +166,7 @@ Therefore the future generic eval engine must not be designed as a special Actio
 
 These are constraints to preserve, not gaps for Task 1 to solve:
 
-- exact Code Mode caller-final value/error on stock OpenCode 2.0.23;
+- exact Code Mode caller-final value/error on stock OpenCode 2.2.2;
 - OpenCode runtime observation for the `github-copilot-cli` transport;
 - resistance to a deliberately hostile evaluated plugin sharing the trusted OpenCode process;
 - input JSON request API;
@@ -211,7 +213,7 @@ The final architecture must not violate these runner-level facts:
 11. **No universal assertion DSL is implied by the runner contract.**
 12. **No input JSON API or public eval CLI exists yet.**
 13. **Copilot runtime evidence is explicitly unsupported.**
-14. **Code Mode final caller value/error is explicitly unsupported on stock 2.0.23.**
+14. **Code Mode final caller value/error is explicitly unsupported on stock 2.2.2.**
 15. **The normal trust profile is trusted-checkout, not hostile-plugin resistance.**
 
 This matrix is intentionally a constraint inventory. The sibling Loom-responsibility inventory and the Task 1 integration owner should use it as a non-negotiable boundary when defining the generic orchestration modules for Tasks 2–5.

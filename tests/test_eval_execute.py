@@ -201,6 +201,7 @@ class EvalExecuteTests(unittest.TestCase):
             self.spec,
             image=image,
             require_local_image=True,
+            models_catalog=Path(__file__).parent / "fixtures" / "models-catalog.json",
         )
         with (
             patch.dict(

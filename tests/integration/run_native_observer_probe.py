@@ -157,7 +157,7 @@ def inside() -> int:
         else None
     )
     checks = {
-        "stock_2_0_23": version in {"2.0.23", "opencode v2.0.23"},
+        "stock_2_2_2": version in {"2.2.2", "opencode v2.2.2"},
         "transport_success": result.get("exit_code") == 0,
         "capture_complete": observed.get("status") == "complete"
             and observed.get("evidence_eligible") is True

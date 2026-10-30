@@ -7,7 +7,7 @@ import subprocess
 from collections.abc import Mapping
 from urllib.parse import urlsplit
 
-SUPPORTED_OPENCODE_VERSION = "2.0.23"
+SUPPORTED_OPENCODE_VERSION = "2.2.2"
 SUPPORTED_INVOKE_ADAPTER_ID = "opencode-eval-runner/opencode-invoke/v1"
 IMAGE_VERSION_LABEL = "org.opencontainers.image.version"
 IMAGE_ADAPTER_LABEL = "io.opencode-eval-runner.invoke-adapter"

@@ -1,6 +1,6 @@
 # Stock native tool observer
 
-Runtime: stock OpenCode **2.0.23**.
+Runtime: stock OpenCode **2.2.2**.
 
 This observer is the production native/direct-call adapter for the trusted-checkout profile. It is not a second public evidence contract.
 

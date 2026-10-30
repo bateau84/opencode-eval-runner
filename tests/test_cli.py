@@ -19,7 +19,6 @@ from runner.cli import (
     build_container_command,
     default_auth_path,
     default_database_path,
-    default_models_path,
     extra_mount_arg,
     host_environment_for_transport,
     resolve_engine,
@@ -300,10 +299,6 @@ class RunnerCliTests(unittest.TestCase):
             self.assertIn("--pull=never", command)
             self.assertIn("--remote=false", calls[0][0])
             self.assertNotIn("CONTAINER_HOST", calls[0][1]["env"])
-
-    def test_default_models_uses_xdg_cache_home(self):
-        with tempfile.TemporaryDirectory() as tmp, patch.dict(os.environ, {"XDG_CACHE_HOME": tmp}, clear=False):
-            self.assertEqual(default_models_path(), Path(tmp) / "opencode" / "models.json")
 
     def test_large_valid_model_catalog_mounts_and_inventories_before_inference(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -782,7 +777,7 @@ class RunnerCliTests(unittest.TestCase):
             self.assertIn("/seed/opencode-config:ro", rendered)
 
 
-    def test_models_catalog_defaults_to_host_cache_when_present(self):
+    def test_implicit_legacy_host_cache_is_not_mounted(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             workspace = root / "workspace"
@@ -818,8 +813,8 @@ class RunnerCliTests(unittest.TestCase):
                 command, _ = build_container_command(args, input_dir, output_dir)
 
             rendered = " ".join(command)
-            self.assertIn(str(models.resolve()), rendered)
-            self.assertIn("/seed/models.json:ro", rendered)
+            self.assertNotIn(str(models.resolve()), rendered)
+            self.assertNotIn("/seed/models.json:ro", rendered)
 
 
     def test_copilot_uses_gh_auth_token_fallback_without_exposing_value(self):

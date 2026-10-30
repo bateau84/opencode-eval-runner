@@ -20,7 +20,7 @@ def available(value):
 HEADER = {
     "kind": "capture_start",
     "version": 1,
-    "source": "stock-opencode-2.0.23-plugin",
+    "source": "stock-opencode-2.2.2-plugin",
     "native_input_boundary": "decoded-tool-execute+outer-execute-before",
     "native_terminal_boundary": "session.tool.success+session.tool.failed",
     "code_input_boundary": "decoded-code-tool-handler",

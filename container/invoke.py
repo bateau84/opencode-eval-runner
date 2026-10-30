@@ -353,9 +353,8 @@ def prepare_opencode_env() -> dict[str, str]:
     config = root / "config" / "opencode"
     data = root / "data" / "opencode"
     cache = root / "cache"
-    cache_opencode = cache / "opencode"
     state = root / "state"
-    for path in (home, config, data, cache_opencode, state):
+    for path in (home, config, data, state):
         path.mkdir(parents=True, exist_ok=True)
 
     seed_config = Path("/seed/opencode.json")
@@ -403,8 +402,8 @@ def prepare_opencode_env() -> dict[str, str]:
                 config_node_modules.symlink_to(workspace_node_modules, target_is_directory=True)
     if seed_auth.is_file():
         shutil.copyfile(seed_auth, data / "auth.json")
-    if seed_models.is_file():
-        shutil.copyfile(seed_models, cache_opencode / "models.json")
+    if not seed_models.is_file():
+        raise RuntimeError("pinned model catalog is missing from /seed/models.json")
     if seed_database.is_file():
         shutil.copyfile(seed_database, data / "opencode.db")
 
@@ -415,10 +414,12 @@ def prepare_opencode_env() -> dict[str, str]:
         "XDG_CACHE_HOME": str(cache),
         "XDG_STATE_HOME": str(state),
         "OPENCODE_CONFIG_DIR": str(config),
-        # Stock 2.0.23 inline config has highest local priority. Register the
+        # Stock 2.2.2 inline config has highest local priority. Register the
         # runner-owned observer last so it sees the effective transformed tools.
         "OPENCODE_CONFIG_CONTENT": json.dumps({"plugins": [observer_root.as_uri()]}),
         "OPENCODE_DB": "opencode.db",
+        "OPENCODE_MODELS_PATH": "/seed/models.json",
+        "OPENCODE_DISABLE_MODELS_FETCH": "1",
         "OPENCODE_DISABLE_AUTOUPDATE": "1",
     })
     return env

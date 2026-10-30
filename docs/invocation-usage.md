@@ -52,7 +52,7 @@ The absence of an input JSON schema is intentional in the current interface. Do 
 | <code>--config PATH</code> | No | OpenCode | Explicit OpenCode JSON config seed. The host OpenCode config is not inherited automatically. |
 | <code>--auth PATH</code> | No | OpenCode | Explicit legacy OpenCode auth JSON seed. |
 | <code>--database PATH</code> | No | OpenCode | OpenCode V2 database source. The runner copies only credential rows and migration journals into a sanitized temporary database. |
-| <code>--models-catalog PATH</code> | No | OpenCode | Explicit OpenCode model-catalog seed. |
+| <code>--models-catalog PATH</code> | No | OpenCode | Explicit OpenCode model-catalog snapshot. Otherwise `OPENCODE_EVAL_RUNNER_MODELS` is used, or the runner downloads `https://models.opencode.ai/api.json` before invocation. The file is validated, mounted read-only, and OpenCode background fetch is disabled. There is no implicit legacy XDG cache discovery. |
 | <code>--config-root PATH</code> | No | OpenCode | Explicit OpenCode config-root source used by the runtime plugin compatibility bridge. The current implementation materializes the supported local Loom plugin tree from <code>plugins/loom</code> when present. |
 
 ## Ways to run
@@ -110,7 +110,7 @@ The separate generic suite command is documented in [Public eval CLI and profile
 | --- | --- | --- | --- |
 | <code>--auth PATH</code> | Optional; otherwise env/default discovery | OpenCode | Legacy auth JSON seed. |
 | <code>--database PATH</code> | Optional; otherwise env/default discovery | OpenCode | V2 database source; sanitized before container use. |
-| <code>--models-catalog PATH</code> | Optional; otherwise env/default discovery | OpenCode | Model-catalog seed. |
+| <code>--models-catalog PATH</code> | Optional; otherwise env/download | Built-in OpenCode eval | Explicit > `OPENCODE_EVAL_RUNNER_MODELS` > current registry download. One run snapshot is shared by its phases, iterations and retries. |
 | <code>--config PATH</code> | Optional | OpenCode | Explicit OpenCode config JSON. |
 | <code>--config-root PATH</code> | Optional | OpenCode | Explicit config-root source for supported local plugin materialization. |
 
@@ -162,7 +162,7 @@ A project may either call `invoke` repeatedly from its own harness or implement 
 | <code>OPENCODE_EVAL_RUNNER_IMAGE</code> | Generic fallback image override used after the transport-specific override. |
 | <code>OPENCODE_EVAL_RUNNER_AUTH</code> | OpenCode auth JSON seed path. |
 | <code>OPENCODE_EVAL_RUNNER_DB</code> | OpenCode V2 database source path. |
-| <code>OPENCODE_EVAL_RUNNER_MODELS</code> | OpenCode model-catalog seed path. |
+| <code>OPENCODE_EVAL_RUNNER_MODELS</code> | Explicit OpenCode model-catalog snapshot path. Used when `--models-catalog` is absent; the registry is downloaded only when both are absent. |
 | <code>OPENCODE_EVAL_RUNNER_CONFIG</code> | Explicit OpenCode config JSON path. |
 | <code>OPENCODE_EVAL_RUNNER_CONFIG_ROOT</code> | Explicit OpenCode config-root source path. |
 

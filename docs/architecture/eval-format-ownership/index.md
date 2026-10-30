@@ -10,6 +10,8 @@
 
 ## Related authority
 
+- [Catalog ADR-001 — Native registry file and shared snapshot](../opencode-catalog/decisions/adr-001-pin-catalog-through-supported-file-interface.md) — Implemented and revalidated catalog acquisition, immutable snapshots, and native OpenCode file delivery.
+
 - [Evaluation format ownership requirements](../../requirements/eval-format-ownership/index.md)
 - [BR-005 — Evaluate multiple skill inputs together](../../requirements/eval-format-ownership/br-005-evaluate-multiple-skill-inputs-together.md)
 - [OC-001 — Evaluation case input conformance](../../requirements/eval-format-ownership/oc-001-evaluation-case-input-conformance.md)

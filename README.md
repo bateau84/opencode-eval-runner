@@ -56,21 +56,15 @@ OpenCode V2 provider connections are stored in the normal OpenCode database:
 
 The runner does **not** mount that database directly. It creates a temporary schema-only copy containing only the `credential` rows and migration journals; session, project, message, event, and other runtime tables remain empty. That sanitized credential database is mounted read-only and copied into the container's fresh writable data directory.
 
-The normal OpenCode model catalog is also seeded automatically when present:
+The runner pins the catalog through OpenCode's supported registry-file interface. For OpenCode invocations, it uses an explicit `--models-catalog` path first, then `OPENCODE_EVAL_RUNNER_MODELS`, and otherwise downloads the current registry from `https://models.opencode.ai/api.json` before launching the container. It validates and snapshots the complete source, then mounts it read-only at `/seed/models.json`.
 
-```text
-~/.cache/opencode/models.json
-```
-
-(or `$XDG_CACHE_HOME/opencode/models.json`). This makes the isolated container see the same resolved model registry as the host without inheriting the rest of the host cache.
-
-The auth, sanitized V2 credential database, and model-catalog seeds are mounted read-only and copied into fresh container-local XDG directories. Sessions, history, projects, the rest of the cache, and the global config tree are not inherited.
+OpenCode receives `OPENCODE_MODELS_PATH=/seed/models.json` and `OPENCODE_DISABLE_MODELS_FETCH=1`; the runner does not use or discover the legacy XDG model cache. The auth and sanitized V2 credential database are copied into fresh container-local XDG directories. Sessions, history, projects, the rest of the cache, and the global config tree are not inherited.
 
 An OpenCode config is **not** inherited automatically. The container constructs a minimal config unless you explicitly pass one with `--config` or `OPENCODE_EVAL_RUNNER_CONFIG`.
 
 This avoids importing host MCPs, plugins, agent defaults, or provider overrides into behavioral evidence. Only explicit seed files are mounted; the host OpenCode config directory, data directory, cache, and sessions are never mounted.
 
-OpenCode V2 does not document a manual model-catalog refresh command. The runner therefore does not run the legacy `opencode models --refresh` path. Each invocation starts a fresh OpenCode process with a fresh writable cache and lets V2 resolve the requested model through its normal catalog/provider startup path. If an explicit models catalog is supplied, it is available as a seed for custom/private-provider cases.
+Each invocation starts a fresh OpenCode process and consumes the pinned registry file before model selection. Catalog acquisition or validation failure stops preparation before inference; there is no bundled/legacy-cache fallback. Built-in eval acquires once and shares the same snapshot across its phases, iterations and retries. External profiles retain their per-spec catalog choices.
 
 Known API-key environment variables are passed when present:
 
@@ -80,7 +74,7 @@ Known API-key environment variables are passed when present:
 
 Additional variables require explicit `--env NAME`.
 
-Reasoning can be pinned explicitly with `--reasoning LEVEL`. The pinned stock OpenCode 2.0.23 CLI represents a model variant in the model reference, so the runner maps `--model provider/model --reasoning LEVEL` to `opencode run --model provider/model#LEVEL`. Supplying both a `#variant` in `--model` and `--reasoning` is rejected as ambiguous. If the model reference already contains a variant and `--reasoning` is omitted, the result records that variant with `"reasoning_source": "model-variant"`. If neither form supplies a level, the runner leaves OpenCode's provider/model default untouched and records `"reasoning": "provider-default"`.
+Reasoning can be pinned explicitly with `--reasoning LEVEL`. The pinned stock OpenCode 2.2.2 CLI represents a model variant in the model reference, so the runner maps `--model provider/model --reasoning LEVEL` to `opencode run --model provider/model#LEVEL`. Supplying both a `#variant` in `--model` and `--reasoning` is rejected as ambiguous. If the model reference already contains a variant and `--reasoning` is omitted, the result records that variant with `"reasoning_source": "model-variant"`. If neither form supplies a level, the runner leaves OpenCode's provider/model default untouched and records `"reasoning": "provider-default"`.
 
 ### `github-copilot-cli`
 
@@ -149,7 +143,7 @@ PYTHONPATH=. python3 bin/opencode-eval-runner invoke \
   --output /tmp/target.json
 ```
 
-The wrapper automatically detects the normal OpenCode `auth.json`, `opencode.db`, and `models.json` when they exist. The database is always sanitized before it enters the container.
+The wrapper detects the normal OpenCode `auth.json` and `opencode.db` when present. Catalog selection follows the explicit path > `OPENCODE_EVAL_RUNNER_MODELS` > current registry download precedence. The database is always sanitized before it enters the container.
 
 Container networking uses the OCI engine's normal default unless explicitly overridden. For hosts where rootless Podman DNS is broken, an opt-in override can be supplied:
 
@@ -197,7 +191,7 @@ opencode-eval-runner invoke \
   ...
 ```
 
-The expected-plugin preflight is zero-inference. The runner requires the plugin entrypoint to be materialized in the isolated config, starts a private stock OpenCode 2.0.23 server, creates a non-resuming Session prompt so plugin activation reaches its barrier without model inference, and verifies that the named plugin is present and active in the runtime plugin inventory. Agent resolution remains part of the real `opencode run --agent` invocation. Missing materialization, activation failure, or later agent resolution failure is infrastructure/non-evidence, never a behavioral FAIL. Actual tool use remains a repository-owned behavioral assertion in the eval corpus.
+The expected-plugin preflight is zero-inference. The runner requires the plugin entrypoint to be materialized in the isolated config, starts a private stock OpenCode 2.2.2 server, creates a non-resuming Session prompt so plugin activation reaches its barrier without model inference, and verifies that the named plugin is present and active in the runtime plugin inventory. Agent resolution remains part of the real `opencode run --agent` invocation. Missing materialization, activation failure, or later agent resolution failure is infrastructure/non-evidence, never a behavioral FAIL. Actual tool use remains a repository-owned behavioral assertion in the eval corpus.
 
 ### Evaluating a skill
 
@@ -388,9 +382,9 @@ The container emits this object as a single JSON line on stdout. The host harnes
 
 ### Large OpenCode model catalogs
 
-The runner treats imported `models.json` as a potential credential source, not harmless metadata. Generated OpenCode model caches may exceed the usual **4 MB** limit for authentication and configuration JSON. The credential inventory now scans **up to 64 MB** of model-catalog JSON while retaining the original 4 MB bound for auth/config. It reads and validates the *entire* selected source, including sensitive values near its end; no prefix-only, skipped-source, or trust-by-extension exceptions are permitted.
+The runner treats `models.json` as a potential credential source, not harmless metadata. The credential inventory scans **up to 64 MB** of model-catalog JSON while retaining the original 4 MB bound for auth/config. It reads and validates the *entire* selected source, including sensitive values near its end; no prefix-only, skipped-source, or trust-by-extension exceptions are permitted.
 
-Oversized, malformed, or unreadable catalogs now fail host-side preflight **before inference begins** with an actionable credential-inventory error. The container independently repeats the fail-closed scan before output: if its inventory is unavailable, required observations remain non-evidence and the result-sink guard redacts convenience fields instead of reporting unsanitized data. The higher catalog-specific bound is deliberate and finite to avoid unbounded memory use. If the cache exceeds it, supply a valid minimal `--models-catalog` seed containing the required provider and model until a larger bounded source strategy is designed.
+Oversized, malformed, or unreadable catalogs fail host-side preflight **before inference begins** with an actionable error. The container independently repeats the fail-closed scan before output: if its inventory is unavailable, required observations remain non-evidence and the result-sink guard redacts convenience fields instead of reporting unsanitized data. The higher catalog-specific bound is deliberate and finite to avoid unbounded memory use. If the catalog exceeds it, supply a valid bounded `--models-catalog` snapshot.
 
 The runtime image and host runner must be updated together; changing only the host Python library does **not** change the container's credential scanner.
 
@@ -407,7 +401,7 @@ The eval repository still owns the assertion semantics and decides PASS, FAIL, o
 
 The transport images currently pin:
 
-- OpenCode CLI `2.0.23`
+- OpenCode CLI `2.2.2`
 - GitHub Copilot CLI `1.0.83`
 
 The two CLIs are not bundled together. OpenCode's npm package is used only as a build-time native-binary selector; GitHub Copilot CLI is installed from its native release installer. Node/npm are absent from the final runtime images.
@@ -446,13 +440,13 @@ This profile does **not** claim resistance to an evaluated plugin that deliberat
 
 See [Trusted-checkout runtime evidence](docs/trusted-checkout-evidence.md) and the [versioned runtime-evidence result contract](docs/runtime-evidence-contract.md).
 
-OpenCode results now expose `opencode-eval-runner/runtime-evidence/v1` as the single authoritative runtime-evidence object. Native calls are observed through the stock-2.0.23 decoded-execution and Session terminal boundaries. Code Mode inner identity/input/ordering is observable, while exact final script-visible value/error remains explicitly `unsupported`. Existing `tools`, `actions`, `tool_result_evidence`, stdout/stderr, and model text remain convenience/diagnostic data only; they do not expose runtime-evidence eligibility and are never substitutes for `runtime_evidence`.
+OpenCode results now expose `opencode-eval-runner/runtime-evidence/v1` as the single authoritative runtime-evidence object. Native calls are observed through the stock-2.2.2 decoded-execution and Session terminal boundaries. Code Mode inner identity/input/ordering is observable, while exact final script-visible value/error remains explicitly `unsupported`. Existing `tools`, `actions`, `tool_result_evidence`, stdout/stderr, and model text remain convenience/diagnostic data only; they do not expose runtime-evidence eligibility and are never substitutes for `runtime_evidence`.
 
 Overall evidence eligibility is separate from assertion eligibility: an unsupported Code Mode finality boundary does not invalidate an unrelated complete native assertion, and redacted/omitted fields only block assertions that require those exact values.
 
 The `github-copilot-cli` transport has no OpenCode runtime observer. It still emits the canonical `runtime_evidence` object, but with status `unsupported`.
 
-> Stock OpenCode 2.0.23 does not expose a supported boundary that proves the exact final value/error seen by a Code Mode script for each inner call. That assertion is reported as unsupported.
+> Stock OpenCode 2.2.2 does not expose a supported boundary that proves the exact final value/error seen by a Code Mode script for each inner call. That assertion is reported as unsupported.
 
 ## Security boundary
 

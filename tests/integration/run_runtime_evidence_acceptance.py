@@ -11,14 +11,15 @@ from __future__ import annotations
 import argparse
 import json
 import os
-from pathlib import Path
 import re
+import shlex
 import shutil
 import subprocess
 import sys
 import tempfile
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -731,7 +732,39 @@ def clean_env(scenario: str, xdg: Path) -> dict[str, str]:
     return env
 
 
-def run_scenario(image: str, scenario: str, output: Path) -> dict[str, Any]:
+def engine_environment(engine: str, host_data_home: str | None, wrapper_dir: Path) -> dict[str, str]:
+    """Keep Podman's host image store while runner/OpenCode XDG state stays isolated."""
+    env = dict(os.environ)
+    if engine != "podman":
+        return env
+    podman = shutil.which("podman")
+    if not podman or not host_data_home:
+        raise RuntimeError("Podman acceptance requires a host data directory and podman executable")
+    wrapper_dir.mkdir(parents=True, exist_ok=True)
+    wrapper = wrapper_dir / "podman"
+    # Engine-specific environment is applied only in the Podman process. The
+    # runner itself retains clean_env's temporary XDG directories.
+    wrapper.write_text(
+        "#!/bin/sh\n"
+        f"export XDG_DATA_HOME={shlex.quote(host_data_home)}\n"
+        "if [ \"$1\" = run ]; then shift; "
+        f"exec {shlex.quote(podman)} run --pull=never \"$@\"; fi\n"
+        f"exec {shlex.quote(podman)} \"$@\"\n",
+        encoding="utf-8",
+    )
+    wrapper.chmod(0o755)
+    env["PATH"] = f"{wrapper_dir}{os.pathsep}{env.get('PATH', '')}"
+    return env
+
+
+def run_scenario(
+    image: str,
+    scenario: str,
+    output: Path,
+    engine: str,
+    host_data_home: str | None,
+    wrapper_dir: Path,
+) -> dict[str, Any]:
     with FixtureProvider(scenario) as provider, tempfile.TemporaryDirectory(prefix=f"runtime-evidence-{scenario}-") as tmp:
         root = Path(tmp)
         workspace = root / "workspace"
@@ -740,17 +773,26 @@ def run_scenario(image: str, scenario: str, output: Path) -> dict[str, Any]:
         prompt = root / "prompt.txt"
         prompt.write_text(f"Run the deterministic {scenario} fixture.", encoding="utf-8")
         result_path = root / "result.json"
-        timeout = 2 if scenario == "timeout" else 30
+        # Leave enough time for the real runtime/plugin startup under CI load;
+        # the fixture's slow tool takes 10 seconds, so 8 seconds still proves
+        # an in-flight invocation timeout without timing out before tool start.
+        timeout = 8 if scenario == "timeout" else 30
         command = [
             os.environ.get("PYTHON", "python3"), str(ROOT / "bin" / "opencode-eval-runner"), "invoke",
-            "--engine", "docker", "--network", "host", "--image", image,
+            "--engine", engine, "--network", "host", "--image", image,
             "--transport", "opencode", "--workspace", str(workspace), "--workspace-mode", "rw",
+            "--models-catalog", str(ROOT / "tests" / "fixtures" / "models-catalog.json"),
             "--model", "fixture/mock", "--agent", "general",
             "--config", str(workspace / "opencode.json"), "--prompt-file", str(prompt),
             "--output", str(result_path), "--timeout-seconds", str(timeout), "--container-timeout", "45",
         ]
+        scenario_xdg = root / "xdg"
+        scenario_env = clean_env(scenario, scenario_xdg)
+        if scenario_env["XDG_DATA_HOME"] != str(scenario_xdg / "data"):
+            raise RuntimeError("scenario XDG data directory must remain isolated from engine storage")
+        scenario_env["PATH"] = engine_environment(engine, host_data_home, wrapper_dir)["PATH"]
         proc = subprocess.run(
-            command, cwd=ROOT, env=clean_env(scenario, root / "xdg"),
+            command, cwd=ROOT, env=scenario_env,
             capture_output=True, text=True, timeout=60, check=False,
         )
         result = json.loads(result_path.read_text(encoding="utf-8")) if result_path.is_file() else {}
@@ -780,37 +822,60 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--image", required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--engine", choices=("docker", "podman"), default="docker")
+    parser.add_argument("--image-id", help="Expected full local image ID; checked before any scenario")
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
 
-    version = subprocess.run(
-        ["docker", "run", "--rm", "--entrypoint", "opencode", args.image, "--version"],
-        capture_output=True, text=True, check=True, timeout=30,
-    ).stdout.strip()
-    runtime_ok = version in {"2.0.23", "opencode v2.0.23"}
+    host_data_home = os.environ.get("XDG_DATA_HOME") or str(Path.home() / ".local" / "share")
+    engine_tmp = tempfile.TemporaryDirectory(prefix="runtime-evidence-engine-")
+    try:
+        wrapper_dir = Path(engine_tmp.name)
+        engine_env = engine_environment(args.engine, host_data_home, wrapper_dir)
+        image_id = subprocess.run(
+            [args.engine, "image", "inspect", "--format", "{{.Id}}", args.image],
+            capture_output=True, text=True, check=True, timeout=30, env=engine_env,
+        ).stdout.strip()
+        if args.image_id and image_id.removeprefix("sha256:") != args.image_id.removeprefix("sha256:"):
+            raise RuntimeError(f"local image ID mismatch: expected {args.image_id}, found {image_id}")
+        # Use the immutable ID, not a mutable tag. Podman's engine wrapper
+        # preserves its host image store while app state remains isolated.
+        immutable_image = f"sha256:{image_id.removeprefix('sha256:')}"
+        version = subprocess.run(
+            [args.engine, "run", "--rm", "--pull=never", "--entrypoint", "opencode", immutable_image, "--version"],
+            capture_output=True, text=True, check=True, timeout=30, env=engine_env,
+        ).stdout.strip()
+    except Exception:
+        engine_tmp.cleanup()
+        raise
+    runtime_ok = version in {"2.2.2", "opencode v2.2.2"}
 
     reports = {}
     for scenario in VALIDATORS:
-        reports[scenario] = run_scenario(args.image, scenario, args.output)
+        reports[scenario] = run_scenario(immutable_image, scenario, args.output, args.engine, host_data_home, wrapper_dir)
         print(f"{scenario}: {'PASS' if reports[scenario]['passed'] else 'FAIL'}", flush=True)
 
     summary = {
         "kind": "provider-free-runtime-evidence-acceptance",
         "version": 1,
-        "image": args.image,
+        "image": immutable_image,
+        "image_id": image_id,
+        "engine": args.engine,
         "opencode_version": version,
-        "stock_opencode_2_0_23": runtime_ok,
+        "stock_opencode_2_2_2": runtime_ok,
         "provider_inference": False,
         "cases": {name: report["passed"] for name, report in reports.items()},
         "passed": runtime_ok and all(report["passed"] for report in reports.values()),
         "notes": {
-            "code_mode": "Stock 2.0.23 inner execution identity/input/order are observed; exact final script-visible value/error is explicitly unsupported.",
+            "engine_storage": "Podman engine subprocesses retain host image storage; runner/OpenCode XDG state remains isolated. Every Podman run is pull-never.",
+            "code_mode": "Stock 2.2.2 inner execution identity/input/order are observed; exact final script-visible value/error is explicitly unsupported.",
             "authority": "Workspace oracle records are comparison fixtures only and never evidence authority.",
             "outcomes": "Each case records product outcome, observation outcome, and evidence eligibility separately.",
         },
     }
     (args.output / "summary.json").write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     print(json.dumps(summary, indent=2, sort_keys=True), flush=True)
+    engine_tmp.cleanup()
     return 0 if summary["passed"] else 1
 
 
