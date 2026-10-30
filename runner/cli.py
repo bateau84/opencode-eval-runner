@@ -9,6 +9,7 @@ import sqlite3
 import subprocess
 import sys
 import tempfile
+from contextlib import nullcontext
 from pathlib import Path
 
 from container.evidence_safety import (
@@ -16,6 +17,7 @@ from container.evidence_safety import (
     _json_source_credentials,
 )
 from container.runtime_evidence import RuntimeEvidenceError, validate_runtime_evidence
+from runner.model_catalog import pinned_model_catalog
 from runner.oci_image import (
     ImageSelectionError,
     local_engine_prefix_and_environment,
@@ -60,11 +62,6 @@ def validate_container_result(result: object) -> dict:
 def default_auth_path() -> Path:
     base = Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local" / "share"))
     return base / "opencode" / "auth.json"
-
-
-def default_models_path() -> Path:
-    base = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache"))
-    return base / "opencode" / "models.json"
 
 
 def default_database_path() -> Path:
@@ -326,11 +323,9 @@ def build_container_command(
 
     auth = existing_seed(args.auth, "OPENCODE_EVAL_RUNNER_AUTH", default_auth_path())
     config = existing_seed(args.config, "OPENCODE_EVAL_RUNNER_CONFIG")
-    models = existing_seed(
-        args.models_catalog,
-        "OPENCODE_EVAL_RUNNER_MODELS",
-        default_models_path(),
-    )
+    models = getattr(args, "models_catalog", None) or os.environ.get("OPENCODE_EVAL_RUNNER_MODELS")
+    if models:
+        models = Path(models).expanduser().resolve()
     # Fail before spending model inference if a selected model cache cannot
     # support a complete credential inventory. The container repeats this
     # check before any observation is exported (including after seed copy).
@@ -339,8 +334,7 @@ def build_container_command(
     ):
         raise RunnerError(
             "model catalog credential inventory unavailable: "
-            f"{models} must be valid JSON within {MODEL_CATALOG_SOURCE_LIMIT} bytes; "
-            "use --models-catalog with a provider-scoped cache or repair the source"
+            f"{models} must be valid JSON within {MODEL_CATALOG_SOURCE_LIMIT} bytes"
         )
     if auth:
         command += bind_arg(auth, "/seed/auth.json", readonly=True)
@@ -410,29 +404,34 @@ def invoke(args: argparse.Namespace) -> int:
         )
 
         host_env = host_environment_for_transport(args.transport)
-        command, _ = build_container_command(
-            args,
-            input_dir,
-            output_dir,
-            host_env=host_env,
-            database_seed=database_seed,
+        catalog_source = (
+            pinned_model_catalog(args.models_catalog)
+            if args.transport == "opencode"
+            else nullcontext(None)
         )
-        command_environment = host_env
-        if getattr(args, "require_local_opencode_image", False):
-            try:
-                _, command_environment = local_engine_prefix_and_environment(
-                    command[0], host_env
-                )
-            except ImageSelectionError as exc:
-                raise RunnerError(str(exc)) from exc
-        proc = subprocess.run(
-            command,
-            env=command_environment,
-            text=True,
-            capture_output=True,
-            timeout=args.container_timeout,
-            check=False,
-        )
+        try:
+            catalog = catalog_source.__enter__()
+        except (OSError, TypeError, ValueError) as exc:
+            raise RunnerError(f"model catalog preparation failed: {exc}") from exc
+        try:
+            if catalog is not None:
+                args.models_catalog = str(catalog)
+            command, _ = build_container_command(
+                args, input_dir, output_dir, host_env=host_env,
+                database_seed=database_seed,
+            )
+            command_environment = host_env
+            if getattr(args, "require_local_opencode_image", False):
+                try:
+                    _, command_environment = local_engine_prefix_and_environment(command[0], host_env)
+                except ImageSelectionError as exc:
+                    raise RunnerError(str(exc)) from exc
+            proc = subprocess.run(
+                command, env=command_environment, text=True, capture_output=True,
+                timeout=args.container_timeout, check=False,
+            )
+        finally:
+            catalog_source.__exit__(None, None, None)
         try:
             result = json.loads(proc.stdout)
         except json.JSONDecodeError as exc:

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Provider-free stock OpenCode 2.0.23 Code Mode observation boundary probe.
+"""Provider-free stock OpenCode 2.2.2 Code Mode observation boundary probe.
 
 This is an experiment, not an evidence producer. It drives the actual runner image
 with a deterministic loopback OpenAI-compatible provider and checks which facts a
@@ -333,9 +333,9 @@ def summarize(report: dict, image: str) -> dict:
         return output if isinstance(output, str) else None
 
     checks = {
-        "stock_runtime_2_0_23": report.get("opencode_version") in {
-            "2.0.23",
-            "opencode v2.0.23",
+        "stock_runtime_2_2_2": report.get("opencode_version") in {
+            "2.2.2",
+            "opencode v2.2.2",
         },
         "provider_free_execution_completed": (
             report.get("transport", {}).get("exit_code") == 0
@@ -422,7 +422,7 @@ def summarize(report: dict, image: str) -> dict:
         "kind": "code-mode-inner-observation-probe",
         "version": 1,
         "image": image,
-        "runtime": "stock OpenCode 2.0.23",
+        "runtime": "stock OpenCode 2.2.2",
         "checks": checks,
         "diagnostics_passed": all(checks.values()),
         "capabilities": {
@@ -452,6 +452,7 @@ def summarize(report: dict, image: str) -> dict:
 
 def host(image: str, output: Path) -> int:
     repo = Path(__file__).resolve().parents[2]
+    model_catalog = repo / "tests" / "fixtures" / "models-catalog.json"
     output.mkdir(parents=True, exist_ok=True)
     command = [
         "docker",
@@ -472,6 +473,8 @@ def host(image: str, output: Path) -> int:
         "/workspace",
         "--volume",
         f"{repo}:/probe-repo:ro",
+        "--volume",
+        f"{model_catalog}:/seed/models.json:ro",
         "--entrypoint",
         "python3",
         image,

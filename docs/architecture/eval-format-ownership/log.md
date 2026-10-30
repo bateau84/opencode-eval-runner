@@ -3,7 +3,14 @@ type: Log
 title: Evaluation format ownership architecture change log
 description: Changes to the evaluation format ownership architecture bundle.
 tags: [architecture, evaluation, log]
+timestamp: 2026-10-30T00:00:00Z
 ---
+
+## 2026-10-30
+
+- Updated [ARS-001](specifications/ars-001-runner-eval-contract.md) and the [index](index.md) to link the authorized [catalog compatibility decision](../opencode-catalog/decisions/adr-001-pin-catalog-through-supported-file-interface.md); distinguished target realization from current implementation and preserved model/reasoning/failure contracts.
+
+- Reconciled current catalog implementation/revalidation status in [ARS-001](specifications/ars-001-runner-eval-contract.md), the [index](index.md), and [runner contracts](../../eval-engine-runner-contracts.md); CI direct-image probes now mount the read-only catalog fixture, and CI explicitly runs catalog pytest coverage.
 
 ## 2026-10-16
 

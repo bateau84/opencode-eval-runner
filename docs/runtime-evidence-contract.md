@@ -63,12 +63,12 @@ A consumer must decide evidence eligibility per assertion, not from the top-leve
 4. If the assertion depends on an exact observation field, that field must be `available`. `redacted` or `omitted` makes that value-dependent assertion incomplete; `unsupported` makes it unsupported.
 5. Never fill a missing authoritative fact from `tools`, `actions`, `tool_result_evidence`, stdout/stderr, model text, or workspace files.
 
-For example, an assertion that a direct tool ran can depend on `native`. An assertion about a Code Mode inner tool identity/input can depend on `code_mode_execution`. An assertion about the exact final value or error seen by a Code Mode script depends on `code_mode_finality` and is therefore unsupported on stock OpenCode 2.0.23.
+For example, an assertion that a direct tool ran can depend on `native`. An assertion about a Code Mode inner tool identity/input can depend on `code_mode_execution`. An assertion about the exact final value or error seen by a Code Mode script depends on `code_mode_finality` and is therefore unsupported on stock OpenCode 2.2.2.
 
 
 ## Native observation
 
-The runner-owned stock OpenCode 2.0.23 observer records:
+The runner-owned stock OpenCode 2.2.2 observer records:
 
 - opaque invocation identity;
 - resolved tool;
@@ -94,7 +94,7 @@ The implementation does not treat \`tool.execute.after\` as a complete native fa
 
 ## Code Mode observation
 
-For Code Mode inner calls the runner can observe, on stock 2.0.23:
+For Code Mode inner calls the runner can observe, on stock 2.2.2:
 
 - a unique per-inner invocation identity;
 - the actual effective tool;
@@ -118,7 +118,7 @@ The public result therefore emits the final \`result\` or \`error\` field as:
 
 The \`code_mode_execution\` boundary can still be complete and eligible.
 
-> Stock OpenCode 2.0.23 does not expose a supported boundary that proves the exact final value/error seen by a Code Mode script for each inner call. That assertion is reported as unsupported.
+> Stock OpenCode 2.2.2 does not expose a supported boundary that proves the exact final value/error seen by a Code Mode script for each inner call. That assertion is reported as unsupported.
 
 ## Completeness and invalidity
 
@@ -175,17 +175,17 @@ These are current adapter safety limits, not provider or model guarantees.
 
 The outer result schema remains `opencode-eval-runner/v1`, but `runtime_evidence` is now mandatory. The host CLI validates it after container execution and rejects a result that omits it or violates this v1 contract.
 
-Official OpenCode and Copilot images in this revision emit the required object. A legacy or custom image built against the older result shape must be upgraded together with the host runner. This does not require any OpenCode modification: the supported OpenCode profile uses stock 2.0.23. Copilot results satisfy the result-shape requirement by reporting runtime evidence as explicitly `unsupported`.
+Official OpenCode and Copilot images in this revision emit the required object. A legacy or custom image built against the older result shape must be upgraded together with the host runner. This does not require any OpenCode modification: the supported OpenCode profile uses stock 2.2.2. Copilot results satisfy the result-shape requirement by reporting runtime evidence as explicitly `unsupported`.
 
 ## Unsupported areas
 
-- \`code_mode_finality\`: stock OpenCode 2.0.23 does not expose the exact final value/error seen by each Code Mode script call.
+- \`code_mode_finality\`: stock OpenCode 2.2.2 does not expose the exact final value/error seen by each Code Mode script call.
 - \`github-copilot-cli\`: this transport has no OpenCode runtime observer, so its \`runtime_evidence\` object is explicitly \`unsupported\`.
 - hostile evaluated plugins: same-process instrumentation is not protected from a plugin that deliberately compromises the trusted runtime.
 
 ## Trust scope
 
-This is the normal trusted-checkout Loom eval profile. It uses stock OpenCode 2.0.23 and reviewed same-process instrumentation.
+This is the normal trusted-checkout Loom eval profile. It uses stock OpenCode 2.2.2 and reviewed same-process instrumentation.
 
 It does not require or claim:
 

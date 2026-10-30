@@ -329,7 +329,16 @@ class AgentRuntimeAdapter:
             timeout=timeout,
             container_timeout=container_timeout,
         )
-        spec = replace(spec, engine=self._args.engine or "auto", network=self._args.network)
+        spec = replace(
+            spec,
+            engine=self._args.engine or "auto",
+            network=self._args.network,
+            models_catalog=(
+                Path(self._args.models_catalog)
+                if getattr(self._args, "models_catalog", None)
+                else None
+            ),
+        )
         prepared.invocations.append(_record_invocation(spec))
         return spec
 
@@ -408,7 +417,16 @@ class AgentRuntimeAdapter:
                           workspace=prepared.judge_workspace, workspace_mode="ro", prompt=prompt,
                           expected_plugin=None, config_root=None, timeout=timeout,
                           container_timeout=container_timeout, system=JUDGE_SYSTEM)
-        spec = replace(spec, engine=self._args.engine or "auto", network=self._args.network)
+        spec = replace(
+            spec,
+            engine=self._args.engine or "auto",
+            network=self._args.network,
+            models_catalog=(
+                Path(self._args.models_catalog)
+                if getattr(self._args, "models_catalog", None)
+                else None
+            ),
+        )
         prepared.invocations.append(_record_invocation(spec))
         return spec
 
@@ -778,7 +796,16 @@ class SkillAblationAdapter:
             timeout=timeout,
             container_timeout=outer_timeout,
         )
-        return replace(spec, engine=self._args.engine or "auto", network=self._args.network)
+        return replace(
+            spec,
+            engine=self._args.engine or "auto",
+            network=self._args.network,
+            models_catalog=(
+                Path(self._args.models_catalog)
+                if getattr(self._args, "models_catalog", None)
+                else None
+            ),
+        )
 
     def _profile_side(self, case: NormalizedCase, side: SkillSide):
         adapter = self

@@ -158,6 +158,7 @@ def grade(expectations, forbidden, *, met=True, trap_observed=False):
 class BuiltinInvoker:
     def __init__(self, *, agent_grade=None, skill_grades=None, runtime_evidence=None, skill_candidate_evidence=None):
         self.specs = []
+        self.catalog_bytes = []
         self.agent_grade = agent_grade
         self.skill_grades = skill_grades or [
             grade(["useful"], ["leaks"], met=False),
@@ -169,6 +170,7 @@ class BuiltinInvoker:
 
     def __call__(self, spec):
         self.specs.append(spec)
+        self.catalog_bytes.append(spec.models_catalog.read_bytes() if spec.models_catalog else None)
         if spec.agent == "eval-judge":
             if self.agent_grade is not None:
                 text = self.agent_grade
@@ -201,7 +203,10 @@ def run_command(args, invoker):
     stdout, stderr = io.StringIO(), io.StringIO()
     with patch.dict(
         os.environ,
-        {"OPENCODE_EVAL_RUNNER_OPENCODE_IMAGE": TEST_OPENCODE_IMAGE},
+        {
+            "OPENCODE_EVAL_RUNNER_OPENCODE_IMAGE": TEST_OPENCODE_IMAGE,
+            "OPENCODE_EVAL_RUNNER_MODELS": str(Path(__file__).parent / "fixtures" / "models-catalog.json"),
+        },
         clear=False,
     ):
         result = run_eval(args, stdout=stdout, stderr=stderr, invoker=invoker, sleep=lambda _: None)
@@ -244,6 +249,9 @@ def test_builtin_agent_eval_uses_public_command_and_seals_family_metadata(tmp_pa
     assert [spec.agent for spec in invoker.specs] == ["assistant", "eval-judge"]
     assert all(spec.model == "provider/model" for spec in invoker.specs)
     assert all(spec.require_local_image for spec in invoker.specs)
+    assert len({spec.models_catalog for spec in invoker.specs}) == 1
+    assert all(spec.models_catalog is not None for spec in invoker.specs)
+    assert len(set(invoker.catalog_bytes)) == 1
     assert all(
         spec.image == TEST_OPENCODE_IMAGE
         for spec in invoker.specs
@@ -265,6 +273,34 @@ def test_builtin_agent_eval_uses_public_command_and_seals_family_metadata(tmp_pa
     assert family["family_result"]["semantic_judge"]["passed"] is True
     assert len(artifact["project_metadata"]["runner_eval_invocations"]) == 2
     assert manifest["project_metadata"]["runner_eval_input"]["sha256"] == __import__("hashlib").sha256(source.read_bytes()).hexdigest()
+
+
+def test_invalid_catalog_fails_before_any_builtin_invocation(tmp_path, monkeypatch):
+    root = tmp_path / "project"
+    write_agent_root(root)
+    source = tmp_path / "suite.json"
+    source.write_text(json.dumps({
+        "version": 1, "name": "single", "cases": [{
+            "id": "decision", "agent": "assistant", "execution": "role-decision",
+            "requirements": ["BR-1"], "prompt": "Choose", "trap": "fabricate",
+            "expectations": ["good", "safe"], "must_not": ["fake"],
+        }],
+    }))
+    bad_catalog = tmp_path / "bad-catalog.json"
+    bad_catalog.write_text("not json", encoding="utf-8")
+    monkeypatch.chdir(root)
+    args = parser().parse_args([
+        "eval", "--input", str(source), "--family", "agent-runtime",
+        "--target-model", "provider/model", "--all", "--models-catalog", str(bad_catalog),
+    ])
+    invoker = BuiltinInvoker()
+
+    code, stdout, stderr = run_command(args, invoker)
+
+    assert code == EVAL_EXIT_ERROR
+    assert stdout == ""
+    assert "model catalog preparation failed" in stderr
+    assert invoker.specs == []
 
 
 def test_builtin_eval_rejects_missing_or_mutable_image_before_invoker():
@@ -623,6 +659,9 @@ def test_skill_eval_runs_four_phases_and_preserves_comparison_and_pair_integrity
     code, _, _ = run_command(args, invoker)
 
     assert code == EVAL_EXIT_PASS
+    assert len({spec.models_catalog for spec in invoker.specs}) == 1
+    assert all(spec.models_catalog is not None for spec in invoker.specs)
+    assert len(set(invoker.catalog_bytes)) == 1
     assert [spec.agent for spec in invoker.specs] == ["skill-baseline", "eval-judge", "skill-eval", "eval-judge"]
     assert [spec.skill for spec in invoker.specs] == [None, None, "helper", None]
     assert all(spec.require_local_image for spec in invoker.specs)

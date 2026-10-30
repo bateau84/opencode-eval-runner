@@ -1,0 +1,1 @@
+{"fixture":{"id":"fixture","name":"Fixture provider","env":[],"npm":"fixture/provider","models":{"fixture/model":{"id":"fixture/model","name":"Fixture model","release_date":"2026-01-01","limit":{"context":4096,"output":1024},"reasoning_options":[{"type":"effort","values":["low","high"]},{"type":"toggle"},{"type":"budget_tokens","min":0,"max":262144}]}}}}

@@ -20,7 +20,7 @@ jobs:
           python3 -m pip install -r requirements-test.txt
           python3 -m compileall -q runner container tests
           python3 -m unittest discover -s tests -p 'test_*.py' -v
-          python3 -m pytest -v tests/test_eval_input.py tests/test_eval_assertions.py tests/test_eval_builtin_cli.py
+          python3 -m pytest -v tests/test_eval_input.py tests/test_eval_assertions.py tests/test_eval_builtin_cli.py tests/test_model_catalog.py
 
       - name: Build fake Copilot transport for action smoke test
         run: |
@@ -103,7 +103,7 @@ jobs:
             printf 'changed: %s\n' "$path"
 
             case "$path" in
-              Containerfile|action.yml|bin/*|container/*|runner/*|tests/integration/*|tests/test_invoke.py|tests/test_evidence_safety.py|tests/test_native_observer.py|tests/test_runtime_evidence.py|tests/test_runtime_evidence_acceptance.py|.github/workflows/ci.yml)
+              Containerfile|action.yml|bin/*|container/*|runner/*|tests/fixtures/models-catalog.json|tests/integration/*|tests/test_invoke.py|tests/test_evidence_safety.py|tests/test_native_observer.py|tests/test_runtime_evidence.py|tests/test_runtime_evidence_acceptance.py|.github/workflows/ci.yml)
                 runtime=true
                 ;;
             esac
@@ -126,7 +126,7 @@ jobs:
         if: steps.changes.outputs.runtime == 'true'
         run: mkdir -p runtime-integration-artifacts
 
-      - name: Build stock OpenCode 2.0.23 image
+      - name: Build stock OpenCode 2.2.2 image
         if: steps.changes.outputs.runtime == 'true'
         run: docker build -f Containerfile --target opencode -t opencode-eval-runner:opencode-test .
 
@@ -135,13 +135,13 @@ jobs:
         run: |
           version="$(docker run --rm --entrypoint opencode opencode-eval-runner:opencode-test --version)"
           printf 'OpenCode version: %s\n' "$version"
-          test "${version#opencode v}" = "2.0.23"
+          test "${version#opencode v}" = "2.2.2"
           docker run --rm --entrypoint opencode opencode-eval-runner:opencode-test run --help             | grep -F -- 'provider/model#variant'
 
       - name: Run provider-free native observer probe
         if: steps.changes.outputs.runtime == 'true'
         run: |
-          docker run --rm             --network none             --tmpfs /tmp:rw,exec,nosuid,nodev,size=1g,mode=1777             --tmpfs /workspace:rw,nosuid,nodev,size=64m,mode=1777             --volume "$PWD:/probe-repo:ro"             --entrypoint python3             opencode-eval-runner:opencode-test             /probe-repo/tests/integration/run_native_observer_probe.py             > runtime-integration-artifacts/native-observer-probe.json
+          docker run --rm             --network none             --tmpfs /tmp:rw,exec,nosuid,nodev,size=1g,mode=1777             --tmpfs /workspace:rw,nosuid,nodev,size=64m,mode=1777             --volume "$PWD:/probe-repo:ro"             --volume "$PWD/tests/fixtures/models-catalog.json:/seed/models.json:ro"             --entrypoint python3             opencode-eval-runner:opencode-test             /probe-repo/tests/integration/run_native_observer_probe.py             > runtime-integration-artifacts/native-observer-probe.json
           cat runtime-integration-artifacts/native-observer-probe.json
 
       - name: Run stock Code Mode capability probe
@@ -167,7 +167,7 @@ jobs:
           }
           EOF
 
-          docker run --rm             --workdir /workspace             --volume /tmp/preflight-workspace:/workspace:ro             --volume /tmp/preflight-config-root:/seed/opencode-config:ro             --entrypoint python3             opencode-eval-runner:opencode-test - <<'PY'
+          docker run --rm -i             --workdir /workspace             --volume /tmp/preflight-workspace:/workspace:ro             --volume /tmp/preflight-config-root:/seed/opencode-config:ro             --volume "$PWD/tests/fixtures/models-catalog.json:/seed/models.json:ro"             --entrypoint python3             opencode-eval-runner:opencode-test - <<'PY'
           import sys
 
           sys.path.insert(0, "/opt/opencode-eval-runner")
@@ -209,42 +209,45 @@ jobs:
           import { writeFileSync } from "node:fs"
           import { marker } from "fixture-dep"
 
-          writeFileSync("/tmp/config-plugin-loaded", marker)
-          export default async () => ({})
+          export default {
+            id: "loom",
+            async setup() {
+              writeFileSync("/tmp/config-plugin-loaded", marker)
+            },
+          }
           EOF
 
-          docker run --rm             --volume /tmp/plugin-workspace:/workspace:ro             --volume /tmp/plugin-config-root:/seed/opencode-config:ro             --entrypoint python3             opencode-eval-runner:opencode-test - <<'PY'
+          docker run --rm -i             --volume /tmp/plugin-workspace:/workspace:ro             --volume /tmp/plugin-config-root:/seed/opencode-config:ro             --volume "$PWD/tests/fixtures/models-catalog.json:/seed/models.json:ro"             --entrypoint python3             opencode-eval-runner:opencode-test - <<'PY'
           from pathlib import Path
-          import subprocess
           import sys
 
           sys.path.insert(0, "/opt/opencode-eval-runner")
-          from container.invoke import prepare_opencode_env
+          from container.invoke import prepare_opencode_env, verify_expected_plugin
 
           env = prepare_opencode_env()
           bridge = Path(env["OPENCODE_CONFIG_DIR"]) / "node_modules"
           if not bridge.is_symlink():
               raise SystemExit(f"config dependency bridge missing: {bridge}")
 
-          proc = subprocess.run(
-              ["opencode", "api", "--standalone", "GET", "/experimental/tool/ids"],
-              cwd="/workspace",
-              env=env,
-              capture_output=True,
-              text=True,
-              timeout=30,
-              check=False,
+          result = verify_expected_plugin(
+              env,
+              "general",
+              "openai/preflight-no-inference",
+              "loom",
+              30,
           )
+          assert result["plugin"]["id"] == "loom", result
+          assert result["plugin"]["state"]["status"] == "active", result
+          assert result["verification"] == "plugin-entrypoint+activation-barrier+plugin-inventory", result
           marker = Path("/tmp/config-plugin-loaded")
           if not marker.is_file():
               raise SystemExit(
-                  "config-root plugin did not load with workspace dependency; "
-                  f"exit={proc.returncode} stdout={proc.stdout!r} stderr={proc.stderr!r}"
+                  "activated config-root plugin did not resolve workspace dependency"
               )
           value = marker.read_text(encoding="utf-8")
           if value != "resolved-from-workspace-node-modules":
               raise SystemExit(f"unexpected dependency marker: {value!r}")
-          print("PASS config-root plugin dependency bridge")
+          print("PASS config-root plugin activation and dependency bridge")
           PY
 
       - name: Build real Copilot image
