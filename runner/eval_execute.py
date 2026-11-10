@@ -183,6 +183,7 @@ def invoke_once(spec: InvocationSpec) -> tuple[int, object]:
             models_catalog=_path_arg(spec.models_catalog),
             database=_path_arg(spec.database),
             config_root=_path_arg(spec.config_root),
+            claude_config_dir=_path_arg(spec.claude_config_dir),
             env=list(spec.env_names),
             timeout_seconds=spec.timeout_seconds,
             container_timeout=spec.container_timeout,

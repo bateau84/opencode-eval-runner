@@ -38,6 +38,9 @@ See **[Invocation usage and interface reference](docs/invocation-usage.md)** for
 
 ## Transports
 
+[Claude Agent subscription evaluation profile](docs/claude-agent-evals.md) is an opt-in OpenCode 2.2.6 image with an official Claude Code binary and a dedicated native login. Existing 2.2.2 images and non-Claude runs remain unchanged. No live subscription/account acceptance is claimed by the source change.
+
+
 ### `opencode`
 
 Use this for real OpenCode runtime behavior, including project-local agents, skills, plugins, and tool assertions.
