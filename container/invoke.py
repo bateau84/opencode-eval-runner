@@ -752,6 +752,7 @@ def resolve_opencode_reasoning(model: str, reasoning: str) -> tuple[str, str, st
 
 
 RUNTIME_JSON_CREDENTIAL_SOURCES = (
+    Path("/seed/claude-profile/.credentials.json"),
     Path("/seed/auth.json"),
     Path("/seed/opencode.json"),
 )
@@ -822,6 +823,36 @@ def sanitize_result_for_output(
     return safe
 
 
+def require_claude_subscription(env: dict[str, str], model: str) -> None:
+    """Check native Claude login before inference; do not serialize auth output."""
+    selected = model.startswith("claude-agent/")
+    profile = os.environ.get("EVAL_CLAUDE_CONFIG_DIR", "")
+    if bool(profile) != selected:
+        raise RuntimeError("Claude Agent subscription profile/model mismatch")
+    if not selected:
+        return
+    if profile != "/seed/claude-profile":
+        raise RuntimeError("unsupported Claude Agent config mount")
+    path = Path(profile)
+    if not path.is_dir() or not (path / ".credentials.json").is_file():
+        raise RuntimeError("Claude Agent subscription credentials are unavailable")
+    env["CLAUDE_CONFIG_DIR"] = profile
+    env["OPENCODE_CLAUDE_PATH"] = "/usr/local/bin/claude"
+    try:
+        result = subprocess.run(
+            ["/usr/local/bin/claude", "auth", "status", "--json"],
+            cwd=Path("/workspace"), env=env, capture_output=True, text=True,
+            check=False, timeout=20,
+        )
+        status = json.loads(result.stdout) if result.returncode == 0 else {}
+    except (OSError, subprocess.SubprocessError, ValueError):
+        status = {}
+    if (status.get("loggedIn") is not True or status.get("authMethod") != "claude.ai"
+            or not isinstance(status.get("subscriptionType"), str)
+            or not status["subscriptionType"]):
+        raise RuntimeError("Claude Agent requires verified native Claude subscription login; no model request sent")
+
+
 def invoke_opencode(
     model: str,
     agent: str,
@@ -831,7 +862,10 @@ def invoke_opencode(
     reasoning: str = "",
 ) -> dict[str, Any]:
     env = prepare_opencode_env()
+    require_claude_subscription(env, model)
     sanitizer = runtime_sanitizer(env)
+    if model.startswith("claude-agent/") and not sanitizer.inventory_complete:
+        raise RuntimeError("Claude credential inventory unavailable; no model request sent")
     configure_runtime_observer_env(env, sanitizer)
     plugins = plugin_diagnostic(env)
     expected_plugin = os.environ.get("EVAL_EXPECT_PLUGIN", "").strip()

@@ -23,6 +23,7 @@ from runner.oci_image import (
     local_engine_prefix_and_environment,
     validate_immutable_image_identity,
     verify_local_opencode_image,
+    SUPPORTED_CLAUDE_AGENT_VERSION,
 )
 
 DEFAULT_IMAGES = {
@@ -229,6 +230,42 @@ def pass_env(command: list[str], names: list[str], host_env: dict[str, str]) -> 
             command += ["--env", name]
 
 
+def claude_profile_dir(args: argparse.Namespace, host_env: dict[str, str]) -> Path | None:
+    """Explicit Claude subscription path; no implicit host credentials or API fallback."""
+    model = getattr(args, "model", "")
+    selected = isinstance(model, str) and model.startswith("claude-agent/") and len(model) > len("claude-agent/")
+    raw = getattr(args, "claude_config_dir", None)
+    if bool(raw) != selected:
+        raise RunnerError("claude-agent models require --claude-config-dir; other models forbid it")
+    if not selected:
+        return None
+    if args.transport != "opencode":
+        raise RunnerError("Claude Agent requires the OpenCode transport")
+    if any(getattr(args, key, None) for key in ("auth", "database", "config_root")):
+        raise RunnerError("Claude Agent cannot inherit OpenCode auth, database, or config root")
+    if getattr(args, "env", None):
+        raise RunnerError("Claude Agent subscription profile forbids forwarded provider variables")
+    if any(host_env.get(key) for key in (
+        "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL",
+        "CLAUDE_CODE_OAUTH_TOKEN", "CLAUDE_CODE_USE_BEDROCK",
+        "CLAUDE_CODE_USE_VERTEX", "CLAUDE_CODE_USE_FOUNDRY",
+    )):
+        raise RunnerError("Claude Agent subscription profile refuses API, cloud and token environment overrides")
+    source = Path(raw).expanduser()
+    if source.is_symlink() or not source.is_dir() or not (source / ".credentials.json").is_file():
+        raise RunnerError("Claude Agent requires a dedicated real config directory with .credentials.json")
+    if source.resolve() in {Path.home().resolve(), (Path.home() / ".claude").resolve(), Path("/")}:
+        raise RunnerError("use a dedicated Claude eval login, not your default/home profile")
+    if getattr(args, "config", None):
+        try:
+            config = json.loads(Path(args.config).read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            raise RunnerError("Claude Agent evaluation config cannot be inspected") from exc
+        if not isinstance(config, dict) or config.get("providers"):
+            raise RunnerError("Claude Agent evaluation forbids custom provider settings")
+    return source.resolve()
+
+
 def build_container_command(
     args: argparse.Namespace,
     input_dir: Path,
@@ -237,6 +274,7 @@ def build_container_command(
     database_seed: Path | None = None,
 ) -> tuple[list[str], Path]:
     host_env = dict(os.environ) if host_env is None else host_env
+    claude_dir = claude_profile_dir(args, host_env)
     skill = getattr(args, "skill", None)
     expected_plugin = getattr(args, "expected_plugin", None)
     reasoning = getattr(args, "reasoning", None)
@@ -245,10 +283,10 @@ def build_container_command(
     if expected_plugin and args.transport != "opencode":
         raise RunnerError("--expected-plugin is only supported by the opencode transport")
     require_local_opencode_image = getattr(args, "require_local_opencode_image", False)
-    if require_local_opencode_image:
+    if require_local_opencode_image or claude_dir:
         if args.transport != "opencode":
             raise RunnerError("built-in eval requires a compatible local OpenCode image")
-        image = host_env.get("OPENCODE_EVAL_RUNNER_OPENCODE_IMAGE")
+        image = args.image if claude_dir else host_env.get("OPENCODE_EVAL_RUNNER_OPENCODE_IMAGE")
         try:
             validate_immutable_image_identity(image)
         except ImageSelectionError as exc:
@@ -261,7 +299,7 @@ def build_container_command(
         if args.transport == "opencode"
         else "OPENCODE_EVAL_RUNNER_COPILOT_IMAGE"
     )
-    if not require_local_opencode_image:
+    if not (require_local_opencode_image or claude_dir):
         image = (
             args.image
             or host_env.get(transport_env)
@@ -271,7 +309,10 @@ def build_container_command(
         engine_prefix = [engine]
     else:
         try:
-            engine_prefix, _ = verify_local_opencode_image(engine, image, host_env)
+            engine_prefix, _ = verify_local_opencode_image(
+                engine, image, host_env,
+                expected_version=SUPPORTED_CLAUDE_AGENT_VERSION if claude_dir else "2.2.2",
+            )
         except ImageSelectionError as exc:
             raise RunnerError(str(exc)) from exc
     workspace = Path(args.workspace).resolve()
@@ -292,7 +333,7 @@ def build_container_command(
         "--security-opt",
         "no-new-privileges",
     ]
-    if require_local_opencode_image:
+    if require_local_opencode_image or claude_dir:
         command += ["--pull=never"]
     network = getattr(args, "network", None)
     if network:
@@ -321,7 +362,7 @@ def build_container_command(
     for spec in getattr(args, "mount", []):
         command += extra_mount_arg(spec)
 
-    auth = existing_seed(args.auth, "OPENCODE_EVAL_RUNNER_AUTH", default_auth_path())
+    auth = None if claude_dir else existing_seed(args.auth, "OPENCODE_EVAL_RUNNER_AUTH", default_auth_path())
     config = existing_seed(args.config, "OPENCODE_EVAL_RUNNER_CONFIG")
     models = getattr(args, "models_catalog", None) or os.environ.get("OPENCODE_EVAL_RUNNER_MODELS")
     if models:
@@ -344,9 +385,13 @@ def build_container_command(
         command += bind_arg(models, "/seed/models.json", readonly=True)
     if database_seed:
         command += bind_arg(database_seed, "/seed/opencode.db", readonly=True)
-    config_root = existing_dir(getattr(args, "config_root", None), "OPENCODE_EVAL_RUNNER_CONFIG_ROOT")
+    config_root = None if claude_dir else existing_dir(getattr(args, "config_root", None), "OPENCODE_EVAL_RUNNER_CONFIG_ROOT")
     if config_root:
         command += bind_arg(config_root, "/seed/opencode-config", readonly=True)
+
+    if claude_dir:
+        command += bind_arg(claude_dir, "/seed/claude-profile", readonly=False)
+        command += ["--env", "EVAL_CLAUDE_CONFIG_DIR=/seed/claude-profile"]
 
     command += [
         "--env", f"EVAL_TRANSPORT={args.transport}",
@@ -360,7 +405,7 @@ def build_container_command(
         "--env", f"EVAL_TIMEOUT_SECONDS={args.timeout_seconds}",
     ]
 
-    env_names = list(dict.fromkeys(DEFAULT_ENV_ALLOWLIST + tuple(args.env)))
+    env_names = [] if claude_dir else list(dict.fromkeys(DEFAULT_ENV_ALLOWLIST + tuple(args.env)))
     if args.transport == "github-copilot-cli":
         env_names.extend(COPILOT_AUTH_ENVS)
     pass_env(command, env_names, host_env)
@@ -392,7 +437,7 @@ def invoke(args: argparse.Namespace) -> int:
         else:
             (input_dir / "system.txt").write_text("", encoding="utf-8")
 
-        database_source = existing_seed(
+        database_source = None if getattr(args, "claude_config_dir", None) else existing_seed(
             args.database,
             "OPENCODE_EVAL_RUNNER_DB",
             default_database_path(),
@@ -493,6 +538,7 @@ def parser() -> argparse.ArgumentParser:
     run.add_argument("--models-catalog")
     run.add_argument("--database")
     run.add_argument("--config-root")
+    run.add_argument("--claude-config-dir", help="Explicit dedicated Claude Code subscription profile; only for claude-agent/*")
     run.add_argument("--env", action="append", default=[], metavar="NAME")
     run.add_argument("--timeout-seconds", type=int, default=240)
     run.add_argument("--container-timeout", type=int, default=300)
