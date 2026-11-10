@@ -39,6 +39,9 @@ jobs:
           test "$(docker image inspect eval-claude-agent:candidate --format '{{index .Config.Labels "io.opencode-eval-runner.claude-version"}}')" = "2.1.318"
           docker run --rm --network none --read-only --tmpfs /tmp:rw,nosuid,nodev \
             --entrypoint /bin/sh eval-claude-agent:candidate -ec '
-              test "$(opencode --version)" = "2.2.6"
+              case "$(opencode --version)" in
+                "2.2.6"|"opencode v2.2.6") ;;
+                *) exit 14 ;;
+              esac
               claude --version | grep -F "2.1.318"
             '
