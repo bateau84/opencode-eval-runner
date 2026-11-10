@@ -80,11 +80,10 @@ LABEL org.opencontainers.image.version="${CLAUDE_OPENCODE_VERSION}" \
 COPY --from=claude-agent-builder /opencode-claude /usr/local/bin/opencode
 COPY --from=claude-agent-builder /usr/local/bin/node /usr/local/bin/node
 COPY --from=claude-agent-builder /usr/local/lib/node_modules /usr/local/lib/node_modules
-USER root
-RUN ln -s /usr/local/lib/node_modules/@anthropic-ai/claude-code/cli.js /usr/local/bin/claude \
-    && opencode --version \
-    && claude --version
-USER 1000:1000
+# Preserve the native executable/npm launcher installed by the official package.
+# Never guess the package's internal CLI path; CI verifies real execution here.
+COPY --from=claude-agent-builder /usr/local/bin/claude /usr/local/bin/claude
+RUN opencode --version && claude --version
 ENV OPENCODE_CLAUDE_PATH=/usr/local/bin/claude
 
 FROM runtime-base AS copilot
