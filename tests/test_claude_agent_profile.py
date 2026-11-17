@@ -333,5 +333,57 @@ class ClaudeAgentProfileTests(unittest.TestCase):
             self.assertNotIn("would otherwise pass", out.getvalue())
 
 
+    def test_post_refresh_sink_includes_initial_and_rotated_credentials(self):
+        import io
+        from contextlib import redirect_stdout
+        from container.invoke import emit_result, unsupported_runtime_evidence
+        with tempfile.TemporaryDirectory() as tmp:
+            credential = Path(tmp) / ".credentials.json"
+            credential.write_text('{"claudeAiOauth":{"refreshToken":"SYNTHETIC-ROTATED"}}')
+            result = {
+                "schema": "opencode-eval-runner/v1", "transport": "opencode",
+                "model": "claude-agent/test", "reasoning": "provider-default",
+                "reasoning_source": "provider-default", "exit_code": 0,
+                "runtime_evidence": unsupported_runtime_evidence(
+                    "runtime_observer_unavailable_after_infrastructure_error"
+                ),
+                "tool_result_evidence": {"unexpected": "SYNTHETIC-BEFORE-REFRESH"},
+                "text": "innocent",
+            }
+            out = io.StringIO()
+            with patch.dict("os.environ", {
+                "EVAL_CLAUDE_CONFIG_DIR": "/seed/claude-profile",
+                "OPENCODE_EVAL_OBSERVER_CREDENTIALS": '["SYNTHETIC-BEFORE-REFRESH"]',
+            }, clear=True), patch("container.invoke.RUNTIME_JSON_CREDENTIAL_SOURCES", (credential,)), redirect_stdout(out):
+                emit_result(result)
+            body = out.getvalue()
+            self.assertNotIn("SYNTHETIC-BEFORE-REFRESH", body)
+            self.assertNotIn("SYNTHETIC-ROTATED", body)
+            self.assertTrue(json.loads(body)["infrastructure_error"])
+
+    def test_post_refresh_missing_credential_file_cannot_claim_success(self):
+        import io
+        from contextlib import redirect_stdout
+        from container.invoke import emit_result, unsupported_runtime_evidence
+        with tempfile.TemporaryDirectory() as tmp:
+            missing = Path(tmp) / ".credentials.json"
+            result = {
+                "schema": "opencode-eval-runner/v1", "transport": "opencode",
+                "model": "claude-agent/test", "reasoning": "provider-default",
+                "reasoning_source": "provider-default", "exit_code": 0,
+                "runtime_evidence": unsupported_runtime_evidence(
+                    "runtime_observer_unavailable_after_infrastructure_error"
+                ),
+                "text": "cannot prove auth persists",
+            }
+            out = io.StringIO()
+            with patch.dict("os.environ", {"EVAL_CLAUDE_CONFIG_DIR": "/seed/claude-profile"}, clear=True), patch(
+                "container.invoke.RUNTIME_JSON_CREDENTIAL_SOURCES", (missing,)
+            ), redirect_stdout(out):
+                emit_result(result)
+            self.assertTrue(json.loads(out.getvalue())["infrastructure_error"])
+            self.assertNotIn("cannot prove auth persists", out.getvalue())
+
+
 if __name__ == "__main__":
     unittest.main()
