@@ -261,7 +261,7 @@ def _check_private_claude_entry(path: Path, *, directory: bool) -> None:
     expected = stat.S_ISDIR if directory else stat.S_ISREG
     if (not expected(info.st_mode) or info.st_uid != os.getuid()
             or info.st_mode & 0o077 or (not directory and info.st_nlink != 1)):
-        raise RunnerError("Claude Agent native state must contain only private, regular, unlinked entries")
+        raise RunnerError("Claude Agent native state must contain only private, regular, and not linked entries")
 
 
 def _check_claude_native_state(document: object) -> None:
