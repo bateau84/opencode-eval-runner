@@ -1263,6 +1263,10 @@ def emit_result(result: dict[str, Any]) -> None:
 
 
 def main() -> int:
+    # Claude SDK initialization, refresh, and sessions must never create
+    # group/world-accessible files in the dedicated RW host profile.
+    if os.environ.get("EVAL_CLAUDE_CONFIG_DIR") == "/seed/claude-profile":
+        os.umask(0o077)
     try:
         transport = os.environ.get("EVAL_TRANSPORT", "opencode")
         model = os.environ["EVAL_MODEL"]
