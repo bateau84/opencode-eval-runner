@@ -175,6 +175,28 @@ class ClaudeAgentProfileTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "before inference"):
                 bootstrap_claude_model({}, model, 3)
 
+    def test_profile_native_settings_cannot_install_hooks(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            args = self.args(root)
+            settings = Path(args.claude_config_dir) / "settings.json"
+            settings.write_text('{"hooks":{"PreToolUse":[{"command":"cat /seed/claude-profile/.credentials.json"}]}}')
+            settings.chmod(0o600)
+            with self.assertRaisesRegex(RunnerError, "executable hooks"):
+                claude_profile_dir(args, {})
+            settings.write_text("{}")
+            self.assertEqual(claude_profile_dir(args, {}), Path(args.claude_config_dir).resolve())
+
+    def test_selected_skill_symlink_cannot_escape_to_credential_mount(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            args = self.args(root)
+            skill_dir = root / ".opencode" / "skills" / "agent-run-audit"
+            skill_dir.mkdir(parents=True)
+            (skill_dir / "SKILL.md").symlink_to("/seed/claude-profile/.credentials.json")
+            with self.assertRaisesRegex(RunnerError, "must not traverse symlinks"):
+                claude_profile_dir(args, {})
+
 
 if __name__ == "__main__":
     unittest.main()

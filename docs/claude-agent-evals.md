@@ -36,7 +36,10 @@ The runner does not forward OAuth token values; it mounts the **explicit
 directory** for the official executable to use and refresh its own credentials.
 The dedicated profile must be owner-only (0700), with private regular files
 (0600), no symlinks/hardlinks, and only native credential/settings JSON files.
-Remove unrelated files rather than mounting a broad Claude home.
+Remove unrelated files rather than mounting a broad Claude home. Native
+settings files must contain only an empty JSON object, preventing hooks or
+unreviewed provider/tool configuration. The runner also rejects symlinks
+on paths to allowed skill resources inside the evaluation workspace.
 Independent invocations use an exclusive sibling lock file so native token
 refresh cannot race across separate evaluation processes.
 **Because this mount is read/write and the evaluated tools share its container

@@ -266,6 +266,20 @@ def validate_claude_profile_source(source: Path) -> Path:
             raise RunnerError("Claude Agent requires a real .credentials.json file")
         if credential.stat().st_size > 4_000_000:
             raise RunnerError("Claude Agent credential file exceeds admission bound")
+        # Native Claude settings may declare executable hooks, plugin commands,
+        # additional providers or paths. This dedicated eval profile accepts
+        # only empty settings documents; remove broader host configuration.
+        for settings in entries:
+            if settings.name == ".credentials.json":
+                continue
+            if settings.stat().st_size > 8192:
+                raise RunnerError("Claude Agent settings exceed admission bound")
+            try:
+                document = json.loads(settings.read_text(encoding="utf-8"))
+            except (OSError, ValueError) as exc:
+                raise RunnerError("Claude Agent settings must be empty JSON objects") from exc
+            if document != {}:
+                raise RunnerError("Claude Agent evaluation forbids native settings and executable hooks")
     except OSError as exc:
         raise RunnerError("Claude Agent profile cannot be safely inspected") from exc
     return source.resolve()
@@ -320,6 +334,27 @@ def validate_claude_eval_config(path: str | None) -> None:
             raise RunnerError("Claude Agent evaluation cannot expose general-purpose tools")
 
 
+def validate_claude_workspace_paths(workspace: Path, config_path: str) -> None:
+    """Prohibit symlink escapes from otherwise permitted skill/read resources."""
+    if workspace.is_symlink() or not workspace.is_dir():
+        raise RunnerError("Claude Agent requires a real read-only evaluation workspace")
+    config = json.loads(Path(config_path).read_text(encoding="utf-8"))
+    agent = config["agents"][config["default_agent"]]
+    relative_paths = []
+    for rule in agent["permissions"][1:]:
+        resource = rule["resource"]
+        if rule["action"] == "read":
+            relative_paths.append(PurePosixPath(resource))
+        elif rule["action"] == "skill":
+            relative_paths.append(PurePosixPath(".opencode/skills") / resource / "SKILL.md")
+    for resource in relative_paths:
+        current = workspace
+        for component in resource.parts:
+            current = current / component
+            if current.is_symlink():
+                raise RunnerError("Claude Agent skill resource must not traverse symlinks")
+
+
 @contextmanager
 def claude_profile_lock(profile: Path):
     """Serialize independent host invocations over a native refreshable login."""
@@ -366,6 +401,7 @@ def claude_profile_dir(args: argparse.Namespace, host_env: dict[str, str]) -> Pa
         raise RunnerError("Claude Agent subscription profile refuses API, cloud and token environment overrides")
     source = validate_claude_profile_source(Path(raw).expanduser())
     validate_claude_eval_config(getattr(args, "config", None))
+    validate_claude_workspace_paths(Path(args.workspace).expanduser(), args.config)
     if getattr(args, "mount", None) or getattr(args, "workspace_mode", "ro") != "ro":
         raise RunnerError("Claude Agent forbids extra mounts and writable workspaces")
     if getattr(args, "network", None) in {"host", "container:host"}:
@@ -524,7 +560,10 @@ def build_container_command(
 def invoke(args: argparse.Namespace) -> int:
     profile = getattr(args, "claude_config_dir", None)
     if profile:
-        with claude_profile_lock(Path(profile).expanduser()):
+        # Do not create even the sibling lock file until the profile has
+        # passed admission; rejected/default profiles remain untouched.
+        source = validate_claude_profile_source(Path(profile).expanduser())
+        with claude_profile_lock(source):
             return _invoke_unlocked(args)
     return _invoke_unlocked(args)
 
