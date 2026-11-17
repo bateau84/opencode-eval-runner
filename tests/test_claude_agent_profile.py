@@ -274,5 +274,64 @@ class ClaudeAgentProfileTests(unittest.TestCase):
                 claude_profile_dir(args, {})
 
 
+    def test_rotated_credential_cannot_escape_through_protocol_evidence(self):
+        """The final sink must rescan credentials minted after observer startup."""
+        import io
+        from contextlib import redirect_stdout
+        from container.invoke import emit_result, unsupported_runtime_evidence
+        with tempfile.TemporaryDirectory() as tmp:
+            credential = Path(tmp) / ".credentials.json"
+            credential.write_text(json.dumps({
+                "claudeAiOauth": {"refreshToken": "SYNTHETIC-POST-START-ROTATED-SECRET"}
+            }))
+            result = {
+                "schema": "opencode-eval-runner/v1", "transport": "opencode",
+                "model": "claude-agent/claude-sonnet-5-5",
+                "reasoning": "provider-default", "reasoning_source": "provider-default",
+                "exit_code": 0, "text": "benign model output",
+                "tool_result_evidence": {"unexpected": "SYNTHETIC-POST-START-ROTATED-SECRET"},
+                "runtime_evidence": unsupported_runtime_evidence(
+                    "runtime_observer_unavailable_after_infrastructure_error"
+                ),
+            }
+            out = io.StringIO()
+            with patch.dict("os.environ", {"EVAL_CLAUDE_CONFIG_DIR": "/seed/claude-profile"}, clear=True), patch(
+                "container.invoke.RUNTIME_JSON_CREDENTIAL_SOURCES", (credential,)
+            ), redirect_stdout(out):
+                emit_result(result)
+            body = out.getvalue()
+            self.assertNotIn("SYNTHETIC-POST-START-ROTATED-SECRET", body)
+            emitted = json.loads(body)
+            self.assertTrue(emitted["infrastructure_error"])
+            self.assertEqual(emitted["exit_code"], 2)
+            self.assertEqual(emitted["runtime_evidence"]["status"], "unsupported")
+
+    def test_late_corrupt_credential_inventory_withholds_success(self):
+        import io
+        from contextlib import redirect_stdout
+        from container.invoke import emit_result, unsupported_runtime_evidence
+        with tempfile.TemporaryDirectory() as tmp:
+            credential = Path(tmp) / ".credentials.json"
+            credential.write_text("{invalid-json")
+            result = {
+                "schema": "opencode-eval-runner/v1", "transport": "opencode",
+                "model": "claude-agent/test", "reasoning": "provider-default",
+                "reasoning_source": "provider-default", "exit_code": 0,
+                "text": "would otherwise pass",
+                "runtime_evidence": unsupported_runtime_evidence(
+                    "runtime_observer_unavailable_after_infrastructure_error"
+                ),
+            }
+            out = io.StringIO()
+            with patch.dict("os.environ", {"EVAL_CLAUDE_CONFIG_DIR": "/seed/claude-profile"}, clear=True), patch(
+                "container.invoke.RUNTIME_JSON_CREDENTIAL_SOURCES", (credential,)
+            ), redirect_stdout(out):
+                emit_result(result)
+            emitted = json.loads(out.getvalue())
+            self.assertEqual(emitted["exit_code"], 2)
+            self.assertTrue(emitted["infrastructure_error"])
+            self.assertNotIn("would otherwise pass", out.getvalue())
+
+
 if __name__ == "__main__":
     unittest.main()
