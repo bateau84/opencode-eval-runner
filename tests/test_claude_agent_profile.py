@@ -210,5 +210,67 @@ class ClaudeAgentProfileTests(unittest.TestCase):
             self.assertEqual(claude_profile_dir(args, {}), Path(args.claude_config_dir).resolve())
 
 
+    def test_native_state_profile_is_accepted_on_repeated_preflights(self):
+        """Native Claude writes account metadata and session state under CLAUDE_CONFIG_DIR."""
+        with tempfile.TemporaryDirectory() as tmp:
+            args = self.args(Path(tmp))
+            profile = Path(args.claude_config_dir)
+            (profile / ".claude.json").write_text(json.dumps({
+                "oauthAccount": {"accountUuid": "fixture-account", "organizationUuid": "fixture-org"},
+                "hasCompletedOnboarding": True, "mcpServers": {},
+                "projects": {"/workspace": {"hasTrustDialogAccepted": True, "allowedTools": []}},
+            }))
+            (profile / ".claude.json").chmod(0o600)
+            backup = profile / "backups"
+            backup.mkdir(mode=0o700)
+            (backup / ".claude.json.backup").write_text('{"oauthAccount":{"accountUuid":"fixture-account"}}')
+            (backup / ".claude.json.backup").chmod(0o600)
+            project = profile / "projects" / "fixture-workspace"
+            project.mkdir(parents=True, mode=0o700)
+            (project / "fixture-session.jsonl").write_text('{"type":"system","subtype":"init"}\\n')
+            (project / "fixture-session.jsonl").chmod(0o600)
+            for _ in range(2):
+                self.assertEqual(claude_profile_dir(args, {}), profile.resolve())
+
+    def test_native_state_rejects_tool_and_provider_overrides(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            args = self.args(Path(tmp))
+            profile = Path(args.claude_config_dir)
+            state = profile / ".claude.json"
+            for value in (
+                {"mcpServers": {"unexpected": {"command": "sh", "args": []}}},
+                {"projects": {"/workspace": {"allowedTools": ["Bash(*)"]}}},
+                {"hooks": {"PreToolUse": [{"command": "echo unexpected"}]}},
+                {"env": {"ANTHROPIC_API_KEY": "FAKE-ONLY"}},
+            ):
+                with self.subTest(value=value):
+                    state.write_text(json.dumps(value))
+                    state.chmod(0o600)
+                    with self.assertRaisesRegex(RunnerError, "native state|provider|executable"):
+                        claude_profile_dir(args, {})
+            state.unlink()
+            (profile / "plugins").mkdir(mode=0o700)
+            with self.assertRaisesRegex(RunnerError, "unrelated|unsupported"):
+                claude_profile_dir(args, {})
+
+    def test_native_state_rejects_symlinks_and_public_descendants(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            args = self.args(Path(tmp))
+            profile = Path(args.claude_config_dir)
+            project = profile / "projects"
+            project.mkdir(mode=0o700)
+            file = project / "session.jsonl"
+            file.write_text('{"type":"system"}\\n')
+            file.chmod(0o644)
+            with self.assertRaisesRegex(RunnerError, "private"):
+                claude_profile_dir(args, {})
+            file.chmod(0o600)
+            self.assertEqual(claude_profile_dir(args, {}), profile.resolve())
+            file.rename(project / "actual.jsonl")
+            file.symlink_to(project / "actual.jsonl")
+            with self.assertRaisesRegex(RunnerError, "linked|private|regular"):
+                claude_profile_dir(args, {})
+
+
 if __name__ == "__main__":
     unittest.main()
