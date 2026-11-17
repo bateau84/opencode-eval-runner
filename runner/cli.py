@@ -2,15 +2,18 @@
 from __future__ import annotations
 
 import argparse
+import fcntl
 import json
 import os
+import re
 import shutil
 import sqlite3
+import stat
 import subprocess
 import sys
 import tempfile
-from contextlib import nullcontext
-from pathlib import Path
+from contextlib import contextmanager, nullcontext
+from pathlib import Path, PurePosixPath
 
 from container.evidence_safety import (
     MODEL_CATALOG_SOURCE_LIMIT,
@@ -230,6 +233,116 @@ def pass_env(command: list[str], names: list[str], host_env: dict[str, str]) -> 
             command += ["--env", name]
 
 
+_CLAUDE_PROFILE_FILES = frozenset({
+    ".credentials.json", "settings.json", "settings.local.json", ".claude.json",
+})
+_CLAUDE_DENY = {"action": "*", "resource": "*", "effect": "deny"}
+
+
+def validate_claude_profile_source(source: Path) -> Path:
+    """Admit only a private, minimal native profile; never follow profile symlinks."""
+    if source == Path("/") or not source.is_dir():
+        raise RunnerError("Claude Agent requires a dedicated real configuration directory")
+    for ancestor in (source, *source.parents):
+        if ancestor.is_symlink():
+            raise RunnerError("Claude Agent profile path cannot traverse symlinks")
+    if source.resolve() in {Path.home().resolve(), (Path.home() / ".claude").resolve()}:
+        raise RunnerError("use a dedicated Claude eval login, not your default/home profile")
+    try:
+        directory = source.stat(follow_symlinks=False)
+        if (not stat.S_ISDIR(directory.st_mode) or directory.st_uid != os.getuid()
+                or directory.st_mode & 0o077):
+            raise RunnerError("Claude Agent profile must be owner-only (mode 0700)")
+        entries = list(source.iterdir())
+        if {p.name for p in entries} - _CLAUDE_PROFILE_FILES:
+            raise RunnerError("Claude Agent profile contains unrelated files or directories")
+        for path in entries:
+            info = path.stat(follow_symlinks=False)
+            if (not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid()
+                    or info.st_mode & 0o077 or info.st_nlink != 1):
+                raise RunnerError("Claude Agent profile files must be private, regular, and not linked")
+        credential = source / ".credentials.json"
+        if not credential.is_file() or credential.is_symlink():
+            raise RunnerError("Claude Agent requires a real .credentials.json file")
+        if credential.stat().st_size > 4_000_000:
+            raise RunnerError("Claude Agent credential file exceeds admission bound")
+    except OSError as exc:
+        raise RunnerError("Claude Agent profile cannot be safely inspected") from exc
+    return source.resolve()
+
+
+def validate_claude_eval_config(path: str | None) -> None:
+    """Require an exact default-deny tool boundary before mounting native credentials."""
+    if not path:
+        raise RunnerError("Claude Agent requires an explicit restricted --config")
+    try:
+        data = json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise RunnerError("Claude Agent evaluation config cannot be inspected") from exc
+    if not isinstance(data, dict) or data.get("providers") or any(
+        key not in {
+            "$schema", "share", "update", "snapshots", "warming", "instructions",
+            "plugins", "permissions", "default_agent", "agents", "providers",
+        } for key in data
+    ):
+        raise RunnerError("Claude Agent evaluation forbids custom provider/runtime settings")
+    if (data.get("permissions") != [_CLAUDE_DENY]
+            or data.get("plugins") != ["-opencode.skill", "-opencode.browser"]
+            or data.get("instructions") != [] or data.get("share") != "disabled"):
+        raise RunnerError("Claude Agent requires default-deny permissions and no stock skills")
+    agents = data.get("agents")
+    name = data.get("default_agent")
+    if not isinstance(name, str) or not isinstance(agents, dict) or set(agents) != {name}:
+        raise RunnerError("Claude Agent requires one explicitly restricted evaluation agent")
+    agent = agents[name]
+    if (not isinstance(agent, dict) or agent.get("mode") != "primary"
+            or set(agent) - {"mode", "description", "system", "permissions"}
+            or not isinstance(agent.get("permissions"), list)):
+        raise RunnerError("Claude Agent evaluation agent must have a restricted tool policy")
+    rules = agent["permissions"]
+    if not rules or rules[0] != _CLAUDE_DENY:
+        raise RunnerError("Claude Agent evaluation agent must deny all tools by default")
+    for rule in rules[1:]:
+        if not isinstance(rule, dict) or set(rule) != {"action", "resource", "effect"} or rule["effect"] != "allow":
+            raise RunnerError("Claude Agent evaluation has an unsupported tool permission")
+        resource = rule["resource"]
+        if not isinstance(resource, str) or not resource or any(char in resource for char in "*?[]"):
+            raise RunnerError("Claude Agent evaluation permits only exact skill resources")
+        if rule["action"] == "skill":
+            if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", resource):
+                raise RunnerError("Claude Agent skill permission must be an exact skill ID")
+        elif rule["action"] == "read":
+            path = PurePosixPath(resource)
+            if (not resource.startswith(".opencode/skills/") or path.is_absolute()
+                    or ".." in path.parts or len(path.parts) < 4):
+                raise RunnerError("Claude Agent reads must stay within selected skill resources")
+        else:
+            raise RunnerError("Claude Agent evaluation cannot expose general-purpose tools")
+
+
+@contextmanager
+def claude_profile_lock(profile: Path):
+    """Serialize independent host invocations over a native refreshable login."""
+    path = profile.with_name(profile.name + ".eval-runner.lock")
+    flags = os.O_CREAT | os.O_RDWR | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0)
+    try:
+        descriptor = os.open(path, flags, 0o600)
+    except OSError as exc:
+        raise RunnerError("cannot safely acquire Claude profile lock") from exc
+    try:
+        info = os.fstat(descriptor)
+        if (not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid()
+                or info.st_mode & 0o077 or info.st_nlink != 1):
+            raise RunnerError("Claude profile lock must be a private regular file")
+        try:
+            fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as exc:
+            raise RunnerError("Claude profile is already in use by another evaluation") from exc
+        yield
+    finally:
+        os.close(descriptor)
+
+
 def claude_profile_dir(args: argparse.Namespace, host_env: dict[str, str]) -> Path | None:
     """Explicit Claude subscription path; no implicit host credentials or API fallback."""
     model = getattr(args, "model", "")
@@ -251,19 +364,13 @@ def claude_profile_dir(args: argparse.Namespace, host_env: dict[str, str]) -> Pa
         "CLAUDE_CODE_USE_VERTEX", "CLAUDE_CODE_USE_FOUNDRY",
     )):
         raise RunnerError("Claude Agent subscription profile refuses API, cloud and token environment overrides")
-    source = Path(raw).expanduser()
-    if source.is_symlink() or not source.is_dir() or not (source / ".credentials.json").is_file():
-        raise RunnerError("Claude Agent requires a dedicated real config directory with .credentials.json")
-    if source.resolve() in {Path.home().resolve(), (Path.home() / ".claude").resolve(), Path("/")}:
-        raise RunnerError("use a dedicated Claude eval login, not your default/home profile")
-    if getattr(args, "config", None):
-        try:
-            config = json.loads(Path(args.config).read_text(encoding="utf-8"))
-        except (OSError, ValueError) as exc:
-            raise RunnerError("Claude Agent evaluation config cannot be inspected") from exc
-        if not isinstance(config, dict) or config.get("providers"):
-            raise RunnerError("Claude Agent evaluation forbids custom provider settings")
-    return source.resolve()
+    source = validate_claude_profile_source(Path(raw).expanduser())
+    validate_claude_eval_config(getattr(args, "config", None))
+    if getattr(args, "mount", None) or getattr(args, "workspace_mode", "ro") != "ro":
+        raise RunnerError("Claude Agent forbids extra mounts and writable workspaces")
+    if getattr(args, "network", None) in {"host", "container:host"}:
+        raise RunnerError("Claude Agent forbids host network mode")
+    return source
 
 
 def build_container_command(
@@ -415,6 +522,14 @@ def build_container_command(
 
 
 def invoke(args: argparse.Namespace) -> int:
+    profile = getattr(args, "claude_config_dir", None)
+    if profile:
+        with claude_profile_lock(Path(profile).expanduser()):
+            return _invoke_unlocked(args)
+    return _invoke_unlocked(args)
+
+
+def _invoke_unlocked(args: argparse.Namespace) -> int:
     prompt_path = Path(args.prompt_file).resolve()
     if not prompt_path.is_file():
         raise RunnerError(f"prompt file not found: {prompt_path}")
@@ -480,10 +595,12 @@ def invoke(args: argparse.Namespace) -> int:
         try:
             result = json.loads(proc.stdout)
         except json.JSONDecodeError as exc:
-            detail = " | ".join(part.strip() for part in (proc.stderr, proc.stdout) if part.strip())
+            # Raw stderr/stdout may contain native credentials, even on a
+            # failure before the container's sanitizer emitted valid JSON.
+            # Never place untrusted diagnostics in an exception/artifact.
             raise RunnerError(
-                f"container produced invalid result JSON (exit {proc.returncode}): {exc}"
-                + (f": {detail[:2000]}" if detail else "")
+                f"container produced invalid result JSON (exit {proc.returncode}); "
+                "diagnostics withheld to protect credentials"
             ) from exc
 
         result = validate_container_result(result)

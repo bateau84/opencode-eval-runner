@@ -27,12 +27,18 @@ mkdir -p "$HOME/.claude-eval-profile"
 chmod 700 "$HOME/.claude-eval-profile"
 CLAUDE_CONFIG_DIR="$HOME/.claude-eval-profile" claude auth login
 CLAUDE_CONFIG_DIR="$HOME/.claude-eval-profile" claude auth status --json
+chmod 600 "$HOME/.claude-eval-profile/.credentials.json"
 ```
 
 Require an actual subscription login (the native status command must report
 `loggedIn: true`, `authMethod: claude.ai` and a nonempty `subscriptionType`).
-The runner never parses or forwards OAuth token values; it mounts the **explicit
+The runner does not forward OAuth token values; it mounts the **explicit
 directory** for the official executable to use and refresh its own credentials.
+The dedicated profile must be owner-only (0700), with private regular files
+(0600), no symlinks/hardlinks, and only native credential/settings JSON files.
+Remove unrelated files rather than mounting a broad Claude home.
+Independent invocations use an exclusive sibling lock file so native token
+refresh cannot race across separate evaluation processes.
 **Because this mount is read/write and the evaluated tools share its container
 namespace, credential confidentiality against a compromised evaluated agent
 is not proven.** Use only a disposable dedicated profile, deny arbitrary
@@ -53,6 +59,7 @@ python3 bin/opencode-eval-runner invoke \
   --image '<FULL_LOCAL_IMAGE_ID>' \
   --model 'claude-agent/<EXACT_CLAUDE_MODEL_ID>' \
   --claude-config-dir "$HOME/.claude-eval-profile" \
+  --config /path/to/generated-restricted-opencode-eval-config.json \
   --workspace /path/to/disposable-project --workspace-mode ro \
   --prompt-file /tmp/claude-skill-prompt.txt \
   --output /tmp/claude-invocation.json
@@ -62,13 +69,24 @@ This makes a **real** model request and draws from the signed-in account's
 allowance. Only run once credential and billing policy have been checked.
 The runner rejects implicit Claude credentials, provider-env overrides,
 custom Claude provider settings, a mismatched model/profile, unqualified
-images, and missing native subscription status *before inference*.
+images, and missing native subscription status *before inference*. It also
+requires a strict generated evaluation config: global and per-agent default
+deny, only selected skill-loading and skill-resource reads, disabled stock
+skills/browser plugin, no extra mounts, and a read-only workspace. It
+registers OpenCode's native external Claude integration in isolated state,
+triggers SDK initialization without sending a prompt, and requires the exact
+model to appear in the native catalog before any target/judge inference.
 
 ## What remains unqualified
 
 No networked Claude provider request or subscription/billing assertion has been
-executed in CI. Provider registration, exact model discovery, automatic token
-refresh under parallel invocation, credential exposure through tools, independent
-skill-loading evidence, model/judge parity, and provider rate limits require
-explicit installed-host tests on the exact image. A green unit test is not a
-proof of these boundaries. Existing OpenCode/Copilot modes must keep passing.
+executed in CI. The connection/catalog bootstrap is covered by provider-free
+tests but must still be proven against the installed OpenCode image and native
+Claude SDK. The read/write credential mount remains in the evaluated process
+namespace; default-deny tool permissions are defense-in-depth, not a proof
+against arbitrary code execution. Credential read-denial, actual skill-loading
+evidence, model/judge parity, refresh after expiry, and provider rate limits
+require explicit installed-host qualification. Account-level **paid usage
+credits disabled** is a mandatory manual check before any live test; native
+authentication alone cannot establish or enforce zero overage.
+Existing OpenCode/Copilot modes must keep passing.

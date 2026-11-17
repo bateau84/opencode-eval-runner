@@ -853,6 +853,68 @@ def require_claude_subscription(env: dict[str, str], model: str) -> None:
         raise RuntimeError("Claude Agent requires verified native Claude subscription login; no model request sent")
 
 
+def bootstrap_claude_model(env: dict[str, str], model: str, timeout: int) -> None:
+    """Create the native external connection and prove exact model discovery.
+
+    OpenCode 2.2.6 starts Claude SDK discovery only after an integration
+    connection is active. Its initialization probe sends no prompt/inference.
+    The ephemeral OpenCode database and provider storage are reused by run.
+    """
+    if not model.startswith("claude-agent/"):
+        return
+    model_id = model[len("claude-agent/"):].split("#", 1)[0]
+    if not model_id or "/" in model_id or any(char.isspace() for char in model_id):
+        raise RuntimeError("invalid Claude Agent model ID; no model request sent")
+    server = None
+    budget = min(max(timeout, 1), 75)
+    try:
+        server, base_url, authorization = _start_preflight_server(env, budget)
+        integration = unwrap_api_data(_standalone_json_request(
+            base_url, "/api/integration/claude-agent", authorization=authorization,
+            timeout=min(10, budget),
+        ))
+        if (not isinstance(integration, dict)
+                or integration.get("id") != "claude-agent"
+                or not any(
+                    isinstance(method, dict) and method.get("id") == "claude-login"
+                    and method.get("type") == "external"
+                    for method in integration.get("methods", [])
+                )):
+            raise RuntimeError("native Claude integration method is unavailable")
+        if not integration.get("connections"):
+            _standalone_json_request(
+                base_url, "/api/integration/claude-agent/connect/external",
+                method="POST", payload={"methodID": "claude-login"},
+                authorization=authorization, timeout=min(10, budget),
+            )
+        deadline = time.monotonic() + budget
+        while time.monotonic() < deadline:
+            models = unwrap_api_data(_standalone_json_request(
+                base_url, "/api/model", authorization=authorization,
+                timeout=min(10, max(1, deadline - time.monotonic())),
+            ))
+            if not isinstance(models, list):
+                raise RuntimeError("native model catalog response is invalid")
+            if any(
+                isinstance(item, dict) and item.get("providerID") == "claude-agent"
+                and item.get("id") == model_id
+                for item in models
+            ):
+                return
+            time.sleep(0.4)
+        raise RuntimeError("exact requested Claude model was not discovered")
+    except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as exc:
+        # Preflight/server errors can embed raw SDK logs or HTTP bodies.
+        # Only the fixed classification may cross the result sink.
+        raise RuntimeError(
+            "Claude Agent native connection/model discovery failed before inference; "
+            "verify the requested model and dedicated subscription"
+        ) from None
+    finally:
+        if server is not None:
+            _stop_preflight_server(server)
+
+
 def invoke_opencode(
     model: str,
     agent: str,
@@ -872,11 +934,9 @@ def invoke_opencode(
     plugin_preflight = verify_expected_plugin(env, agent, model, expected_plugin, timeout)
     invoked_model, reasoning_label, reasoning_source = resolve_opencode_reasoning(model, reasoning)
 
-    # OpenCode V2 has no documented force-refresh command for the model
-    # catalog. A fresh isolated process owns a fresh cache and resolves the
-    # requested model through its normal provider/catalog startup path.
-    # The real model invocation is authoritative; provider/model resolution
-    # failures are reported as transport failures instead of preflight guesses.
+    # The first-run native connection and exact model must be resolved in
+    # fresh isolated state, not inferred from the separate Claude login.
+    bootstrap_claude_model(env, model, timeout)
     # Every eval invocation uses a fresh OpenCode session. Supplying a fixed
     # title prevents OpenCode from launching its automatic title agent, which
     # otherwise adds an unrelated model call (and any title-model retries) to

@@ -5,17 +5,29 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
-from runner.cli import RunnerError, build_container_command, claude_profile_dir
-from container.invoke import require_claude_subscription
+from runner.cli import (RunnerError, build_container_command, claude_profile_dir,
+                        claude_profile_lock, invoke)
+from container.invoke import require_claude_subscription, bootstrap_claude_model
 
 
 class ClaudeAgentProfileTests(unittest.TestCase):
     def args(self, root, **kw):
         p = root / "claude-profile"
         p.mkdir()
+        p.chmod(0o700)
         (p / ".credentials.json").write_text('{"claudeAiOauth":{"accessToken":"TEST-ONLY"}}')
+        (p / ".credentials.json").chmod(0o600)
         cfg = root / "config.json"
-        cfg.write_text('{"providers":{}}')
+        cfg.write_text(json.dumps({
+            "share": "disabled", "plugins": ["-opencode.skill", "-opencode.browser"],
+            "instructions": [], "permissions": [{"action":"*","resource":"*","effect":"deny"}],
+            "default_agent": "eval-target", "agents": {
+                "eval-target": {"mode": "primary", "permissions": [
+                    {"action":"*","resource":"*","effect":"deny"},
+                    {"action":"skill","resource":"agent-run-audit","effect":"allow"}
+                ]}
+            }
+        }))
         args = dict(
             transport="opencode", engine="podman", network=None,
             image="sha256:" + "a" * 64, workspace=str(root),
@@ -80,6 +92,88 @@ class ClaudeAgentProfileTests(unittest.TestCase):
             run.return_value.stdout = json.dumps({"loggedIn": True, "authMethod": "api-key"})
             with self.assertRaisesRegex(RuntimeError, "native Claude subscription"):
                 require_claude_subscription({}, "claude-agent/claude-sonnet-5-5")
+
+    def test_rejects_public_symlinked_and_unrelated_profile_data(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            args = self.args(root)
+            credential = Path(args.claude_config_dir) / ".credentials.json"
+            credential.chmod(0o644)
+            with self.assertRaisesRegex(RunnerError, "private"):
+                claude_profile_dir(args, {})
+            credential.chmod(0o600)
+            (credential.parent / "private-notes.txt").write_text("unexpected")
+            with self.assertRaisesRegex(RunnerError, "unrelated"):
+                claude_profile_dir(args, {})
+            (credential.parent / "private-notes.txt").unlink()
+            credential.rename(credential.parent / "real.json")
+            credential.symlink_to(credential.parent / "real.json")
+            with self.assertRaisesRegex(RunnerError, "not linked|real"):
+                claude_profile_dir(args, {})
+
+    def test_rejects_unrestricted_agent_permissions_and_extra_mounts(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            args = self.args(root)
+            config = json.loads(Path(args.config).read_text())
+            config["agents"]["eval-target"]["permissions"].append(
+                {"action": "read", "resource": "/seed/claude-profile/.credentials.json", "effect": "allow"}
+            )
+            Path(args.config).write_text(json.dumps(config))
+            with self.assertRaisesRegex(RunnerError, "selected skill resources"):
+                claude_profile_dir(args, {})
+            config["agents"]["eval-target"]["permissions"].pop()
+            Path(args.config).write_text(json.dumps(config))
+            args.mount = ["/tmp:/injected"]
+            with self.assertRaisesRegex(RunnerError, "extra mounts"):
+                claude_profile_dir(args, {})
+
+    def test_host_profile_lock_blocks_competing_invocations(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            args = self.args(Path(tmp))
+            profile = Path(args.claude_config_dir)
+            with claude_profile_lock(profile):
+                with self.assertRaisesRegex(RunnerError, "already in use"):
+                    with claude_profile_lock(profile):
+                        pass
+
+    def test_invalid_container_diagnostics_are_not_persisted(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            args = self.args(root, model="openai/not-called", claude_config_dir=None,
+                             transport="github-copilot-cli", prompt_file=str(root / "prompt.txt"),
+                             system_file=None, container_timeout=3, print_result=False)
+            (root / "prompt.txt").write_text("no model call")
+            with patch("runner.cli.build_container_command", return_value=(["synthetic"], root)), patch(
+                "runner.cli.subprocess.run"
+            ) as run:
+                run.return_value.returncode = 91
+                run.return_value.stdout = "MALFORMED SECRET-MARKER"
+                run.return_value.stderr = "SECRET-MARKER in raw stderr"
+                with self.assertRaises(RunnerError) as caught:
+                    invoke(args)
+            self.assertNotIn("SECRET-MARKER", str(caught.exception))
+            self.assertFalse(Path(args.output).exists())
+
+    def test_native_discovery_requires_exact_catalog_model_without_prompt(self):
+        model = "claude-agent/claude-sonnet-5-5"
+        integration = {"id": "claude-agent", "methods": [{"id": "claude-login", "type": "external"}], "connections": []}
+        discovered = [{"providerID": "claude-agent", "id": "claude-sonnet-5-5"}]
+        responses = [integration, None, [], discovered]
+        with patch("container.invoke._start_preflight_server", return_value=(object(), "http://fake", "auth")), patch(
+            "container.invoke._standalone_json_request", side_effect=responses
+        ) as request, patch("container.invoke._stop_preflight_server") as stop, patch(
+            "container.invoke.time.sleep"
+        ):
+            bootstrap_claude_model({}, model, 3)
+            self.assertEqual(request.call_args_list[1].args[1], "/api/integration/claude-agent/connect/external")
+            self.assertEqual(request.call_args_list[1].kwargs["payload"], {"methodID": "claude-login"})
+            stop.assert_called_once()
+        with patch("container.invoke._start_preflight_server", return_value=(object(), "http://fake", "auth")), patch(
+            "container.invoke._standalone_json_request", side_effect=[integration, None, {"data": "wrong-shape"}]
+        ), patch("container.invoke._stop_preflight_server"):
+            with self.assertRaisesRegex(RuntimeError, "before inference"):
+                bootstrap_claude_model({}, model, 3)
 
 
 if __name__ == "__main__":
