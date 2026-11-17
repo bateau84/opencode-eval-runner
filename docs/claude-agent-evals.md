@@ -34,14 +34,32 @@ Require an actual subscription login (the native status command must report
 `loggedIn: true`, `authMethod: claude.ai` and a nonempty `subscriptionType`).
 The runner does not forward OAuth token values; it mounts the **explicit
 directory** for the official executable to use and refresh its own credentials.
-The dedicated profile must be owner-only (0700), with private regular files
-(0600), no symlinks/hardlinks, and only native credential/settings JSON files.
-Remove unrelated files rather than mounting a broad Claude home. Native
-settings files must contain only an empty JSON object, preventing hooks or
-unreviewed provider/tool configuration. The runner also rejects symlinks
-on paths to allowed skill resources inside the evaluation workspace.
+The dedicated profile must be owner-only (0700). All native state directories
+and descendants must be private; regular files must have no group/other access
+and no symlinks or hardlinks. Before a live trial, inspect this **dedicated**
+profile for links/unrelated material and normalize permissions after login:
+
+```sh
+chmod -R go-rwx "$HOME/.claude-eval-profile"
+```
+
+Claude Code normally writes nonempty `.claude.json` account/project metadata,
+backups, sessions and other data under `CLAUDE_CONFIG_DIR`. The runner admits
+only recognized private *data* paths, checks backups, and rejects nonempty
+MCP/plugin/hook/provider/permission overrides in account state. Native
+`settings.json` and `settings.local.json` must remain `{}`; user plugins,
+commands and custom skills are not accepted in this evaluation profile.
+The container uses a private umask for newly created state and refresh files.
+If a future native release changes the file layout, admission fails until the
+new state type has been reviewed. The runner also rejects symlinks on paths to
+allowed skill resources inside the evaluation workspace.
 Independent invocations use an exclusive sibling lock file so native token
-refresh cannot race across separate evaluation processes.
+refresh cannot race across separate evaluation processes. At final
+serialization the runner also inventories the updated credential file, retains
+the original token inventory, and withholds result evidence if credentials are
+missing, malformed, or present in any emitted field. This protects the local
+result sink but does **not** establish that a model-controlled tool could never
+read or transmit credentials.
 **Because this mount is read/write and the evaluated tools share its container
 namespace, credential confidentiality against a compromised evaluated agent
 is not proven.** Use only a disposable dedicated profile, deny arbitrary
