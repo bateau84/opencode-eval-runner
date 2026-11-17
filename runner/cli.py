@@ -389,6 +389,11 @@ def claude_profile_dir(args: argparse.Namespace, host_env: dict[str, str]) -> Pa
         return None
     if args.transport != "opencode":
         raise RunnerError("Claude Agent requires the OpenCode transport")
+    if not getattr(args, "claude_billing_confirmed", False):
+        raise RunnerError(
+            "Claude Agent live evaluation requires --claude-billing-confirmed "
+            "after disabling paid usage credits in the dedicated account"
+        )
     if any(getattr(args, key, None) for key in ("auth", "database", "config_root")):
         raise RunnerError("Claude Agent cannot inherit OpenCode auth, database, or config root")
     if getattr(args, "env", None):
@@ -695,6 +700,10 @@ def parser() -> argparse.ArgumentParser:
     run.add_argument("--database")
     run.add_argument("--config-root")
     run.add_argument("--claude-config-dir", help="Explicit dedicated Claude Code subscription profile; only for claude-agent/*")
+    run.add_argument(
+        "--claude-billing-confirmed", action="store_true",
+        help="Operator confirms paid usage credits are disabled for dedicated Claude account (not a provider billing attestation).",
+    )
     run.add_argument("--env", action="append", default=[], metavar="NAME")
     run.add_argument("--timeout-seconds", type=int, default=240)
     run.add_argument("--container-timeout", type=int, default=300)

@@ -36,7 +36,8 @@ class ClaudeAgentProfileTests(unittest.TestCase):
             agent="eval-target", skill="agent-run-audit", expected_plugin=None,
             auth=None, database=None, config=str(cfg), config_root=None,
             models_catalog=None, env=[], timeout_seconds=120,
-            claude_config_dir=str(p), require_local_opencode_image=False,
+            claude_config_dir=str(p), claude_billing_confirmed=True,
+            require_local_opencode_image=False,
         )
         args.update(kw)
         return argparse.Namespace(**args)
@@ -199,6 +200,14 @@ class ClaudeAgentProfileTests(unittest.TestCase):
             (skill_dir / "SKILL.md").symlink_to("/seed/claude-profile/.credentials.json")
             with self.assertRaisesRegex(RunnerError, "must not traverse symlinks"):
                 claude_profile_dir(args, {})
+
+    def test_billing_acknowledgement_is_required_but_not_attestation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            args = self.args(Path(tmp), claude_billing_confirmed=False)
+            with self.assertRaisesRegex(RunnerError, "--claude-billing-confirmed"):
+                claude_profile_dir(args, {})
+            args.claude_billing_confirmed = True
+            self.assertEqual(claude_profile_dir(args, {}), Path(args.claude_config_dir).resolve())
 
 
 if __name__ == "__main__":

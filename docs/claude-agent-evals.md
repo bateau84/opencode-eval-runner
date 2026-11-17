@@ -62,6 +62,7 @@ python3 bin/opencode-eval-runner invoke \
   --image '<FULL_LOCAL_IMAGE_ID>' \
   --model 'claude-agent/<EXACT_CLAUDE_MODEL_ID>' \
   --claude-config-dir "$HOME/.claude-eval-profile" \
+  --claude-billing-confirmed \
   --config /path/to/generated-restricted-opencode-eval-config.json \
   --workspace /path/to/disposable-project --workspace-mode ro \
   --prompt-file /tmp/claude-skill-prompt.txt \
@@ -91,5 +92,7 @@ against arbitrary code execution. Credential read-denial, actual skill-loading
 evidence, model/judge parity, refresh after expiry, and provider rate limits
 require explicit installed-host qualification. Account-level **paid usage
 credits disabled** is a mandatory manual check before any live test; native
-authentication alone cannot establish or enforce zero overage.
+authentication alone cannot establish or enforce zero overage. The
+`--claude-billing-confirmed` flag is a deliberate operator acknowledgement,
+not a machine-verified guarantee of account billing configuration.
 Existing OpenCode/Copilot modes must keep passing.
