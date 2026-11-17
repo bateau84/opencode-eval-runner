@@ -385,5 +385,18 @@ class ClaudeAgentProfileTests(unittest.TestCase):
             self.assertNotIn("cannot prove auth persists", out.getvalue())
 
 
+    def test_claude_process_creates_native_state_with_private_umask(self):
+        from container.invoke import main
+        with patch.dict("os.environ", {
+            "EVAL_CLAUDE_CONFIG_DIR": "/seed/claude-profile",
+            "EVAL_MODEL": "claude-agent/test",
+            "EVAL_PROMPT_FILE": "/nonexistent-eval-prompt",
+        }, clear=True), patch("container.invoke.os.umask") as umask, patch(
+            "container.invoke.emit_result"
+        ):
+            self.assertEqual(main(), 2)
+            umask.assert_called_once_with(0o077)
+
+
 if __name__ == "__main__":
     unittest.main()
