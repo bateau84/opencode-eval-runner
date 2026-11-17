@@ -236,7 +236,77 @@ def pass_env(command: list[str], names: list[str], host_env: dict[str, str]) -> 
 _CLAUDE_PROFILE_FILES = frozenset({
     ".credentials.json", "settings.json", "settings.local.json", ".claude.json",
 })
+# Claude Code creates account and session state even during SDK initialization.
+# Only data locations are allowed: no user plugins, commands, skills, or hooks.
+_CLAUDE_STATE_FILES = frozenset({
+    "history.jsonl", "stats-cache.json", "remote-settings.json",
+    "policy-limits.json", "policy-limits.json.stamp.json", "mcp-needs-auth-cache.json",
+})
+_CLAUDE_STATE_DIRS = frozenset({
+    "backups", "projects", "sessions", "cache", "debug", "plans",
+    "tasks", "session-env", "shell-snapshots", "file-history",
+    "usage-data", "todos", "statsig", "logs", "image-cache", "paste-cache",
+})
+_CLAUDE_UNSAFE_STATE_KEYS = frozenset({
+    "mcpservers", "hooks", "plugins", "enabledplugins", "pluginmarketplaces",
+    "commands", "settings", "env", "apikey", "authtoken",
+    "anthropicbaseurl", "baseurl", "permissions", "allowedtools", "disallowedtools",
+})
+_CLAUDE_STATE_ENTRY_LIMIT = 10000
 _CLAUDE_DENY = {"action": "*", "resource": "*", "effect": "deny"}
+
+
+def _check_private_claude_entry(path: Path, *, directory: bool) -> None:
+    info = path.stat(follow_symlinks=False)
+    expected = stat.S_ISDIR if directory else stat.S_ISREG
+    if (not expected(info.st_mode) or info.st_uid != os.getuid()
+            or info.st_mode & 0o077 or (not directory and info.st_nlink != 1)):
+        raise RunnerError("Claude Agent native state must contain only private, regular, unlinked entries")
+
+
+def _check_claude_native_state(document: object) -> None:
+    """Allow native account metadata, not executable settings or provider overrides."""
+    if not isinstance(document, dict):
+        raise RunnerError("Claude Agent native state must be a JSON object")
+    pending = [document]
+    while pending:
+        value = pending.pop()
+        if isinstance(value, list):
+            pending.extend(value)
+        elif isinstance(value, dict):
+            for name, child in value.items():
+                if not isinstance(name, str):
+                    raise RunnerError("Claude Agent native state has an invalid key")
+                key = re.sub(r"[^a-z0-9]", "", name.lower())
+                if key in _CLAUDE_UNSAFE_STATE_KEYS and child not in ({}, [], None, "", False):
+                    raise RunnerError("Claude Agent native state contains executable or provider overrides")
+                pending.append(child)
+
+
+def _validate_claude_state_tree(root: Path) -> None:
+    """Reject links and public descendants before exposing native state to the OCI container."""
+    pending = [root]
+    scanned = 0
+    while pending:
+        entry = pending.pop()
+        scanned += 1
+        if scanned > _CLAUDE_STATE_ENTRY_LIMIT:
+            raise RunnerError("Claude Agent native state exceeds the admission entry limit")
+        if entry.is_symlink():
+            raise RunnerError("Claude Agent native state cannot contain linked paths")
+        info = entry.stat(follow_symlinks=False)
+        if stat.S_ISDIR(info.st_mode):
+            _check_private_claude_entry(entry, directory=True)
+            pending.extend(entry.iterdir())
+        else:
+            _check_private_claude_entry(entry, directory=False)
+            if "backups" in entry.parts and entry.name.startswith(".claude.json"):
+                if info.st_size > 4_000_000:
+                    raise RunnerError("Claude Agent native backup exceeds admission bound")
+                try:
+                    _check_claude_native_state(json.loads(entry.read_text(encoding="utf-8")))
+                except (OSError, ValueError) as exc:
+                    raise RunnerError("Claude Agent native backup is not safe JSON") from exc
 
 
 def validate_claude_profile_source(source: Path) -> Path:
@@ -254,31 +324,32 @@ def validate_claude_profile_source(source: Path) -> Path:
                 or directory.st_mode & 0o077):
             raise RunnerError("Claude Agent profile must be owner-only (mode 0700)")
         entries = list(source.iterdir())
-        if {p.name for p in entries} - _CLAUDE_PROFILE_FILES:
+        if {p.name for p in entries} - (_CLAUDE_PROFILE_FILES | _CLAUDE_STATE_FILES | _CLAUDE_STATE_DIRS):
             raise RunnerError("Claude Agent profile contains unrelated files or directories")
         for path in entries:
-            info = path.stat(follow_symlinks=False)
-            if (not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid()
-                    or info.st_mode & 0o077 or info.st_nlink != 1):
-                raise RunnerError("Claude Agent profile files must be private, regular, and not linked")
+            if path.name in _CLAUDE_STATE_DIRS:
+                _validate_claude_state_tree(path)
+            else:
+                _check_private_claude_entry(path, directory=False)
         credential = source / ".credentials.json"
         if not credential.is_file() or credential.is_symlink():
             raise RunnerError("Claude Agent requires a real .credentials.json file")
         if credential.stat().st_size > 4_000_000:
             raise RunnerError("Claude Agent credential file exceeds admission bound")
-        # Native Claude settings may declare executable hooks, plugin commands,
-        # additional providers or paths. This dedicated eval profile accepts
-        # only empty settings documents; remove broader host configuration.
+        # Nonempty account metadata is normal. Keep native settings documents
+        # empty and reject tool/provider overrides within account state.
         for settings in entries:
-            if settings.name == ".credentials.json":
+            if settings.name not in {"settings.json", "settings.local.json", ".claude.json"}:
                 continue
-            if settings.stat().st_size > 8192:
+            if settings.stat().st_size > 4_000_000:
                 raise RunnerError("Claude Agent settings exceed admission bound")
             try:
                 document = json.loads(settings.read_text(encoding="utf-8"))
             except (OSError, ValueError) as exc:
-                raise RunnerError("Claude Agent settings must be empty JSON objects") from exc
-            if document != {}:
+                raise RunnerError("Claude Agent settings must be valid JSON objects") from exc
+            if settings.name == ".claude.json":
+                _check_claude_native_state(document)
+            elif document != {}:
                 raise RunnerError("Claude Agent evaluation forbids native settings and executable hooks")
     except OSError as exc:
         raise RunnerError("Claude Agent profile cannot be safely inspected") from exc
