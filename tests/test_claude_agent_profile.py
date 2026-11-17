@@ -106,8 +106,8 @@ class ClaudeAgentProfileTests(unittest.TestCase):
             with self.assertRaisesRegex(RunnerError, "unrelated"):
                 claude_profile_dir(args, {})
             (credential.parent / "private-notes.txt").unlink()
-            credential.rename(credential.parent / "real.json")
-            credential.symlink_to(credential.parent / "real.json")
+            credential.rename(credential.parent / "settings.json")
+            credential.symlink_to(credential.parent / "settings.json")
             with self.assertRaisesRegex(RunnerError, "not linked|real"):
                 claude_profile_dir(args, {})
 
