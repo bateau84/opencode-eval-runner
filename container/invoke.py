@@ -1212,9 +1212,38 @@ def invoke_copilot(
 
 
 def emit_result(result: dict[str, Any]) -> None:
-    # Validate before the first result/stdout serialization sink.
+    # Validate before the first result/stdout serialization sink. A native
+    # Claude process can refresh its OAuth tokens after the observer starts:
+    # never trust the startup credential inventory at the final output boundary.
     validate_runtime_evidence(result.get("runtime_evidence"))
     sanitizer = runtime_sanitizer(dict(os.environ))
+    if os.environ.get("EVAL_CLAUDE_CONFIG_DIR") == "/seed/claude-profile":
+        # Runtime evidence is an authoritative protocol field and bypasses the
+        # ordinary convenience-field sanitizer. If newly minted credentials
+        # appear anywhere in the assembled result, withhold *all* evidence
+        # rather than accidentally publishing a false-green or sensitive trace.
+        raw = json.dumps(result, ensure_ascii=False, separators=(",", ":"))
+        if not sanitizer.inventory_complete or sanitizer.matches(raw):
+            result = {
+                "schema": RESULT_SCHEMA,
+                "transport": os.environ.get("EVAL_TRANSPORT", "opencode"),
+                "model": os.environ.get("EVAL_MODEL"),
+                "reasoning": os.environ.get("EVAL_REASONING") or "provider-default",
+                "reasoning_source": "explicit" if os.environ.get("EVAL_REASONING") else "provider-default",
+                "exit_code": 2,
+                "session_id": None,
+                "text": "",
+                "tools": [],
+                "actions": [],
+                "skills_loaded": [],
+                "stderr": "Claude credential inventory changed or unsafe result evidence; output withheld",
+                "stdout": "",
+                "runtime_evidence": unsupported_runtime_evidence(
+                    "runtime_observer_unavailable_after_infrastructure_error"
+                ),
+                "infrastructure_error": True,
+            }
+            validate_runtime_evidence(result["runtime_evidence"])
     safe = sanitize_result_for_output(result, sanitizer)
     sys.stdout.write(json.dumps(safe, separators=(",", ":")) + "\n")
     sys.stdout.flush()
