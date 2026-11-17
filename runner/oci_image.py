@@ -8,9 +8,12 @@ from collections.abc import Mapping
 from urllib.parse import urlsplit
 
 SUPPORTED_OPENCODE_VERSION = "2.2.2"
+SUPPORTED_CLAUDE_AGENT_VERSION = "2.2.6"
+SUPPORTED_CLAUDE_CODE_VERSION = "2.1.318"
 SUPPORTED_INVOKE_ADAPTER_ID = "opencode-eval-runner/opencode-invoke/v1"
 IMAGE_VERSION_LABEL = "org.opencontainers.image.version"
 IMAGE_ADAPTER_LABEL = "io.opencode-eval-runner.invoke-adapter"
+IMAGE_CLAUDE_LABEL = "io.opencode-eval-runner.claude-version"
 
 _IMAGE_ID = re.compile(r"^(?:sha256:)?([0-9a-f]{64})$")
 _DIGEST_REFERENCE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._:/-]*@sha256:([0-9a-f]{64})$")
@@ -69,8 +72,12 @@ def verify_local_opencode_image(
     engine: str,
     image: str,
     host_environment: Mapping[str, str],
+    *,
+    expected_version: str = SUPPORTED_OPENCODE_VERSION,
 ) -> tuple[list[str], dict[str, str]]:
-    """Inspect only the local image store and enforce the runner release contract."""
+    """Inspect only the local image store and enforce the selected exact host profile."""
+    if expected_version not in {SUPPORTED_OPENCODE_VERSION, SUPPORTED_CLAUDE_AGENT_VERSION}:
+        raise ImageSelectionError("unsupported OpenCode image profile")
     validate_immutable_image_identity(image)
     prefix, environment = local_engine_prefix_and_environment(engine, host_environment)
     try:
@@ -116,10 +123,12 @@ def verify_local_opencode_image(
     if not isinstance(labels, Mapping):
         raise ImageSelectionError("built-in eval image is missing runner compatibility metadata")
     if (
-        labels.get(IMAGE_VERSION_LABEL) != SUPPORTED_OPENCODE_VERSION
+        labels.get(IMAGE_VERSION_LABEL) != expected_version
         or labels.get(IMAGE_ADAPTER_LABEL) != SUPPORTED_INVOKE_ADAPTER_ID
     ):
         raise ImageSelectionError("built-in eval image is incompatible with this runner release")
+    if expected_version == SUPPORTED_CLAUDE_AGENT_VERSION and labels.get(IMAGE_CLAUDE_LABEL) != SUPPORTED_CLAUDE_CODE_VERSION:
+        raise ImageSelectionError("Claude Agent image has an unqualified Claude Code version")
     return prefix, environment
 
 

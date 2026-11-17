@@ -752,6 +752,7 @@ def resolve_opencode_reasoning(model: str, reasoning: str) -> tuple[str, str, st
 
 
 RUNTIME_JSON_CREDENTIAL_SOURCES = (
+    Path("/seed/claude-profile/.credentials.json"),
     Path("/seed/auth.json"),
     Path("/seed/opencode.json"),
 )
@@ -822,6 +823,114 @@ def sanitize_result_for_output(
     return safe
 
 
+def require_claude_subscription(env: dict[str, str], model: str) -> None:
+    """Check native Claude login before inference; do not serialize auth output."""
+    selected = model.startswith("claude-agent/")
+    profile = os.environ.get("EVAL_CLAUDE_CONFIG_DIR", "")
+    if bool(profile) != selected:
+        raise RuntimeError("Claude Agent subscription profile/model mismatch")
+    if not selected:
+        return
+    if profile != "/seed/claude-profile":
+        raise RuntimeError("unsupported Claude Agent config mount")
+    path = Path(profile)
+    if not path.is_dir() or not (path / ".credentials.json").is_file():
+        raise RuntimeError("Claude Agent subscription credentials are unavailable")
+    env["CLAUDE_CONFIG_DIR"] = profile
+    env["OPENCODE_CLAUDE_PATH"] = "/usr/local/bin/claude"
+    try:
+        result = subprocess.run(
+            ["/usr/local/bin/claude", "auth", "status", "--json"],
+            cwd=Path("/workspace"), env=env, capture_output=True, text=True,
+            check=False, timeout=20,
+        )
+        status = json.loads(result.stdout) if result.returncode == 0 else {}
+    except (OSError, subprocess.SubprocessError, ValueError):
+        status = {}
+    if (status.get("loggedIn") is not True or status.get("authMethod") != "claude.ai"
+            or not isinstance(status.get("subscriptionType"), str)
+            or not status["subscriptionType"]):
+        raise RuntimeError("Claude Agent requires verified native Claude subscription login; no model request sent")
+
+
+def bootstrap_claude_model(env: dict[str, str], model: str, timeout: int) -> None:
+    """Create the native external connection and prove exact model discovery.
+
+    OpenCode 2.2.6 starts Claude SDK discovery only after an integration
+    connection is active. Its initialization probe sends no prompt/inference.
+    The ephemeral OpenCode database and provider storage are reused by run.
+    """
+    if not model.startswith("claude-agent/"):
+        return
+    model_id = model[len("claude-agent/"):].split("#", 1)[0]
+    if not model_id or "/" in model_id or any(char.isspace() for char in model_id):
+        raise RuntimeError("invalid Claude Agent model ID; no model request sent")
+    server = None
+    budget = min(max(timeout, 1), 75)
+    try:
+        server, base_url, authorization = _start_preflight_server(env, budget)
+        # Plugin registration is asynchronous on a cold Location. Prepare a
+        # non-resuming Session so native integration methods are settled,
+        # without sending a model prompt (as in existing plugin preflight).
+        session = unwrap_api_data(_standalone_json_request(
+            base_url, "/api/session", method="POST",
+            payload={"title": "claude model discovery preflight",
+                     "location": {"directory": "/workspace"}},
+            authorization=authorization, timeout=min(10, budget),
+        ))
+        if not isinstance(session, dict) or not isinstance(session.get("id"), str):
+            raise RuntimeError("native Claude activation session is unavailable")
+        _standalone_json_request(
+            base_url, f"/api/session/{session['id']}/prompt", method="POST",
+            payload={"text": "native provider registration preflight", "resume": False},
+            authorization=authorization, timeout=min(10, budget),
+        )
+        integration = unwrap_api_data(_standalone_json_request(
+            base_url, "/api/integration/claude-agent", authorization=authorization,
+            timeout=min(10, budget),
+        ))
+        if (not isinstance(integration, dict)
+                or integration.get("id") != "claude-agent"
+                or not any(
+                    isinstance(method, dict) and method.get("id") == "claude-login"
+                    and method.get("type") == "external"
+                    for method in integration.get("methods", [])
+                )):
+            raise RuntimeError("native Claude integration method is unavailable")
+        if not integration.get("connections"):
+            _standalone_json_request(
+                base_url, "/api/integration/claude-agent/connect/external",
+                method="POST", payload={"methodID": "claude-login"},
+                authorization=authorization, timeout=min(10, budget),
+            )
+        deadline = time.monotonic() + budget
+        while time.monotonic() < deadline:
+            models = unwrap_api_data(_standalone_json_request(
+                base_url, "/api/model", authorization=authorization,
+                timeout=min(10, max(1, deadline - time.monotonic())),
+            ))
+            if not isinstance(models, list):
+                raise RuntimeError("native model catalog response is invalid")
+            if any(
+                isinstance(item, dict) and item.get("providerID") == "claude-agent"
+                and item.get("id") == model_id
+                for item in models
+            ):
+                return
+            time.sleep(0.4)
+        raise RuntimeError("exact requested Claude model was not discovered")
+    except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as exc:
+        # Preflight/server errors can embed raw SDK logs or HTTP bodies.
+        # Only the fixed classification may cross the result sink.
+        raise RuntimeError(
+            "Claude Agent native connection/model discovery failed before inference; "
+            "verify the requested model and dedicated subscription"
+        ) from None
+    finally:
+        if server is not None:
+            _stop_preflight_server(server)
+
+
 def invoke_opencode(
     model: str,
     agent: str,
@@ -831,18 +940,19 @@ def invoke_opencode(
     reasoning: str = "",
 ) -> dict[str, Any]:
     env = prepare_opencode_env()
+    require_claude_subscription(env, model)
     sanitizer = runtime_sanitizer(env)
+    if model.startswith("claude-agent/") and not sanitizer.inventory_complete:
+        raise RuntimeError("Claude credential inventory unavailable; no model request sent")
     configure_runtime_observer_env(env, sanitizer)
     plugins = plugin_diagnostic(env)
     expected_plugin = os.environ.get("EVAL_EXPECT_PLUGIN", "").strip()
     plugin_preflight = verify_expected_plugin(env, agent, model, expected_plugin, timeout)
     invoked_model, reasoning_label, reasoning_source = resolve_opencode_reasoning(model, reasoning)
 
-    # OpenCode V2 has no documented force-refresh command for the model
-    # catalog. A fresh isolated process owns a fresh cache and resolves the
-    # requested model through its normal provider/catalog startup path.
-    # The real model invocation is authoritative; provider/model resolution
-    # failures are reported as transport failures instead of preflight guesses.
+    # The first-run native connection and exact model must be resolved in
+    # fresh isolated state, not inferred from the separate Claude login.
+    bootstrap_claude_model(env, model, timeout)
     # Every eval invocation uses a fresh OpenCode session. Supplying a fixed
     # title prevents OpenCode from launching its automatic title agent, which
     # otherwise adds an unrelated model call (and any title-model retries) to
@@ -1102,15 +1212,61 @@ def invoke_copilot(
 
 
 def emit_result(result: dict[str, Any]) -> None:
-    # Validate before the first result/stdout serialization sink.
+    # Validate before the first result/stdout serialization sink. A native
+    # Claude process can refresh its OAuth tokens after the observer starts:
+    # never trust the startup credential inventory at the final output boundary.
     validate_runtime_evidence(result.get("runtime_evidence"))
     sanitizer = runtime_sanitizer(dict(os.environ))
+    if os.environ.get("EVAL_CLAUDE_CONFIG_DIR") == "/seed/claude-profile":
+        # Keep both the observer's original secrets and the final refreshed
+        # values. A token removed from the file during refresh may still occur
+        # in a tool result or error; the final disk inventory alone misses it.
+        try:
+            initial = json.loads(os.environ.get("OPENCODE_EVAL_OBSERVER_CREDENTIALS", "[]"))
+            initial_valid = isinstance(initial, list) and all(type(value) is str for value in initial)
+        except (TypeError, ValueError):
+            initial, initial_valid = [], False
+        sanitizer = Sanitizer(
+            (*sanitizer.credentials, *(initial if initial_valid else [])),
+            inventory_complete=sanitizer.inventory_complete and initial_valid,
+        )
+        credential = RUNTIME_JSON_CREDENTIAL_SOURCES[0]
+        credential_present = credential.is_file() and not credential.is_symlink()
+        # Runtime evidence bypasses convenience-field redaction. Never return
+        # a nominal success if inventory is missing or a refreshed/old secret
+        # appears in any protocol or result field.
+        raw = json.dumps(result, ensure_ascii=False, separators=(",", ":"))
+        if not credential_present or not sanitizer.inventory_complete or sanitizer.matches(raw):
+            result = {
+                "schema": RESULT_SCHEMA,
+                "transport": os.environ.get("EVAL_TRANSPORT", "opencode"),
+                "model": os.environ.get("EVAL_MODEL"),
+                "reasoning": os.environ.get("EVAL_REASONING") or "provider-default",
+                "reasoning_source": "explicit" if os.environ.get("EVAL_REASONING") else "provider-default",
+                "exit_code": 2,
+                "session_id": None,
+                "text": "",
+                "tools": [],
+                "actions": [],
+                "skills_loaded": [],
+                "stderr": "Claude credential inventory changed or unsafe result evidence; output withheld",
+                "stdout": "",
+                "runtime_evidence": unsupported_runtime_evidence(
+                    "runtime_observer_unavailable_after_infrastructure_error"
+                ),
+                "infrastructure_error": True,
+            }
+            validate_runtime_evidence(result["runtime_evidence"])
     safe = sanitize_result_for_output(result, sanitizer)
     sys.stdout.write(json.dumps(safe, separators=(",", ":")) + "\n")
     sys.stdout.flush()
 
 
 def main() -> int:
+    # Claude SDK initialization, refresh, and sessions must never create
+    # group/world-accessible files in the dedicated RW host profile.
+    if os.environ.get("EVAL_CLAUDE_CONFIG_DIR") == "/seed/claude-profile":
+        os.umask(0o077)
     try:
         transport = os.environ.get("EVAL_TRANSPORT", "opencode")
         model = os.environ["EVAL_MODEL"]

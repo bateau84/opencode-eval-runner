@@ -61,6 +61,31 @@ LABEL org.opencontainers.image.version="${OPENCODE_VERSION}" \
 COPY --from=opencode-builder /opencode /usr/local/bin/opencode
 RUN opencode --version
 
+# Separate, explicitly qualified Claude Agent target. The historical 2.2.2
+# OpenCode image remains unchanged. Native Claude owns the subscription login.
+FROM node:24-bookworm-slim@sha256:0e0ff40c39bc087845bfb27465a0df4ea419520094bc35842ff83dd8cbe6f9b6 AS claude-agent-builder
+ARG CLAUDE_OPENCODE_VERSION=2.2.6
+ARG CLAUDE_CODE_VERSION=2.1.318
+RUN npm install --global "@opencode/cli@${CLAUDE_OPENCODE_VERSION}" "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}" \
+    && cp "$(readlink -f "$(command -v opencode)")" /opencode-claude \
+    && /opencode-claude --version \
+    && claude --version
+
+FROM runtime-base AS claude-agent
+ARG CLAUDE_OPENCODE_VERSION=2.2.6
+ARG CLAUDE_CODE_VERSION=2.1.318
+LABEL org.opencontainers.image.version="${CLAUDE_OPENCODE_VERSION}" \
+      io.opencode-eval-runner.invoke-adapter="opencode-eval-runner/opencode-invoke/v1" \
+      io.opencode-eval-runner.claude-version="${CLAUDE_CODE_VERSION}"
+COPY --from=claude-agent-builder /opencode-claude /usr/local/bin/opencode
+COPY --from=claude-agent-builder /usr/local/bin/node /usr/local/bin/node
+COPY --from=claude-agent-builder /usr/local/lib/node_modules /usr/local/lib/node_modules
+# Preserve the native executable/npm launcher installed by the official package.
+# Never guess the package's internal CLI path; CI verifies real execution here.
+COPY --from=claude-agent-builder /usr/local/bin/claude /usr/local/bin/claude
+RUN opencode --version && claude --version
+ENV OPENCODE_CLAUDE_PATH=/usr/local/bin/claude
+
 FROM runtime-base AS copilot
 COPY --from=copilot-builder /opt/copilot/bin/copilot /usr/local/bin/copilot
 RUN copilot --version

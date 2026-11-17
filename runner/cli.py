@@ -2,15 +2,18 @@
 from __future__ import annotations
 
 import argparse
+import fcntl
 import json
 import os
+import re
 import shutil
 import sqlite3
+import stat
 import subprocess
 import sys
 import tempfile
-from contextlib import nullcontext
-from pathlib import Path
+from contextlib import contextmanager, nullcontext
+from pathlib import Path, PurePosixPath
 
 from container.evidence_safety import (
     MODEL_CATALOG_SOURCE_LIMIT,
@@ -23,6 +26,7 @@ from runner.oci_image import (
     local_engine_prefix_and_environment,
     validate_immutable_image_identity,
     verify_local_opencode_image,
+    SUPPORTED_CLAUDE_AGENT_VERSION,
 )
 
 DEFAULT_IMAGES = {
@@ -229,6 +233,258 @@ def pass_env(command: list[str], names: list[str], host_env: dict[str, str]) -> 
             command += ["--env", name]
 
 
+_CLAUDE_PROFILE_FILES = frozenset({
+    ".credentials.json", "settings.json", "settings.local.json", ".claude.json",
+})
+# Claude Code creates account and session state even during SDK initialization.
+# Only data locations are allowed: no user plugins, commands, skills, or hooks.
+_CLAUDE_STATE_FILES = frozenset({
+    "history.jsonl", "stats-cache.json", "remote-settings.json",
+    "policy-limits.json", "policy-limits.json.stamp.json", "mcp-needs-auth-cache.json",
+})
+_CLAUDE_STATE_DIRS = frozenset({
+    "backups", "projects", "sessions", "cache", "debug", "plans",
+    "tasks", "session-env", "shell-snapshots", "file-history",
+    "usage-data", "todos", "statsig", "logs", "image-cache", "paste-cache",
+})
+_CLAUDE_UNSAFE_STATE_KEYS = frozenset({
+    "mcpservers", "hooks", "plugins", "enabledplugins", "pluginmarketplaces",
+    "commands", "settings", "env", "apikey", "authtoken",
+    "anthropicbaseurl", "baseurl", "permissions", "allowedtools", "disallowedtools",
+})
+_CLAUDE_STATE_ENTRY_LIMIT = 10000
+_CLAUDE_DENY = {"action": "*", "resource": "*", "effect": "deny"}
+
+
+def _check_private_claude_entry(path: Path, *, directory: bool) -> None:
+    info = path.stat(follow_symlinks=False)
+    expected = stat.S_ISDIR if directory else stat.S_ISREG
+    if (not expected(info.st_mode) or info.st_uid != os.getuid()
+            or info.st_mode & 0o077 or (not directory and info.st_nlink != 1)):
+        raise RunnerError("Claude Agent native state must contain only private, regular, and not linked entries")
+
+
+def _check_claude_native_state(document: object) -> None:
+    """Allow native account metadata, not executable settings or provider overrides."""
+    if not isinstance(document, dict):
+        raise RunnerError("Claude Agent native state must be a JSON object")
+    pending = [document]
+    while pending:
+        value = pending.pop()
+        if isinstance(value, list):
+            pending.extend(value)
+        elif isinstance(value, dict):
+            for name, child in value.items():
+                if not isinstance(name, str):
+                    raise RunnerError("Claude Agent native state has an invalid key")
+                key = re.sub(r"[^a-z0-9]", "", name.lower())
+                if key in _CLAUDE_UNSAFE_STATE_KEYS and child not in ({}, [], None, "", False):
+                    raise RunnerError("Claude Agent native state contains executable or provider overrides")
+                pending.append(child)
+
+
+def _validate_claude_state_tree(root: Path) -> None:
+    """Reject links and public descendants before exposing native state to the OCI container."""
+    pending = [root]
+    scanned = 0
+    while pending:
+        entry = pending.pop()
+        scanned += 1
+        if scanned > _CLAUDE_STATE_ENTRY_LIMIT:
+            raise RunnerError("Claude Agent native state exceeds the admission entry limit")
+        if entry.is_symlink():
+            raise RunnerError("Claude Agent native state cannot contain linked paths")
+        info = entry.stat(follow_symlinks=False)
+        if stat.S_ISDIR(info.st_mode):
+            _check_private_claude_entry(entry, directory=True)
+            pending.extend(entry.iterdir())
+        else:
+            _check_private_claude_entry(entry, directory=False)
+            if "backups" in entry.parts and entry.name.startswith(".claude.json"):
+                if info.st_size > 4_000_000:
+                    raise RunnerError("Claude Agent native backup exceeds admission bound")
+                try:
+                    _check_claude_native_state(json.loads(entry.read_text(encoding="utf-8")))
+                except (OSError, ValueError) as exc:
+                    raise RunnerError("Claude Agent native backup is not safe JSON") from exc
+
+
+def validate_claude_profile_source(source: Path) -> Path:
+    """Admit only a private, minimal native profile; never follow profile symlinks."""
+    if source == Path("/") or not source.is_dir():
+        raise RunnerError("Claude Agent requires a dedicated real configuration directory")
+    for ancestor in (source, *source.parents):
+        if ancestor.is_symlink():
+            raise RunnerError("Claude Agent profile path cannot traverse symlinks")
+    if source.resolve() in {Path.home().resolve(), (Path.home() / ".claude").resolve()}:
+        raise RunnerError("use a dedicated Claude eval login, not your default/home profile")
+    try:
+        directory = source.stat(follow_symlinks=False)
+        if (not stat.S_ISDIR(directory.st_mode) or directory.st_uid != os.getuid()
+                or directory.st_mode & 0o077):
+            raise RunnerError("Claude Agent profile must be owner-only (mode 0700)")
+        entries = list(source.iterdir())
+        if {p.name for p in entries} - (_CLAUDE_PROFILE_FILES | _CLAUDE_STATE_FILES | _CLAUDE_STATE_DIRS):
+            raise RunnerError("Claude Agent profile contains unrelated files or directories")
+        for path in entries:
+            if path.name in _CLAUDE_STATE_DIRS:
+                _validate_claude_state_tree(path)
+            else:
+                _check_private_claude_entry(path, directory=False)
+        credential = source / ".credentials.json"
+        if not credential.is_file() or credential.is_symlink():
+            raise RunnerError("Claude Agent requires a real .credentials.json file")
+        if credential.stat().st_size > 4_000_000:
+            raise RunnerError("Claude Agent credential file exceeds admission bound")
+        # Nonempty account metadata is normal. Keep native settings documents
+        # empty and reject tool/provider overrides within account state.
+        for settings in entries:
+            if settings.name not in {"settings.json", "settings.local.json", ".claude.json"}:
+                continue
+            if settings.stat().st_size > 4_000_000:
+                raise RunnerError("Claude Agent settings exceed admission bound")
+            try:
+                document = json.loads(settings.read_text(encoding="utf-8"))
+            except (OSError, ValueError) as exc:
+                raise RunnerError("Claude Agent settings must be valid JSON objects") from exc
+            if settings.name == ".claude.json":
+                _check_claude_native_state(document)
+            elif document != {}:
+                raise RunnerError("Claude Agent evaluation forbids native settings and executable hooks")
+    except OSError as exc:
+        raise RunnerError("Claude Agent profile cannot be safely inspected") from exc
+    return source.resolve()
+
+
+def validate_claude_eval_config(path: str | None) -> None:
+    """Require an exact default-deny tool boundary before mounting native credentials."""
+    if not path:
+        raise RunnerError("Claude Agent requires an explicit restricted --config")
+    try:
+        data = json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise RunnerError("Claude Agent evaluation config cannot be inspected") from exc
+    if not isinstance(data, dict) or data.get("providers") or any(
+        key not in {
+            "$schema", "share", "update", "snapshots", "warming", "instructions",
+            "plugins", "permissions", "default_agent", "agents", "providers",
+        } for key in data
+    ):
+        raise RunnerError("Claude Agent evaluation forbids custom provider/runtime settings")
+    if (data.get("permissions") != [_CLAUDE_DENY]
+            or data.get("plugins") != ["-opencode.skill", "-opencode.browser"]
+            or data.get("instructions") != [] or data.get("share") != "disabled"):
+        raise RunnerError("Claude Agent requires default-deny permissions and no stock skills")
+    agents = data.get("agents")
+    name = data.get("default_agent")
+    if not isinstance(name, str) or not isinstance(agents, dict) or set(agents) != {name}:
+        raise RunnerError("Claude Agent requires one explicitly restricted evaluation agent")
+    agent = agents[name]
+    if (not isinstance(agent, dict) or agent.get("mode") != "primary"
+            or set(agent) - {"mode", "description", "system", "permissions"}
+            or not isinstance(agent.get("permissions"), list)):
+        raise RunnerError("Claude Agent evaluation agent must have a restricted tool policy")
+    rules = agent["permissions"]
+    if not rules or rules[0] != _CLAUDE_DENY:
+        raise RunnerError("Claude Agent evaluation agent must deny all tools by default")
+    for rule in rules[1:]:
+        if not isinstance(rule, dict) or set(rule) != {"action", "resource", "effect"} or rule["effect"] != "allow":
+            raise RunnerError("Claude Agent evaluation has an unsupported tool permission")
+        resource = rule["resource"]
+        if not isinstance(resource, str) or not resource or any(char in resource for char in "*?[]"):
+            raise RunnerError("Claude Agent evaluation permits only exact skill resources")
+        if rule["action"] == "skill":
+            if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", resource):
+                raise RunnerError("Claude Agent skill permission must be an exact skill ID")
+        elif rule["action"] == "read":
+            path = PurePosixPath(resource)
+            if (not resource.startswith(".opencode/skills/") or path.is_absolute()
+                    or ".." in path.parts or len(path.parts) < 4):
+                raise RunnerError("Claude Agent reads must stay within selected skill resources")
+        else:
+            raise RunnerError("Claude Agent evaluation cannot expose general-purpose tools")
+
+
+def validate_claude_workspace_paths(workspace: Path, config_path: str) -> None:
+    """Prohibit symlink escapes from otherwise permitted skill/read resources."""
+    if workspace.is_symlink() or not workspace.is_dir():
+        raise RunnerError("Claude Agent requires a real read-only evaluation workspace")
+    config = json.loads(Path(config_path).read_text(encoding="utf-8"))
+    agent = config["agents"][config["default_agent"]]
+    relative_paths = []
+    for rule in agent["permissions"][1:]:
+        resource = rule["resource"]
+        if rule["action"] == "read":
+            relative_paths.append(PurePosixPath(resource))
+        elif rule["action"] == "skill":
+            relative_paths.append(PurePosixPath(".opencode/skills") / resource / "SKILL.md")
+    for resource in relative_paths:
+        current = workspace
+        for component in resource.parts:
+            current = current / component
+            if current.is_symlink():
+                raise RunnerError("Claude Agent skill resource must not traverse symlinks")
+
+
+@contextmanager
+def claude_profile_lock(profile: Path):
+    """Serialize independent host invocations over a native refreshable login."""
+    path = profile.with_name(profile.name + ".eval-runner.lock")
+    flags = os.O_CREAT | os.O_RDWR | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0)
+    try:
+        descriptor = os.open(path, flags, 0o600)
+    except OSError as exc:
+        raise RunnerError("cannot safely acquire Claude profile lock") from exc
+    try:
+        info = os.fstat(descriptor)
+        if (not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid()
+                or info.st_mode & 0o077 or info.st_nlink != 1):
+            raise RunnerError("Claude profile lock must be a private regular file")
+        try:
+            fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as exc:
+            raise RunnerError("Claude profile is already in use by another evaluation") from exc
+        yield
+    finally:
+        os.close(descriptor)
+
+
+def claude_profile_dir(args: argparse.Namespace, host_env: dict[str, str]) -> Path | None:
+    """Explicit Claude subscription path; no implicit host credentials or API fallback."""
+    model = getattr(args, "model", "")
+    selected = isinstance(model, str) and model.startswith("claude-agent/") and len(model) > len("claude-agent/")
+    raw = getattr(args, "claude_config_dir", None)
+    if bool(raw) != selected:
+        raise RunnerError("claude-agent models require --claude-config-dir; other models forbid it")
+    if not selected:
+        return None
+    if args.transport != "opencode":
+        raise RunnerError("Claude Agent requires the OpenCode transport")
+    if not getattr(args, "claude_billing_confirmed", False):
+        raise RunnerError(
+            "Claude Agent live evaluation requires --claude-billing-confirmed "
+            "after disabling paid usage credits in the dedicated account"
+        )
+    if any(getattr(args, key, None) for key in ("auth", "database", "config_root")):
+        raise RunnerError("Claude Agent cannot inherit OpenCode auth, database, or config root")
+    if getattr(args, "env", None):
+        raise RunnerError("Claude Agent subscription profile forbids forwarded provider variables")
+    if any(host_env.get(key) for key in (
+        "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL",
+        "CLAUDE_CODE_OAUTH_TOKEN", "CLAUDE_CODE_USE_BEDROCK",
+        "CLAUDE_CODE_USE_VERTEX", "CLAUDE_CODE_USE_FOUNDRY",
+    )):
+        raise RunnerError("Claude Agent subscription profile refuses API, cloud and token environment overrides")
+    source = validate_claude_profile_source(Path(raw).expanduser())
+    validate_claude_eval_config(getattr(args, "config", None))
+    validate_claude_workspace_paths(Path(args.workspace).expanduser(), args.config)
+    if getattr(args, "mount", None) or getattr(args, "workspace_mode", "ro") != "ro":
+        raise RunnerError("Claude Agent forbids extra mounts and writable workspaces")
+    if getattr(args, "network", None) in {"host", "container:host"}:
+        raise RunnerError("Claude Agent forbids host network mode")
+    return source
+
+
 def build_container_command(
     args: argparse.Namespace,
     input_dir: Path,
@@ -237,6 +493,7 @@ def build_container_command(
     database_seed: Path | None = None,
 ) -> tuple[list[str], Path]:
     host_env = dict(os.environ) if host_env is None else host_env
+    claude_dir = claude_profile_dir(args, host_env)
     skill = getattr(args, "skill", None)
     expected_plugin = getattr(args, "expected_plugin", None)
     reasoning = getattr(args, "reasoning", None)
@@ -245,10 +502,10 @@ def build_container_command(
     if expected_plugin and args.transport != "opencode":
         raise RunnerError("--expected-plugin is only supported by the opencode transport")
     require_local_opencode_image = getattr(args, "require_local_opencode_image", False)
-    if require_local_opencode_image:
+    if require_local_opencode_image or claude_dir:
         if args.transport != "opencode":
             raise RunnerError("built-in eval requires a compatible local OpenCode image")
-        image = host_env.get("OPENCODE_EVAL_RUNNER_OPENCODE_IMAGE")
+        image = args.image if claude_dir else host_env.get("OPENCODE_EVAL_RUNNER_OPENCODE_IMAGE")
         try:
             validate_immutable_image_identity(image)
         except ImageSelectionError as exc:
@@ -261,7 +518,7 @@ def build_container_command(
         if args.transport == "opencode"
         else "OPENCODE_EVAL_RUNNER_COPILOT_IMAGE"
     )
-    if not require_local_opencode_image:
+    if not (require_local_opencode_image or claude_dir):
         image = (
             args.image
             or host_env.get(transport_env)
@@ -271,7 +528,10 @@ def build_container_command(
         engine_prefix = [engine]
     else:
         try:
-            engine_prefix, _ = verify_local_opencode_image(engine, image, host_env)
+            engine_prefix, _ = verify_local_opencode_image(
+                engine, image, host_env,
+                expected_version=SUPPORTED_CLAUDE_AGENT_VERSION if claude_dir else "2.2.2",
+            )
         except ImageSelectionError as exc:
             raise RunnerError(str(exc)) from exc
     workspace = Path(args.workspace).resolve()
@@ -292,7 +552,7 @@ def build_container_command(
         "--security-opt",
         "no-new-privileges",
     ]
-    if require_local_opencode_image:
+    if require_local_opencode_image or claude_dir:
         command += ["--pull=never"]
     network = getattr(args, "network", None)
     if network:
@@ -321,7 +581,7 @@ def build_container_command(
     for spec in getattr(args, "mount", []):
         command += extra_mount_arg(spec)
 
-    auth = existing_seed(args.auth, "OPENCODE_EVAL_RUNNER_AUTH", default_auth_path())
+    auth = None if claude_dir else existing_seed(args.auth, "OPENCODE_EVAL_RUNNER_AUTH", default_auth_path())
     config = existing_seed(args.config, "OPENCODE_EVAL_RUNNER_CONFIG")
     models = getattr(args, "models_catalog", None) or os.environ.get("OPENCODE_EVAL_RUNNER_MODELS")
     if models:
@@ -344,9 +604,13 @@ def build_container_command(
         command += bind_arg(models, "/seed/models.json", readonly=True)
     if database_seed:
         command += bind_arg(database_seed, "/seed/opencode.db", readonly=True)
-    config_root = existing_dir(getattr(args, "config_root", None), "OPENCODE_EVAL_RUNNER_CONFIG_ROOT")
+    config_root = None if claude_dir else existing_dir(getattr(args, "config_root", None), "OPENCODE_EVAL_RUNNER_CONFIG_ROOT")
     if config_root:
         command += bind_arg(config_root, "/seed/opencode-config", readonly=True)
+
+    if claude_dir:
+        command += bind_arg(claude_dir, "/seed/claude-profile", readonly=False)
+        command += ["--env", "EVAL_CLAUDE_CONFIG_DIR=/seed/claude-profile"]
 
     command += [
         "--env", f"EVAL_TRANSPORT={args.transport}",
@@ -360,7 +624,7 @@ def build_container_command(
         "--env", f"EVAL_TIMEOUT_SECONDS={args.timeout_seconds}",
     ]
 
-    env_names = list(dict.fromkeys(DEFAULT_ENV_ALLOWLIST + tuple(args.env)))
+    env_names = [] if claude_dir else list(dict.fromkeys(DEFAULT_ENV_ALLOWLIST + tuple(args.env)))
     if args.transport == "github-copilot-cli":
         env_names.extend(COPILOT_AUTH_ENVS)
     pass_env(command, env_names, host_env)
@@ -370,6 +634,17 @@ def build_container_command(
 
 
 def invoke(args: argparse.Namespace) -> int:
+    profile = getattr(args, "claude_config_dir", None)
+    if profile:
+        # Do not create even the sibling lock file until the profile has
+        # passed admission; rejected/default profiles remain untouched.
+        source = validate_claude_profile_source(Path(profile).expanduser())
+        with claude_profile_lock(source):
+            return _invoke_unlocked(args)
+    return _invoke_unlocked(args)
+
+
+def _invoke_unlocked(args: argparse.Namespace) -> int:
     prompt_path = Path(args.prompt_file).resolve()
     if not prompt_path.is_file():
         raise RunnerError(f"prompt file not found: {prompt_path}")
@@ -392,7 +667,7 @@ def invoke(args: argparse.Namespace) -> int:
         else:
             (input_dir / "system.txt").write_text("", encoding="utf-8")
 
-        database_source = existing_seed(
+        database_source = None if getattr(args, "claude_config_dir", None) else existing_seed(
             args.database,
             "OPENCODE_EVAL_RUNNER_DB",
             default_database_path(),
@@ -435,10 +710,12 @@ def invoke(args: argparse.Namespace) -> int:
         try:
             result = json.loads(proc.stdout)
         except json.JSONDecodeError as exc:
-            detail = " | ".join(part.strip() for part in (proc.stderr, proc.stdout) if part.strip())
+            # Raw stderr/stdout may contain native credentials, even on a
+            # failure before the container's sanitizer emitted valid JSON.
+            # Never place untrusted diagnostics in an exception/artifact.
             raise RunnerError(
-                f"container produced invalid result JSON (exit {proc.returncode}): {exc}"
-                + (f": {detail[:2000]}" if detail else "")
+                f"container produced invalid result JSON (exit {proc.returncode}); "
+                "diagnostics withheld to protect credentials"
             ) from exc
 
         result = validate_container_result(result)
@@ -493,6 +770,11 @@ def parser() -> argparse.ArgumentParser:
     run.add_argument("--models-catalog")
     run.add_argument("--database")
     run.add_argument("--config-root")
+    run.add_argument("--claude-config-dir", help="Explicit dedicated Claude Code subscription profile; only for claude-agent/*")
+    run.add_argument(
+        "--claude-billing-confirmed", action="store_true",
+        help="Operator confirms paid usage credits are disabled for dedicated Claude account (not a provider billing attestation).",
+    )
     run.add_argument("--env", action="append", default=[], metavar="NAME")
     run.add_argument("--timeout-seconds", type=int, default=240)
     run.add_argument("--container-timeout", type=int, default=300)

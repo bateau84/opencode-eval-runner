@@ -97,6 +97,8 @@ class InvocationSpec:
     timeout_seconds: int
     container_timeout: int
     require_local_image: bool = False
+    claude_config_dir: Path | None = None
+    claude_billing_confirmed: bool = False
 
 
 @dataclass(frozen=True)
