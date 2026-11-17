@@ -869,6 +869,22 @@ def bootstrap_claude_model(env: dict[str, str], model: str, timeout: int) -> Non
     budget = min(max(timeout, 1), 75)
     try:
         server, base_url, authorization = _start_preflight_server(env, budget)
+        # Plugin registration is asynchronous on a cold Location. Prepare a
+        # non-resuming Session so native integration methods are settled,
+        # without sending a model prompt (as in existing plugin preflight).
+        session = unwrap_api_data(_standalone_json_request(
+            base_url, "/api/session", method="POST",
+            payload={"title": "claude model discovery preflight",
+                     "location": {"directory": "/workspace"}},
+            authorization=authorization, timeout=min(10, budget),
+        ))
+        if not isinstance(session, dict) or not isinstance(session.get("id"), str):
+            raise RuntimeError("native Claude activation session is unavailable")
+        _standalone_json_request(
+            base_url, f"/api/session/{session['id']}/prompt", method="POST",
+            payload={"text": "native provider registration preflight", "resume": False},
+            authorization=authorization, timeout=min(10, budget),
+        )
         integration = unwrap_api_data(_standalone_json_request(
             base_url, "/api/integration/claude-agent", authorization=authorization,
             timeout=min(10, budget),

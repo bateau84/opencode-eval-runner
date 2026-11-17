@@ -159,18 +159,21 @@ class ClaudeAgentProfileTests(unittest.TestCase):
         model = "claude-agent/claude-sonnet-5-5"
         integration = {"id": "claude-agent", "methods": [{"id": "claude-login", "type": "external"}], "connections": []}
         discovered = [{"providerID": "claude-agent", "id": "claude-sonnet-5-5"}]
-        responses = [integration, None, [], discovered]
+        responses = [{"id":"ses_fixture"}, None, integration, None, [], discovered]
         with patch("container.invoke._start_preflight_server", return_value=(object(), "http://fake", "auth")), patch(
             "container.invoke._standalone_json_request", side_effect=responses
         ) as request, patch("container.invoke._stop_preflight_server") as stop, patch(
             "container.invoke.time.sleep"
         ):
             bootstrap_claude_model({}, model, 3)
-            self.assertEqual(request.call_args_list[1].args[1], "/api/integration/claude-agent/connect/external")
-            self.assertEqual(request.call_args_list[1].kwargs["payload"], {"methodID": "claude-login"})
+            self.assertEqual(request.call_args_list[1].args[1], "/api/session/ses_fixture/prompt")
+            self.assertIs(request.call_args_list[1].kwargs["payload"]["resume"], False)
+            self.assertEqual(request.call_args_list[3].args[1], "/api/integration/claude-agent/connect/external")
+            self.assertEqual(request.call_args_list[3].kwargs["payload"], {"methodID": "claude-login"})
             stop.assert_called_once()
         with patch("container.invoke._start_preflight_server", return_value=(object(), "http://fake", "auth")), patch(
-            "container.invoke._standalone_json_request", side_effect=[integration, None, {"data": "wrong-shape"}]
+            "container.invoke._standalone_json_request", side_effect=[
+                {"id":"ses_fixture"}, None, integration, None, {"data": "wrong-shape"}]
         ), patch("container.invoke._stop_preflight_server"):
             with self.assertRaisesRegex(RuntimeError, "before inference"):
                 bootstrap_claude_model({}, model, 3)

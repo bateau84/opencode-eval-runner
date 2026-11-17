@@ -45,3 +45,50 @@ jobs:
               esac
               claude --version | grep -F "2.1.318"
             '
+
+      - name: Verify native external integration activation (no credentials, no inference)
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm -i --network none --read-only \
+            --tmpfs /tmp:rw,exec,nosuid,nodev,size=1g,mode=1777 \
+            --tmpfs /workspace:rw,nosuid,nodev,size=64m,mode=1777 \
+            --volume "$PWD/tests/fixtures/models-catalog.json:/seed/models.json:ro" \
+            --entrypoint python3 eval-claude-agent:candidate - <<'PY'
+          import sys
+          sys.path.insert(0, "/opt/opencode-eval-runner")
+          from container.invoke import (
+              _start_preflight_server, _standalone_json_request,
+              _stop_preflight_server, prepare_opencode_env, unwrap_api_data,
+          )
+
+          env = prepare_opencode_env()
+          env["CLAUDE_CONFIG_DIR"] = "/tmp/claude-test-no-login"
+          env["OPENCODE_CLAUDE_PATH"] = "/usr/local/bin/claude"
+          server, url, auth = _start_preflight_server(env, 40)
+          try:
+              def request(path, method="GET", payload=None):
+                  return unwrap_api_data(_standalone_json_request(
+                      url, path, method=method, payload=payload,
+                      authorization=auth, timeout=35,
+                  ))
+              session = request("/api/session", "POST", {
+                  "title": "no-inference native integration test",
+                  "location": {"directory": "/workspace"},
+              })
+              assert isinstance(session.get("id"), str), "no session"
+              request("/api/session/" + session["id"] + "/prompt",
+                      "POST", {"text": "activate plugins without inference", "resume": False})
+              integration = request("/api/integration/claude-agent")
+              assert integration["id"] == "claude-agent", integration
+              assert any(method["id"] == "claude-login" and method["type"] == "external"
+                         for method in integration["methods"]), integration
+              assert not integration["connections"], "unexpected inherited credential connection"
+              request("/api/integration/claude-agent/connect/external",
+                      "POST", {"methodID": "claude-login"})
+              connected = request("/api/integration/claude-agent")
+              assert connected["connections"], "native connection was not persisted"
+              print("PASS native external connection registered with no model prompt")
+          finally:
+              _stop_preflight_server(server)
+          PY
