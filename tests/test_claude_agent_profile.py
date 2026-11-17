@@ -225,8 +225,10 @@ class ClaudeAgentProfileTests(unittest.TestCase):
             backup.mkdir(mode=0o700)
             (backup / ".claude.json.backup").write_text('{"oauthAccount":{"accountUuid":"fixture-account"}}')
             (backup / ".claude.json.backup").chmod(0o600)
-            project = profile / "projects" / "fixture-workspace"
-            project.mkdir(parents=True, mode=0o700)
+            projects = profile / "projects"
+            projects.mkdir(mode=0o700)
+            project = projects / "fixture-workspace"
+            project.mkdir(mode=0o700)
             (project / "fixture-session.jsonl").write_text('{"type":"system","subtype":"init"}\\n')
             (project / "fixture-session.jsonl").chmod(0o600)
             for _ in range(2):
