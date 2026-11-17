@@ -1218,12 +1218,25 @@ def emit_result(result: dict[str, Any]) -> None:
     validate_runtime_evidence(result.get("runtime_evidence"))
     sanitizer = runtime_sanitizer(dict(os.environ))
     if os.environ.get("EVAL_CLAUDE_CONFIG_DIR") == "/seed/claude-profile":
-        # Runtime evidence is an authoritative protocol field and bypasses the
-        # ordinary convenience-field sanitizer. If newly minted credentials
-        # appear anywhere in the assembled result, withhold *all* evidence
-        # rather than accidentally publishing a false-green or sensitive trace.
+        # Keep both the observer's original secrets and the final refreshed
+        # values. A token removed from the file during refresh may still occur
+        # in a tool result or error; the final disk inventory alone misses it.
+        try:
+            initial = json.loads(os.environ.get("OPENCODE_EVAL_OBSERVER_CREDENTIALS", "[]"))
+            initial_valid = isinstance(initial, list) and all(type(value) is str for value in initial)
+        except (TypeError, ValueError):
+            initial, initial_valid = [], False
+        sanitizer = Sanitizer(
+            (*sanitizer.credentials, *(initial if initial_valid else [])),
+            inventory_complete=sanitizer.inventory_complete and initial_valid,
+        )
+        credential = RUNTIME_JSON_CREDENTIAL_SOURCES[0]
+        credential_present = credential.is_file() and not credential.is_symlink()
+        # Runtime evidence bypasses convenience-field redaction. Never return
+        # a nominal success if inventory is missing or a refreshed/old secret
+        # appears in any protocol or result field.
         raw = json.dumps(result, ensure_ascii=False, separators=(",", ":"))
-        if not sanitizer.inventory_complete or sanitizer.matches(raw):
+        if not credential_present or not sanitizer.inventory_complete or sanitizer.matches(raw):
             result = {
                 "schema": RESULT_SCHEMA,
                 "transport": os.environ.get("EVAL_TRANSPORT", "opencode"),
